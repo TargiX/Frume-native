@@ -1,0 +1,980 @@
+import {
+  BlurMask,
+  Canvas,
+  Group,
+  ImageShader,
+  Path,
+  Skia,
+  type SkImage,
+  useImage,
+} from '@shopify/react-native-skia';
+import * as Haptics from 'expo-haptics';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  cancelAnimation,
+  makeMutable,
+  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+
+import {
+  androidAccessibilityLiveRegion,
+  useAccessibilityAnnouncement,
+} from '../../accessibility';
+import { MIN_TOUCH_TARGET } from '../../theme';
+import type { PuzzleEngine } from '../engine';
+import { getTrayMetrics } from '../engine/tray';
+import { usePieceGesture } from '../interaction';
+import type {
+  PieceRuntimeState,
+  PuzzleGuideMode,
+  PuzzleLayout,
+  PuzzlePieceDefinition,
+  PuzzleTableAppearance,
+  SnapFeedback,
+} from '../types';
+import { BoardSurface } from './BoardSurface';
+import { DrawBoardImage } from './DrawBoardImage';
+import { PieceEmbossOverlay } from './PieceEmbossOverlay';
+import {
+  LOCKED_PIECE_SEAM_UNDERPAINT_WIDTH,
+  shouldRenderPieceEmboss,
+} from './pieceEmbossPolicy';
+import { resolvePieceRenderTranslation } from './pieceRenderPosition';
+import { getPieceOverflowMargin } from './pieceOverflowMargin';
+import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
+import { TrayEdgeHint } from './TrayEdgeHint';
+import { TraySurface } from './TraySurface';
+import { resolveTraySurfaceFrame } from './traySurfaceFrame';
+import { PUZZLE_SURFACE_COLORS } from './surfacePalette';
+
+type PieceVisualState = {
+  x: SharedValue<number>;
+  y: SharedValue<number>;
+  rotation: SharedValue<number>;
+  scale: SharedValue<number>;
+  opacity: SharedValue<number>;
+  /** Extra scale applied while the piece rests in the tray; 1 once taken out. */
+  trayFactor: SharedValue<number>;
+  /** Controls the tray-scroll coordinate space independently of React state. */
+  trayAttached: SharedValue<boolean>;
+  engineX: number;
+  engineY: number;
+  engineRotation: number;
+  engineInTray: boolean;
+  engineTrayFactor: number;
+};
+
+type PieceDrawingProps = {
+  definition: PuzzlePieceDefinition;
+  runtime: PieceRuntimeState;
+  visual: PieceVisualState;
+  skiaImage: SkImage;
+  boardWidth: number;
+  boardHeight: number;
+  showSeams: boolean;
+  trayScroll: SharedValue<number>;
+  trayPlacement: 'bottom' | 'right';
+};
+
+function PieceDrawing({
+  definition,
+  runtime,
+  visual,
+  skiaImage,
+  boardWidth,
+  boardHeight,
+  showSeams,
+  trayScroll,
+  trayPlacement,
+}: PieceDrawingProps) {
+  const piecePath = useMemo(
+    () => Skia.Path.MakeFromSVGString(definition.path),
+    [definition.path],
+  );
+  const positionTransform = useDerivedValue(() => {
+    const translation = resolvePieceRenderTranslation({
+      locked: runtime.locked,
+      visualX: visual.x.value,
+      visualY: visual.y.value,
+      correctX: definition.correctPosition.x,
+      correctY: definition.correctPosition.y,
+      trayOffsetX:
+        visual.trayAttached.value && trayPlacement === 'bottom'
+          ? trayScroll.value
+          : 0,
+      trayOffsetY:
+        visual.trayAttached.value && trayPlacement === 'right'
+          ? trayScroll.value
+          : 0,
+    });
+    return [
+      { translateX: translation.x },
+      { translateY: translation.y },
+    ];
+  });
+  const pieceTransform = useDerivedValue(() => [
+    {
+      rotate:
+        ((runtime.locked
+          ? definition.correctRotation
+          : visual.rotation.value) *
+          Math.PI) /
+        180,
+    },
+    {
+      scale:
+        visual.scale.value *
+        (runtime.locked ? 1 : visual.trayFactor.value),
+    },
+  ]);
+  const center = {
+    x: definition.bounds.x + definition.bounds.width / 2,
+    y: definition.bounds.y + definition.bounds.height / 2,
+  };
+
+  if (!piecePath) {
+    return null;
+  }
+
+  return (
+    <Group opacity={visual.opacity} transform={positionTransform}>
+      <Group origin={center} transform={pieceTransform}>
+        {!runtime.locked ? (
+          <Path
+            path={piecePath}
+            color="rgba(0, 0, 0, 0.42)"
+            transform={[{ translateY: 2.5 }]}
+          >
+            <BlurMask blur={3} style="normal" />
+          </Path>
+        ) : null}
+        {runtime.locked ? (
+          <Path
+            path={piecePath}
+            style="stroke"
+            strokeWidth={LOCKED_PIECE_SEAM_UNDERPAINT_WIDTH}
+            strokeJoin="round"
+          >
+            <ImageShader
+              image={skiaImage}
+              x={0}
+              y={0}
+              width={boardWidth}
+              height={boardHeight}
+              fit="cover"
+            />
+          </Path>
+        ) : null}
+        <Path path={piecePath}>
+          <ImageShader
+            image={skiaImage}
+            x={0}
+            y={0}
+            width={boardWidth}
+            height={boardHeight}
+            fit="cover"
+          />
+        </Path>
+        {shouldRenderPieceEmboss({ locked: runtime.locked, showSeams }) ? (
+          <PieceEmbossOverlay path={piecePath} />
+        ) : null}
+      </Group>
+    </Group>
+  );
+}
+
+type PieceGestureOverlayProps = {
+  definition: PuzzlePieceDefinition;
+  runtime: PieceRuntimeState;
+  visual: PieceVisualState;
+  engine: PuzzleEngine;
+  interactive: boolean;
+  trayScroll: SharedValue<number>;
+  trayTop: number;
+  trayLeft: number;
+  trayPlacement: 'bottom' | 'right';
+  trayScale: number;
+  minTrayScroll: number;
+  maxTrayScroll: number;
+  totalPieces: number;
+  surfaceInset: number;
+};
+
+function PieceGestureOverlay({
+  definition,
+  runtime,
+  visual,
+  engine,
+  interactive,
+  trayScroll,
+  trayTop,
+  trayLeft,
+  trayPlacement,
+  trayScale,
+  minTrayScroll,
+  maxTrayScroll,
+  totalPieces,
+  surfaceInset,
+}: PieceGestureOverlayProps) {
+  const inTray = runtime.inTray;
+  const hitWidth = Math.max(
+    definition.bounds.width * (inTray ? trayScale : 1),
+    MIN_TOUCH_TARGET,
+  );
+  const hitHeight = Math.max(
+    definition.bounds.height * (inTray ? trayScale : 1),
+    MIN_TOUCH_TARGET,
+  );
+  const hitOffsetX = (definition.bounds.width - hitWidth) / 2;
+  const hitOffsetY = (definition.bounds.height - hitHeight) / 2;
+  const { gesture } = usePieceGesture({
+    engine,
+    pieceId: definition.id,
+    locked: runtime.locked || !interactive,
+    inTray,
+    trayPlacement,
+    trayTop,
+    trayLeft,
+    pieceWidth: definition.bounds.width,
+    pieceHeight: definition.bounds.height,
+    trayScroll,
+    minTrayScroll,
+    maxTrayScroll,
+    trayAttached: visual.trayAttached,
+    trayFactor: visual.trayFactor,
+    trayScale,
+    positionX: visual.x,
+    positionY: visual.y,
+  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    left:
+      visual.x.value +
+      (visual.trayAttached.value && trayPlacement === 'bottom'
+        ? trayScroll.value
+        : 0) +
+      hitOffsetX + surfaceInset,
+    top:
+      visual.y.value +
+      (visual.trayAttached.value && trayPlacement === 'right'
+        ? trayScroll.value
+        : 0) +
+      hitOffsetY + surfaceInset,
+    opacity: visual.opacity.value,
+    transform: [{ rotate: `${visual.rotation.value}deg` }],
+  }));
+  const placeWithAssistiveTechnology = useCallback(() => {
+    if (!interactive) {
+      return;
+    }
+    const result = engine.assistPiece(definition.id);
+    if (!result) {
+      return;
+    }
+    void Haptics.impactAsync(
+      result.connectedWithNeighbor
+        ? Haptics.ImpactFeedbackStyle.Medium
+        : Haptics.ImpactFeedbackStyle.Light,
+    );
+    const placedCount = Object.values(engine.getState().pieces).filter(
+      (piece) => piece.locked,
+    ).length;
+    AccessibilityInfo.announceForAccessibilityWithOptions(
+      `Assist placed piece ${
+        definition.index + 1
+      }. ${placedCount} of ${totalPieces} pieces placed.`,
+      { queue: true },
+    );
+  }, [definition.id, definition.index, engine, interactive, totalPieces]);
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        pointerEvents={runtime.locked || !interactive ? 'none' : 'auto'}
+        accessible={!runtime.locked && interactive}
+        accessibilityRole="button"
+        accessibilityLabel={`Puzzle piece ${definition.index + 1} of ${totalPieces}${
+          inTray ? ', in tray' : ', on board'
+        }`}
+        accessibilityHint={
+          'Double tap to use Assist and place this piece in its matching position'
+        }
+        accessibilityState={{ disabled: runtime.locked || !interactive }}
+        onAccessibilityTap={placeWithAssistiveTechnology}
+        accessibilityActions={[{ name: 'activate', label: 'Place piece' }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'activate') {
+            placeWithAssistiveTechnology();
+          }
+        }}
+        style={[
+          styles.pieceHitArea,
+          {
+            width: hitWidth,
+            height: hitHeight,
+            zIndex: runtime.zIndex,
+          },
+          animatedStyle,
+        ]}
+      />
+    </GestureDetector>
+  );
+}
+
+type PuzzleBoardProps = {
+  layout: PuzzleLayout;
+  pieces: Record<string, PieceRuntimeState>;
+  engine: PuzzleEngine;
+  snapFeedback: SnapFeedback | null;
+  completed?: boolean;
+  guideMode?: PuzzleGuideMode;
+  tableAppearance?: PuzzleTableAppearance;
+};
+
+export function PuzzleBoard({
+  layout,
+  pieces,
+  engine,
+  snapFeedback,
+  completed = false,
+  guideMode = 'cuts',
+  tableAppearance = 'felt',
+}: PuzzleBoardProps) {
+  const { boardSize, image } = layout;
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [displayImageUri, setDisplayImageUri] = useState(image.uri);
+  const handleImageError = useCallback((caught: Error) => {
+    if (image.remoteUri && displayImageUri !== image.remoteUri) {
+      setImageError(null);
+      setDisplayImageUri(image.remoteUri);
+      return;
+    }
+    setImageError(caught.message || 'The photograph could not be loaded.');
+  }, [displayImageUri, image.remoteUri]);
+  const skiaImage = useImage(displayImageUri, handleImageError);
+  const imageStatusMessage = imageError
+    ? `Photograph unavailable. ${imageError}`
+    : skiaImage
+      ? null
+      : 'Loading photograph.';
+  useAccessibilityAnnouncement(imageStatusMessage);
+  const reduceMotion = useReducedMotion();
+  const piecesOpacity = useMemo(() => makeMutable(1), []);
+  const fullOpacity = useMemo(() => makeMutable(0), []);
+  const trayMetrics = useMemo(() => getTrayMetrics(layout), [layout]);
+  const trayPlacement = trayMetrics.placement;
+  const trayScroll = useMemo(() => makeMutable(0), []);
+  const entranceEngineRef = useRef<PuzzleEngine | null>(null);
+  const surfaceWidth = trayMetrics.left + trayMetrics.width;
+  const surfaceHeight = trayMetrics.top + trayMetrics.height;
+  const surfaceInset = useMemo(
+    () => getPieceOverflowMargin(layout.pieces),
+    [layout.pieces],
+  );
+  const workspaceWidth = surfaceWidth + surfaceInset * 2;
+  const workspaceHeight = surfaceHeight + surfaceInset * 2;
+  const traySurfaceFrame = useMemo(
+    () => resolveTraySurfaceFrame(trayMetrics, trayPlacement, surfaceInset),
+    [surfaceInset, trayMetrics, trayPlacement],
+  );
+  const visuals = useMemo(() => {
+    const next = new Map<string, PieceVisualState>();
+
+    layout.pieces.forEach((definition) => {
+      const runtime = pieces[definition.id];
+      if (!runtime) {
+        return;
+      }
+      const trayFactor = runtime.inTray ? trayMetrics.scale : 1;
+      next.set(definition.id, {
+        x: makeMutable(runtime.position.x),
+        y: makeMutable(runtime.position.y),
+        rotation: makeMutable(runtime.rotation),
+        scale: makeMutable(runtime.locked ? 1 : 0.88),
+        opacity: makeMutable(runtime.locked ? 1 : 0),
+        trayFactor: makeMutable(trayFactor),
+        trayAttached: makeMutable(runtime.inTray),
+        engineX: runtime.position.x,
+        engineY: runtime.position.y,
+        engineRotation: runtime.rotation,
+        engineInTray: runtime.inTray,
+        engineTrayFactor: trayFactor,
+      });
+    });
+
+    return next;
+    // Geometry may change on rotation, but the engine identity stays stable.
+    // Keeping these shared values avoids reconstructing loose pieces at their
+    // entrance-animation state during a relayout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine]);
+
+  useEffect(() => {
+    setImageError(null);
+    setDisplayImageUri(image.uri);
+  }, [image.uri]);
+
+  /**
+   * Extent of the pieces still waiting in the tray, in tray-content space.
+   * Scrolling is bounded by what is actually left rather than by the original
+   * row, so the strip cannot be dragged into the empty space behind pieces the
+   * player has already placed.
+   */
+  const trayExtent = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+
+    layout.pieces.forEach((definition) => {
+      const runtime = pieces[definition.id];
+      if (!runtime?.inTray) {
+        return;
+      }
+      // The renderer scales around the piece centre, so the drawn box is inset
+      // by half the shrinkage along the scrolling axis.
+      const boundsExtent =
+        trayPlacement === 'bottom'
+          ? definition.bounds.width
+          : definition.bounds.height;
+      const position =
+        trayPlacement === 'bottom'
+          ? runtime.position.x
+          : runtime.position.y;
+      const inset = (boundsExtent * (1 - trayMetrics.scale)) / 2;
+      const leading = position + inset;
+      min = Math.min(min, leading);
+      max = Math.max(max, leading + boundsExtent * trayMetrics.scale);
+    });
+
+    return Number.isFinite(min) ? { min, max } : null;
+  }, [layout.pieces, pieces, trayMetrics.scale, trayPlacement]);
+
+  const trayViewportExtent =
+    trayPlacement === 'bottom' ? trayMetrics.width : trayMetrics.height;
+  const minScroll = trayExtent
+    ? Math.min(0, trayViewportExtent - trayExtent.max - 12)
+    : 0;
+  const maxScroll = trayExtent ? Math.max(0, -trayExtent.min + 12) : 0;
+
+  const trayScrollGesture = useMemo(() => {
+    const gesture = Gesture.Pan();
+    if (trayPlacement === 'bottom') {
+      gesture.activeOffsetX([-6, 6]).failOffsetY([-12, 12]);
+    } else {
+      gesture.activeOffsetY([-6, 6]).failOffsetX([-12, 12]);
+    }
+    return gesture.onChange((event) => {
+      const change =
+        trayPlacement === 'bottom' ? event.changeX : event.changeY;
+      trayScroll.value = Math.min(
+        maxScroll,
+        Math.max(minScroll, trayScroll.value + change),
+      );
+    });
+  }, [maxScroll, minScroll, trayPlacement, trayScroll]);
+
+  // Keep at least one waiting piece on screen. Without this the last pieces can
+  // sit entirely beyond the edge with nothing to say they are there.
+  useEffect(() => {
+    if (!trayExtent) {
+      return;
+    }
+    const scroll = trayScroll.value;
+    const windowLeading = -scroll;
+    const windowTrailing = windowLeading + trayViewportExtent;
+    const anyVisible =
+      trayExtent.max > windowLeading + 8 &&
+      trayExtent.min < windowTrailing - 8;
+
+    let target = Math.min(maxScroll, Math.max(minScroll, scroll));
+    if (!anyVisible) {
+      // Centre the nearest end of what is left.
+      target =
+        trayExtent.min >= windowTrailing
+          ? -trayExtent.min + 24
+          : trayViewportExtent - trayExtent.max - 24;
+      target = Math.min(maxScroll, Math.max(minScroll, target));
+    }
+
+    if (Math.abs(target - scroll) > 0.5) {
+      trayScroll.value = reduceMotion
+        ? target
+        : withSpring(target, { damping: 40, stiffness: 320 });
+    }
+  }, [
+    maxScroll,
+    minScroll,
+    reduceMotion,
+    trayExtent,
+    trayScroll,
+    trayViewportExtent,
+  ]);
+
+  useEffect(() => {
+    const shouldAnimateEntrance = entranceEngineRef.current !== engine;
+    entranceEngineRef.current = engine;
+
+    layout.pieces.forEach((definition, index) => {
+      const visual = visuals.get(definition.id);
+      if (!visual) {
+        return;
+      }
+      if (pieces[definition.id]?.locked) {
+        visual.opacity.value = 1;
+        visual.scale.value = 1;
+        return;
+      }
+      if (reduceMotion || !shouldAnimateEntrance) {
+        visual.opacity.value = 1;
+        visual.scale.value = 1;
+        return;
+      }
+      visual.opacity.value = withDelay(
+        index * 34,
+        withTiming(1, { duration: 240 }),
+      );
+      visual.scale.value = withDelay(
+        index * 34,
+        withSpring(1, { damping: 15, stiffness: 210 }),
+      );
+    });
+
+    return () => {
+      visuals.forEach((visual) => {
+        cancelAnimation(visual.x);
+        cancelAnimation(visual.y);
+        cancelAnimation(visual.rotation);
+        cancelAnimation(visual.scale);
+        cancelAnimation(visual.opacity);
+      });
+    };
+    // Entry runs once per engine. Relayout keeps the same engine and therefore
+    // cannot replay the loose-piece deal animation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, reduceMotion, visuals]);
+
+  useEffect(() => {
+    layout.pieces.forEach((definition) => {
+      const runtime = pieces[definition.id];
+      const visual = visuals.get(definition.id);
+      if (!runtime || !visual) {
+        return;
+      }
+
+      const trayTransition = runtime.inTray !== visual.engineInTray;
+      if (trayTransition) {
+        const animateProgrammaticTrayExit =
+          shouldAnimateProgrammaticTrayExit({
+            engineInTray: visual.engineInTray,
+            runtimeInTray: runtime.inTray,
+            trayAttached: visual.trayAttached.value,
+          });
+        visual.engineInTray = runtime.inTray;
+        if (runtime.inTray) {
+          // Change from surface coordinates to tray-content coordinates
+          // without changing the drawn position, then animate home inside the
+          // scrollable content space.
+          const visibleX =
+            visual.x.value +
+            (visual.trayAttached.value && trayPlacement === 'bottom'
+              ? trayScroll.value
+              : 0);
+          const visibleY =
+            visual.y.value +
+            (visual.trayAttached.value && trayPlacement === 'right'
+              ? trayScroll.value
+              : 0);
+          cancelAnimation(visual.x);
+          cancelAnimation(visual.y);
+          visual.x.value =
+            visibleX -
+            (trayPlacement === 'bottom' ? trayScroll.value : 0);
+          visual.y.value =
+            visibleY -
+            (trayPlacement === 'right' ? trayScroll.value : 0);
+          visual.trayAttached.value = true;
+          visual.engineX = runtime.position.x;
+          visual.engineY = runtime.position.y;
+          visual.x.value = reduceMotion
+            ? runtime.position.x
+            : withSpring(runtime.position.x, {
+                damping: 40,
+                stiffness: 380,
+              });
+          visual.y.value = reduceMotion
+            ? runtime.position.y
+            : withSpring(runtime.position.y, {
+                damping: 40,
+                stiffness: 380,
+              });
+        } else {
+          // A gesture worklet has already folded tray scroll into the visual
+          // position. Assist has no gesture, so it still needs a visible move
+          // from the tray slot to the newly locked engine coordinates.
+          visual.trayAttached.value = false;
+          visual.engineX = runtime.position.x;
+          visual.engineY = runtime.position.y;
+          if (animateProgrammaticTrayExit) {
+            visual.x.value = reduceMotion
+              ? runtime.position.x
+              : withSpring(runtime.position.x, {
+                  damping: 40,
+                  stiffness: 380,
+                });
+            visual.y.value = reduceMotion
+              ? runtime.position.y
+              : withSpring(runtime.position.y, {
+                  damping: 40,
+                  stiffness: 380,
+                });
+          }
+        }
+      } else {
+        if (runtime.position.x !== visual.engineX) {
+          visual.engineX = runtime.position.x;
+          visual.x.value = reduceMotion
+            ? runtime.position.x
+            : withSpring(runtime.position.x, {
+                damping: 40,
+                stiffness: 380,
+              });
+        }
+        if (runtime.position.y !== visual.engineY) {
+          visual.engineY = runtime.position.y;
+          visual.y.value = reduceMotion
+            ? runtime.position.y
+            : withSpring(runtime.position.y, {
+                damping: 40,
+                stiffness: 380,
+              });
+        }
+      }
+      if (runtime.rotation !== visual.engineRotation) {
+        visual.engineRotation = runtime.rotation;
+        visual.rotation.value = reduceMotion
+          ? runtime.rotation
+          : withSpring(runtime.rotation, {
+              damping: 42,
+              stiffness: 400,
+            });
+      }
+      const nextFactor = runtime.inTray ? trayMetrics.scale : 1;
+      if (nextFactor !== visual.engineTrayFactor) {
+        visual.engineTrayFactor = nextFactor;
+        // Grows to full size as it leaves the tray, shrinks back on return, and
+        // adapts in place when rotation changes the tray scale.
+        visual.trayFactor.value = reduceMotion
+          ? nextFactor
+          : withSpring(nextFactor, { damping: 42, stiffness: 400 });
+      }
+    });
+  }, [
+    layout.pieces,
+    pieces,
+    reduceMotion,
+    trayMetrics.scale,
+    trayPlacement,
+    trayScroll,
+    visuals,
+  ]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      piecesOpacity.value = completed ? 0 : 1;
+      fullOpacity.value = completed ? 1 : 0;
+      return;
+    }
+    piecesOpacity.value = withTiming(completed ? 0 : 1, { duration: 420 });
+    fullOpacity.value = withTiming(completed ? 1 : 0, { duration: 420 });
+  }, [completed, fullOpacity, piecesOpacity, reduceMotion]);
+
+  useEffect(() => {
+    if (!snapFeedback) {
+      return;
+    }
+    const visual = visuals.get(snapFeedback.pieceId);
+    if (visual && !reduceMotion) {
+      // Seat the piece: a fast press into the board, then a critically damped
+      // return (damping >= 2*sqrt(stiffness)) so it settles without bouncing.
+      visual.scale.value = withSequence(
+        withTiming(0.993, { duration: 60 }),
+        withSpring(1, { damping: 40, stiffness: 400 }),
+      );
+    }
+    engine.clearSnapFeedback();
+  }, [engine, reduceMotion, snapFeedback, visuals]);
+
+  const orderedPieces = useMemo(
+    () =>
+      [...layout.pieces].sort((a, b) => {
+        const aRuntime = pieces[a.id];
+        const bRuntime = pieces[b.id];
+        if (aRuntime?.locked !== bRuntime?.locked) {
+          return aRuntime?.locked ? -1 : 1;
+        }
+        return (aRuntime?.zIndex ?? 0) - (bRuntime?.zIndex ?? 0);
+      }),
+    [layout.pieces, pieces],
+  );
+
+  if (imageError) {
+    return (
+      <View
+        style={[
+          styles.workspace,
+          styles.loading,
+          styles.imageStatus,
+          { width: workspaceWidth, height: workspaceHeight },
+        ]}
+        accessibilityLiveRegion={androidAccessibilityLiveRegion('assertive')}
+      >
+        <Text style={styles.imageStatusTitle}>Photograph unavailable</Text>
+        <Text style={styles.imageStatusBody}>{imageError}</Text>
+      </View>
+    );
+  }
+
+  if (!skiaImage) {
+    return (
+      <View
+        style={[
+          styles.workspace,
+          styles.loading,
+          { width: workspaceWidth, height: workspaceHeight },
+        ]}
+        accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+      >
+        <Text style={styles.imageStatusBody}>Loading photograph…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.workspace,
+        { width: workspaceWidth, height: workspaceHeight },
+      ]}
+    >
+      <View
+        style={[
+          styles.boardSurface,
+          {
+            left: surfaceInset,
+            top: surfaceInset,
+            width: boardSize.width,
+            height: boardSize.height,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <BoardSurface
+          layout={layout}
+          guideMode={completed ? 'none' : guideMode}
+          skiaImage={skiaImage}
+          appearance={tableAppearance}
+        />
+      </View>
+
+      {/* Behind the pieces: drag anywhere on the strip to scroll the tray. */}
+      <GestureDetector gesture={trayScrollGesture}>
+        <View
+          style={[
+            styles.tray,
+            traySurfaceFrame,
+          ]}
+        >
+          <TraySurface
+            width={traySurfaceFrame.width}
+            height={traySurfaceFrame.height}
+            placement={trayPlacement}
+            appearance={tableAppearance}
+          />
+        </View>
+      </GestureDetector>
+
+
+      <Canvas
+        style={styles.scene}
+        pointerEvents="none"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={
+          image.accessibilityLabel ?? 'The photograph being assembled'
+        }
+      >
+        <Group
+          transform={[
+            { translateX: surfaceInset },
+            { translateY: surfaceInset },
+          ]}
+        >
+          <Group opacity={piecesOpacity}>
+            {orderedPieces.map((definition) => {
+            const runtime = pieces[definition.id];
+            const visual = visuals.get(definition.id);
+            if (!runtime || !visual) {
+              return null;
+            }
+            return (
+              <PieceDrawing
+                key={definition.id}
+                definition={definition}
+                runtime={runtime}
+                visual={visual}
+                skiaImage={skiaImage}
+                boardWidth={boardSize.width}
+                boardHeight={boardSize.height}
+                showSeams={!completed}
+                trayScroll={trayScroll}
+                trayPlacement={trayPlacement}
+              />
+            );
+            })}
+          </Group>
+          <Group
+            opacity={fullOpacity}
+            clip={{
+              x: 0,
+              y: 0,
+              width: boardSize.width,
+              height: boardSize.height,
+            }}
+          >
+            <DrawBoardImage
+              skiaImage={skiaImage}
+              boardWidth={boardSize.width}
+              boardHeight={boardSize.height}
+            />
+          </Group>
+        </Group>
+      </Canvas>
+
+      <View style={styles.gestureLayer} pointerEvents="box-none">
+        {orderedPieces.map((definition) => {
+          const runtime = pieces[definition.id];
+          const visual = visuals.get(definition.id);
+          if (!runtime || !visual) {
+            return null;
+          }
+          return (
+            <PieceGestureOverlay
+              key={definition.id}
+              definition={definition}
+              runtime={runtime}
+              visual={visual}
+              engine={engine}
+              interactive={!completed}
+              trayScroll={trayScroll}
+              trayTop={trayMetrics.top}
+              trayLeft={trayMetrics.left}
+              trayPlacement={trayPlacement}
+              trayScale={trayMetrics.scale}
+              minTrayScroll={minScroll}
+              maxTrayScroll={maxScroll}
+              totalPieces={layout.pieces.length}
+              surfaceInset={surfaceInset}
+            />
+          );
+        })}
+      </View>
+
+      {/* Above the pieces, so a hint is never hidden by what it points at. */}
+      {trayExtent ? (
+        <View
+          style={[
+            styles.tray,
+            {
+              left: trayMetrics.left + surfaceInset,
+              top: trayMetrics.top + surfaceInset,
+              width: trayMetrics.width,
+              height: trayMetrics.height,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <TrayEdgeHint
+            side={trayPlacement === 'bottom' ? 'left' : 'top'}
+            edge={trayExtent.min}
+            trayScroll={trayScroll}
+            viewportExtent={trayViewportExtent}
+            crossExtent={
+              trayPlacement === 'bottom'
+                ? trayMetrics.height
+                : trayMetrics.width
+            }
+          />
+          <TrayEdgeHint
+            side={trayPlacement === 'bottom' ? 'right' : 'bottom'}
+            edge={trayExtent.max}
+            trayScroll={trayScroll}
+            viewportExtent={trayViewportExtent}
+            crossExtent={
+              trayPlacement === 'bottom'
+                ? trayMetrics.height
+                : trayMetrics.width
+            }
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  workspace: {
+    alignSelf: 'center',
+    overflow: 'visible',
+  },
+  loading: {
+    backgroundColor: PUZZLE_SURFACE_COLORS.boardLoading,
+  },
+  imageStatus: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  imageStatusTitle: {
+    color: 'rgba(255, 246, 232, 0.92)',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  imageStatusBody: {
+    color: 'rgba(255, 246, 232, 0.68)',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  boardSurface: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  tray: {
+    position: 'absolute',
+  },
+  scene: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  gestureLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  pieceHitArea: {
+    position: 'absolute',
+  },
+});

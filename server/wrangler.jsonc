@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "frume-photos",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CATEGORY_POOLS",
+        "class_name": "CategoryPhotoPool"
+      },
+      {
+        "name": "TRACKING_GRANTS",
+        "class_name": "TrackingGrant"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CategoryPhotoPool", "TrackingGrant"]
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "PHOTO_ISSUE_RATE_LIMITER",
+      // This namespace ID must remain unique within the Cloudflare account.
+      "namespace_id": "2026073101",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "TRACKING_RATE_LIMITER",
+      // Tracking attempts are keyed by the server-issued UUID grant.
+      "namespace_id": "2026073102",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ],
+  "triggers": {
+    // Six searches per run. A 30-minute cadence leaves room for required
+    // download tracking during pre-production rate-limit validation.
+    "crons": ["*/30 * * * *"]
+  }
+
+  // Deployment setup:
+  //
+  // 1. On the first deploy, upload the rotated API credential atomically with
+  //    `wrangler deploy --secrets-file`; `secret put` is for an existing Worker.
+  // 2. Confirm both rate-limit namespace IDs are unique in the account.
+  // 3. For a web build, set ALLOWED_ORIGINS to a comma-separated origin list.
+  //    Native clients do not send an Origin header.
+}

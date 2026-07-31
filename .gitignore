@@ -1,6 +1,7 @@
 node_modules/
 .expo/
 dist/
+coverage/
 npm-debug.*
 *.jks
 *.p8
@@ -9,7 +10,25 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 .env
+.env.*
+!.env.example
+.dev.vars*
+!.dev.vars.example
 web-build/
+
+# Native projects are generated from app.config.js for local device builds and EAS.
+/ios/
+/android/
+
+# Cloudflare local state
+.wrangler/
+
+# TypeScript incremental state
+*.tsbuildinfo
+
+# Local script bytecode
+__pycache__/
+*.py[cod]
 
 # macOS
 .DS_Store
