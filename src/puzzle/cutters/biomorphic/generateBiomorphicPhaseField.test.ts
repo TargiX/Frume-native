@@ -52,8 +52,13 @@ describe("createBiomorphicPhaseFieldTopology", () => {
     // separately proves that developed lobes survive and keep advancing.
     expect(growth.boundaryAmplification).toBeGreaterThan(1.4);
     expect(growth.simulationChangedLabelRatio).toBeGreaterThan(0.008);
-    expect(growth.simulationBoundaryAmplification).toBeGreaterThan(0.6);
-    expect(growth.simulationBoundaryAmplification).toBeLessThan(1);
+    // The simulation must ADD interface, not plane it off. This previously
+    // asserted the opposite -- under 1, i.e. the solve had to shorten the
+    // boundary -- which is exactly the defect the enthalpy sign fix removed:
+    // with latent heat added rather than subtracted the front fed itself, the
+    // fringe collapsed, and surface tension was left doing all the work. It
+    // measures 1.254 now; the bound sits below that with room to move.
+    expect(growth.simulationBoundaryAmplification).toBeGreaterThan(1.1);
     expect(growth.simulationMaximumPenetrationSamples).toBeGreaterThanOrEqual(
       2,
     );

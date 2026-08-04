@@ -158,11 +158,24 @@ function countLabelHoles(
       const pixel = queue[cursor];
       const x = pixel % width;
       const y = Math.floor(pixel / width);
+      // Pieces are grown and repaired under 4-connectivity, so their complement
+      // has to be flooded under 8-connectivity: that is the pairing digital
+      // topology requires. Flooding both under 4 reports a hole wherever the
+      // outline pinches diagonally across a single sample, which is a staircase
+      // artefact of the lattice and not a ring in the piece.
+      const left = x > 0;
+      const right = x + 1 < width;
+      const up = y > 0;
+      const down = y + 1 < height;
       const neighbors = [
-        x > 0 ? pixel - 1 : -1,
-        x + 1 < width ? pixel + 1 : -1,
-        y > 0 ? pixel - width : -1,
-        y + 1 < height ? pixel + width : -1,
+        left ? pixel - 1 : -1,
+        right ? pixel + 1 : -1,
+        up ? pixel - width : -1,
+        down ? pixel + width : -1,
+        left && up ? pixel - width - 1 : -1,
+        right && up ? pixel - width + 1 : -1,
+        left && down ? pixel + width - 1 : -1,
+        right && down ? pixel + width + 1 : -1,
       ];
       for (const neighbor of neighbors) {
         if (
