@@ -24,7 +24,21 @@ export type CutThickness = {
   piece: number;
   /** What was found: a piece splitting in two, or a chunk falling off. */
   kind: "isthmus" | "appendage" | "none";
+  /**
+   * Narrowest place on each piece, in samples. A repair that clears most of
+   * the board does not move the minimum -- one surviving thread anywhere holds
+   * it down -- so progress is only visible in the spread. Report both.
+   */
+  perPiece: number[];
 };
+
+/** How many pieces are thinner than `samples` somewhere. */
+export function countPiecesThinnerThan(
+  thickness: CutThickness,
+  samples: number,
+): number {
+  return thickness.perPiece.filter((value) => value < samples).length;
+}
 
 function erodeOnce(
   source: Uint8Array,
@@ -140,6 +154,7 @@ export function measureCutThickness(
   let best = Number.POSITIVE_INFINITY;
   let bestPiece = -1;
   let bestKind: CutThickness["kind"] = "none";
+  const perPiece: number[] = [];
 
   for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex += 1) {
     let area = 0;
@@ -148,12 +163,15 @@ export function measureCutThickness(
       mask[pixel] = owned;
       area += owned;
     }
-    if (area === 0) continue;
+    if (area === 0) {
+      perPiece.push(2 * maxRadius);
+      continue;
+    }
 
+    let pieceBest = 2 * maxRadius;
     eroded.set(mask);
     for (let radius = 1; radius <= maxRadius; radius += 1) {
       const width2 = 2 * radius;
-      if (width2 >= best) break;
 
       erodeOnce(eroded, scratch, width, height);
       eroded.set(scratch);
@@ -162,9 +180,12 @@ export function measureCutThickness(
       if (remaining.length !== 1) {
         // Zero components means the whole piece is thinner than this; two or
         // more means it pinched apart. Either way the narrowest part is 2r.
-        best = width2;
-        bestPiece = phaseIndex;
-        bestKind = "isthmus";
+        pieceBest = width2;
+        if (width2 < best) {
+          best = width2;
+          bestPiece = phaseIndex;
+          bestKind = "isthmus";
+        }
         break;
       }
 
@@ -194,15 +215,24 @@ export function measureCutThickness(
           part.longSide >= 3 * Math.max(1, part.shortSide),
       );
       if (whisker) {
-        best = width2;
-        bestPiece = phaseIndex;
-        bestKind = "appendage";
+        pieceBest = width2;
+        if (width2 < best) {
+          best = width2;
+          bestPiece = phaseIndex;
+          bestKind = "appendage";
+        }
         break;
       }
     }
+    perPiece.push(pieceBest);
   }
 
   return Number.isFinite(best)
-    ? { narrowestSamples: best, piece: bestPiece, kind: bestKind }
-    : { narrowestSamples: 2 * maxRadius, piece: -1, kind: "none" };
+    ? { narrowestSamples: best, piece: bestPiece, kind: bestKind, perPiece }
+    : {
+        narrowestSamples: 2 * maxRadius,
+        piece: -1,
+        kind: "none",
+        perPiece,
+      };
 }

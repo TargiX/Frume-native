@@ -309,6 +309,127 @@ function hasEnclosingPhase(
  * would snap out of the plywood are removed.
  */
 /** Reduces a mask to its largest 4-connected component, in place. */
+/**
+ * Rounds the whole partition at once: every sample takes the majority label in
+ * a disc of `radius` around it, repeated until nothing changes.
+ *
+ * Shaving pieces one at a time cannot fix a thin neck. The same sliver is an
+ * isthmus of the piece it belongs to and a finger of the piece wrapped around
+ * it, so removing it from one hands it straight to the other, which is what the
+ * measurements showed: the narrowest neck did not move. A majority filter is
+ * symmetric -- it does not know which side it is standing on -- so a structure
+ * thinner than the disc dissolves for whoever owns it, and the neighbours close
+ * over it together.
+ *
+ * Seed samples are pinned, so no piece can be voted out of existence.
+ */
+function roundPartition(
+  labels: Int16Array,
+  width: number,
+  height: number,
+  radius: number,
+  seedPixels: readonly number[],
+  maxPasses = 4,
+): number {
+  if (radius < 1) return 0;
+  const pixelCount = width * height;
+  const next = new Int16Array(pixelCount);
+  const tally = new Map<number, number>();
+  let changedTotal = 0;
+
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    let changed = 0;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const pixel = y * width + x;
+        tally.clear();
+        let best = labels[pixel];
+        let bestCount = 0;
+        for (let dy = -radius; dy <= radius; dy += 1) {
+          const sampleY = y + dy;
+          if (sampleY < 0 || sampleY >= height) continue;
+          const span = radius - Math.abs(dy);
+          for (let dx = -span; dx <= span; dx += 1) {
+            const sampleX = x + dx;
+            if (sampleX < 0 || sampleX >= width) continue;
+            const owner = labels[sampleY * width + sampleX];
+            const count = (tally.get(owner) ?? 0) + 1;
+            tally.set(owner, count);
+            // Ties go to the incumbent, so the filter cannot oscillate.
+            if (count > bestCount || (count === bestCount && owner === labels[pixel])) {
+              bestCount = count;
+              best = owner;
+            }
+          }
+        }
+        next[pixel] = best;
+        if (best !== labels[pixel]) changed += 1;
+      }
+    }
+    labels.set(next);
+    for (let index = 0; index < seedPixels.length; index += 1) {
+      labels[seedPixels[index]] = index;
+    }
+    changedTotal += changed;
+    if (changed === 0) break;
+  }
+  return changedTotal;
+}
+
+/**
+ * Restores one connected piece per phase after the partition has been rounded.
+ *
+ * The majority filter is deliberately blind to ownership, so it can sever a
+ * lobe from its piece. Whatever no longer reaches the piece's seed is released
+ * and handed to the nearest front, which is the same repair the solver already
+ * applies to leftover melt.
+ */
+function repairPartitionConnectivity(
+  labels: Int16Array,
+  width: number,
+  height: number,
+  seedPixels: readonly number[],
+): void {
+  const pixelCount = width * height;
+  const reachable = new Uint8Array(pixelCount);
+  const queue = new Int32Array(pixelCount);
+  let length = 0;
+  for (let phaseIndex = 0; phaseIndex < seedPixels.length; phaseIndex += 1) {
+    const seedPixel = seedPixels[phaseIndex];
+    if (labels[seedPixel] !== phaseIndex || reachable[seedPixel]) continue;
+    reachable[seedPixel] = 1;
+    queue[length] = seedPixel;
+    length += 1;
+  }
+  for (let cursor = 0; cursor < length; cursor += 1) {
+    const pixel = queue[cursor];
+    const owner = labels[pixel];
+    const x = pixel % width;
+    const y = (pixel - x) / width;
+    const neighbours = [
+      x > 0 ? pixel - 1 : -1,
+      x + 1 < width ? pixel + 1 : -1,
+      y > 0 ? pixel - width : -1,
+      y + 1 < height ? pixel + width : -1,
+    ];
+    for (const neighbour of neighbours) {
+      if (neighbour < 0 || reachable[neighbour]) continue;
+      if (labels[neighbour] !== owner) continue;
+      reachable[neighbour] = 1;
+      queue[length] = neighbour;
+      length += 1;
+    }
+  }
+  let released = 0;
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    if (labels[pixel] >= 0 && !reachable[pixel]) {
+      labels[pixel] = -1;
+      released += 1;
+    }
+  }
+  if (released > 0) assignLiquidToNearestFront(labels, width, height);
+}
+
 function keepLargestComponent(
   mask: Uint8Array,
   seen: Uint8Array,
@@ -1907,17 +2028,6 @@ function simulatePhaseField(
     }
   }
 
-  // Remove tabs too thin to survive the plywood. This happens after the solve,
-  // where the paper also strips its too-thin sections, so the physics is free
-  // to keep producing fine detail and only the unmanufacturable parts go.
-  shaveThinNecks(
-    labels,
-    width,
-    height,
-    phaseCount,
-    Math.round(((profile.minNeck ?? 0) * numerics.samplesPerPiece) / 2),
-  );
-
   if (profile.nucleus && profile.polishIterations) {
     // Anneal: re-tile from the grown labels and relax the seams with the
     // same solver, isotropic and undriven — pure interface tension.
@@ -2091,6 +2201,30 @@ function simulatePhaseField(
       numerics.connectivityRadius,
     ),
   );
+
+  // Round off anything too thin to survive the plywood. This has to come after
+  // assignConnectedPhaseLabels, which rebuilds the ownership map from the phase
+  // fields and discards whatever the labels held before it -- every earlier
+  // attempt at this pass ran above that line and was silently thrown away.
+  const neckRadius = Math.round(
+    ((profile.minNeck ?? 0) * numerics.samplesPerPiece) / 2,
+  );
+  if (neckRadius >= 1) {
+    const neckSeedPixels = seeds.map((phaseSeed) => {
+      const x = Math.max(
+        0,
+        Math.min(width - 1, Math.round(phaseSeed.x * width)),
+      );
+      const y = Math.max(
+        0,
+        Math.min(height - 1, Math.round(phaseSeed.y * height)),
+      );
+      return y * width + x;
+    });
+    roundPartition(labels, width, height, neckRadius, neckSeedPixels);
+    repairPartitionConnectivity(labels, width, height, neckSeedPixels);
+  }
+
   return {
     width,
     height,

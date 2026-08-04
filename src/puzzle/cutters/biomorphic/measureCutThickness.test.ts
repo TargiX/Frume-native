@@ -123,3 +123,31 @@ describe("measureCutThickness on real cuts", () => {
     expect(living.fraction).toBeGreaterThan(0);
   }, 120_000);
 });
+
+describe("rounding the partition", () => {
+  it("thins out fewer pieces as the neck floor rises", async () => {
+    // This pass silently did nothing for five rounds of work: it ran above the
+    // line where the solver rebuilds ownership from the phase fields, so every
+    // label it changed was thrown away before the caller saw it. Pin the fix by
+    // asserting the effect, not the call.
+    const { runBiomorphicPhaseFieldLab } = await import(
+      "./generateBiomorphicPhaseField"
+    );
+    const { createPhaseFieldLabSettings } = await import(
+      "./phaseFieldLabConfig"
+    );
+    const thinPieces = (minNeck: number) => {
+      const settings = createPhaseFieldLabSettings("dendrite");
+      settings.rows = 3;
+      settings.columns = 3;
+      settings.numerics.samplesPerPiece = 64;
+      settings.profile.iterations = 400;
+      settings.captureEvery = 400;
+      settings.profile.minNeck = minNeck;
+      const result = runBiomorphicPhaseFieldLab(settings);
+      expect(result.vectorizationError).toBeUndefined();
+      return result.thinnest.perPiece.filter((value) => value < 4).length;
+    };
+    expect(thinPieces(0.08)).toBeLessThan(thinPieces(0));
+  }, 180_000);
+});
