@@ -80,7 +80,12 @@ const CUT_STYLES: {
   {
     id: 'biomorphic',
     label: 'Living',
-    detail: 'Free-form cells grown around the photo',
+    detail: 'Crystal-grown, branching cells',
+  },
+  {
+    id: 'amoeba',
+    label: 'Amoeba',
+    detail: 'Blobby, pseudopod interlocks',
   },
 ];
 
@@ -493,7 +498,8 @@ export function DifficultyScreen({ navigation, route }: Props) {
         {PUZZLE_GUIDE_OPTIONS.map((option) => {
           const active = selectedGuideMode === option.id;
           const livingZones =
-            selectedCutter === 'biomorphic' && option.id === 'grid';
+            (selectedCutter === 'biomorphic' || selectedCutter === 'amoeba') &&
+            option.id === 'grid';
           const label = livingZones ? 'Zones' : option.label;
           const detail = livingZones
             ? 'Approximate placement zones'

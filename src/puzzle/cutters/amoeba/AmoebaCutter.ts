@@ -5,15 +5,11 @@ import type {
   PuzzleImageSource,
   PuzzleLayout,
 } from '../../types/layout';
+import { canonicalizeBiomorphicSeed } from '../biomorphic/generateBiomorphic';
+import { generateBiomorphicPhaseFieldPieces } from '../biomorphic/generateBiomorphicPhaseField';
 import { resolveBoardSize } from '../resolveBoardSize';
-import {
-  canonicalizeBiomorphicSeed,
-  generateBiomorphicPieces,
-} from './generateBiomorphic';
-import { generateBiomorphicPhaseFieldPieces } from './generateBiomorphicPhaseField';
 
-const BIOMORPHIC_CUT_VERSION = 2;
-const LEGACY_BIOMORPHIC_CUT_VERSION = 1;
+const AMOEBA_CUT_VERSION = 1;
 
 function descriptorFromOptions(
   image: PuzzleImageSource,
@@ -21,17 +17,14 @@ function descriptorFromOptions(
 ): PuzzleCutDescriptor {
   if (options.cutDescriptor) {
     const descriptor = options.cutDescriptor;
-    if (descriptor.cutterId !== 'biomorphic') {
+    if (descriptor.cutterId !== 'amoeba') {
       throw new Error(
-        `Cannot use a ${descriptor.cutterId} cut descriptor with Biomorphic`,
+        `Cannot use a ${descriptor.cutterId} cut descriptor with Amoeba`,
       );
     }
-    if (
-      descriptor.version !== LEGACY_BIOMORPHIC_CUT_VERSION &&
-      descriptor.version !== BIOMORPHIC_CUT_VERSION
-    ) {
+    if (descriptor.version !== AMOEBA_CUT_VERSION) {
       throw new Error(
-        `Unsupported Biomorphic cut descriptor version ${descriptor.version}`,
+        `Unsupported Amoeba cut descriptor version ${descriptor.version}`,
       );
     }
     if (
@@ -41,7 +34,7 @@ function descriptorFromOptions(
       descriptor.columns < 1 ||
       !descriptor.seed
     ) {
-      throw new Error('Invalid Biomorphic cut descriptor');
+      throw new Error('Invalid Amoeba cut descriptor');
     }
     return { ...descriptor };
   }
@@ -52,7 +45,7 @@ function descriptorFromOptions(
   const sourceSeed =
     options.seed ??
     [
-      'biomorphic-v2-phase-field',
+      'amoeba-v1-phase-field',
       image.uri,
       image.width,
       image.height,
@@ -61,19 +54,19 @@ function descriptorFromOptions(
     ].join(':');
 
   return {
-    cutterId: 'biomorphic',
-    version: BIOMORPHIC_CUT_VERSION,
+    cutterId: 'amoeba',
+    version: AMOEBA_CUT_VERSION,
     seed: canonicalizeBiomorphicSeed(sourceSeed),
     rows,
     columns,
   };
 }
 
-export const BiomorphicCutter: PuzzleCutter = {
+export const AmoebaCutter: PuzzleCutter = {
   meta: {
-    id: 'biomorphic',
-    name: 'Biomorphic',
-    description: 'Simulated living cells with branching, interlocking contours',
+    id: 'amoeba',
+    name: 'Amoeba',
+    description: 'Simulated pseudopods with dense, blobby interlocks',
   },
 
   async generate(
@@ -84,27 +77,19 @@ export const BiomorphicCutter: PuzzleCutter = {
     const { width, height } = resolveBoardSize(image, options);
 
     return {
-      cutterId: 'biomorphic',
+      cutterId: 'amoeba',
       trayPlacement: options.trayPlacement ?? 'bottom',
       cutDescriptor,
       image,
       boardSize: { width, height },
-      pieces:
-        cutDescriptor.version === LEGACY_BIOMORPHIC_CUT_VERSION
-          ? generateBiomorphicPieces(
-              cutDescriptor.rows,
-              cutDescriptor.columns,
-              width,
-              height,
-              cutDescriptor.seed,
-            )
-          : generateBiomorphicPhaseFieldPieces(
-              cutDescriptor.rows,
-              cutDescriptor.columns,
-              width,
-              height,
-              cutDescriptor.seed,
-            ),
+      pieces: generateBiomorphicPhaseFieldPieces(
+        cutDescriptor.rows,
+        cutDescriptor.columns,
+        width,
+        height,
+        cutDescriptor.seed,
+        'amoeba',
+      ),
     };
   },
 };

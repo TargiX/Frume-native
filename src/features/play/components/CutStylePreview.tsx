@@ -23,6 +23,11 @@ const PREVIEW_PATHS: Record<PreviewCutterId, readonly string[]> = {
     'M 3 34 C 7 29 10 24 15 20 C 25 24 35 24 45 19 C 52 18 57 14 61 10',
     'M 15 20 C 23 15 28 12 31 3',
   ],
+  amoeba: [
+    'M 26 3 C 30 9 24 12 29 17 C 35 23 27 26 32 31 C 38 36 30 41 34 47',
+    'M 3 21 C 10 17 13 25 20 21 C 27 17 26 26 34 24 C 43 21 44 30 53 27 C 57 26 59 24 61 25',
+    'M 34 24 C 40 31 48 34 47 41 C 46 45 50 45 52 47',
+  ],
 };
 
 function makePaths(cutterId: PreviewCutterId): SkPath[] {

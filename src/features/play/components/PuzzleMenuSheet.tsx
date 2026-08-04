@@ -191,7 +191,8 @@ export function PuzzleMenuSheet({
     persistenceError,
     retryingSave,
   );
-  const usesApproximateZones = cutterId === 'biomorphic';
+  const usesApproximateZones =
+    cutterId === 'biomorphic' || cutterId === 'amoeba';
   const headingRef = React.useRef<React.ElementRef<typeof Text>>(null);
   const overlayEntering = FadeIn.duration(
     reduceMotion

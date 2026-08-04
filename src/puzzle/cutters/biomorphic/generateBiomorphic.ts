@@ -727,33 +727,90 @@ function segmentsIntersect(
 export function hasBiomorphicSelfIntersections(
   points: readonly BiomorphicPoint[],
 ): boolean {
-  for (let first = 0; first < points.length; first += 1) {
-    const firstNext = (first + 1) % points.length;
-    for (let second = first + 1; second < points.length; second += 1) {
-      const secondNext = (second + 1) % points.length;
-      const adjacent =
-        first === second ||
-        firstNext === second ||
-        secondNext === first ||
-        (first === 0 && secondNext === 0);
-      if (adjacent) continue;
+  // Uniform-grid broad phase: only segment pairs sharing a bucket are
+  // tested, which keeps dense simulated outlines (thousands of samples)
+  // affordable where the naive quadratic scan is not.
+  const count = points.length;
+  if (count < 4) return false;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const spans = new Float64Array(count);
+  for (let index = 0; index < count; index += 1) {
+    const point = points[index];
+    const next = points[(index + 1) % count];
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+    spans[index] = Math.max(
+      Math.abs(next.x - point.x),
+      Math.abs(next.y - point.y),
+    );
+  }
+  // Bucket by the typical segment size; rare long segments (straight
+  // exterior borders) simply occupy many buckets instead of inflating all
+  // of them to one giant bucket.
+  const sortedSpans = spans.slice().sort();
+  const cellSize = Math.max(sortedSpans[count >> 1] * 2, 1e-6);
+  const columns = Math.max(1, Math.ceil((maxX - minX) / cellSize) + 1);
+  const rows = Math.max(1, Math.ceil((maxY - minY) / cellSize) + 1);
+  const buckets = new Map<number, number[]>();
 
-      if (
-        segmentsIntersect(
-          points[first],
-          points[firstNext],
-          points[second],
-          points[secondNext],
-        )
-      ) {
-        return true;
+  for (let index = 0; index < count; index += 1) {
+    const point = points[index];
+    const next = points[(index + 1) % count];
+    const startColumn = Math.floor((Math.min(point.x, next.x) - minX) / cellSize);
+    const endColumn = Math.floor((Math.max(point.x, next.x) - minX) / cellSize);
+    const startRow = Math.floor((Math.min(point.y, next.y) - minY) / cellSize);
+    const endRow = Math.floor((Math.max(point.y, next.y) - minY) / cellSize);
+    for (let row = startRow; row <= endRow; row += 1) {
+      for (let column = startColumn; column <= endColumn; column += 1) {
+        const key = row * columns + column;
+        const bucket = buckets.get(key);
+        if (bucket) bucket.push(index);
+        else buckets.set(key, [index]);
+      }
+    }
+  }
+  void rows;
+
+  const tested = new Set<number>();
+  for (const bucket of buckets.values()) {
+    for (let a = 0; a < bucket.length; a += 1) {
+      for (let b = a + 1; b < bucket.length; b += 1) {
+        const first = Math.min(bucket[a], bucket[b]);
+        const second = Math.max(bucket[a], bucket[b]);
+        const firstNext = (first + 1) % count;
+        const secondNext = (second + 1) % count;
+        const adjacent =
+          first === second ||
+          firstNext === second ||
+          secondNext === first ||
+          (first === 0 && secondNext === 0);
+        if (adjacent) continue;
+        const pairKey = first * count + second;
+        if (tested.has(pairKey)) continue;
+        tested.add(pairKey);
+
+        if (
+          segmentsIntersect(
+            points[first],
+            points[firstNext],
+            points[second],
+            points[secondNext],
+          )
+        ) {
+          return true;
+        }
       }
     }
   }
   return false;
 }
 
-function isTopologySafe(topology: BiomorphicTopology): boolean {
+export function isBiomorphicTopologySafe(topology: BiomorphicTopology): boolean {
   const idealArea = 1 / topology.cells.length;
   const minimumSpan = Math.min(1 / topology.rows, 1 / topology.columns) * 0.28;
   let totalArea = 0;
@@ -813,7 +870,7 @@ export function createBiomorphicTopology(
           seed,
           curveVariation,
         );
-        if (isTopologySafe(topology)) return topology;
+        if (isBiomorphicTopologySafe(topology)) return topology;
       } catch {
         // Quantized half-plane intersections can only fail at a degenerate
         // seed. Reducing site variation deterministically removes the tie.
@@ -989,6 +1046,23 @@ export function generateBiomorphicPieces(
   }
 
   const topology = createBiomorphicTopology(rows, columns, seed);
+  return generateBiomorphicPiecesFromTopology(topology, boardWidth, boardHeight);
+}
+
+export function generateBiomorphicPiecesFromTopology(
+  topology: BiomorphicTopology,
+  boardWidth: number,
+  boardHeight: number,
+): PuzzlePieceDefinition[] {
+  if (
+    !Number.isFinite(boardWidth) ||
+    !Number.isFinite(boardHeight) ||
+    boardWidth <= 0 ||
+    boardHeight <= 0
+  ) {
+    throw new Error('Biomorphic cutter board dimensions must be positive');
+  }
+
   return topology.cells.map((cell) => {
     const clipRegion = normalizedBounds(cell);
     const bounds: Rect = {

@@ -78,7 +78,11 @@ export function PlayHomeScreen({ navigation }: Props) {
     : 0;
   const total = engineState?.layout.pieces.length ?? 0;
   const savedPremiumCutLabel =
-    session?.cutterId === 'biomorphic' ? 'Living' : 'Organic';
+    session?.cutterId === 'biomorphic'
+      ? 'Living'
+      : session?.cutterId === 'amoeba'
+        ? 'Amoeba'
+        : 'Organic';
 
   const supersedePendingAction = () => {
     actionGuard.beginAction();

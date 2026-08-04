@@ -5,6 +5,7 @@ export type PuzzleCutterId =
   | 'classic'
   | 'organic'
   | 'biomorphic'
+  | 'amoeba'
   | 'fractal';
 
 /** Edge of the board that owns the waiting-piece tray. */

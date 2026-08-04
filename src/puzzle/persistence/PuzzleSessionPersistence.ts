@@ -227,6 +227,7 @@ function parseCutterId(value: unknown): PuzzleCutterId | null {
   return value === 'classic' ||
     value === 'organic' ||
     value === 'biomorphic' ||
+    value === 'amoeba' ||
     value === 'fractal'
     ? value
     : null;

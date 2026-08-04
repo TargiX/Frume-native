@@ -163,8 +163,8 @@ export function PremiumCutsSheet({
               Cuts that feel alive
             </Text>
             <Text style={styles.body}>
-              Unlock Organic and Living pieces: flowing seams plus free-form
-              cells with their own neighbor patterns. Every difficulty stays
+              Unlock Organic and Living pieces: flowing seams plus branching
+              cells grown by a crystal-like simulation. Every difficulty stays
               free.
             </Text>
 

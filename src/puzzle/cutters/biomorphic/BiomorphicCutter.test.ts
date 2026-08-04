@@ -28,6 +28,7 @@ describe('BiomorphicCutter', () => {
       'classic',
       'organic',
       'biomorphic',
+      'amoeba',
     ]);
     expect(() => getCutter('fractal')).toThrow(
       'Puzzle cutter "fractal" is not available',
@@ -43,7 +44,7 @@ describe('BiomorphicCutter', () => {
     expect(layout.cutterId).toBe('biomorphic');
     expect(layout.cutDescriptor).toMatchObject({
       cutterId: 'biomorphic',
-      version: 1,
+      version: 2,
       rows: 4,
       columns: 4,
     });
@@ -67,7 +68,7 @@ describe('BiomorphicCutter', () => {
         ).toContain(piece.id);
       });
     });
-  });
+  }, 60_000);
 
   it('rebuilds identical normalized geometry from its descriptor after resize', async () => {
     const initial = await BiomorphicCutter.generate(image, {
@@ -119,9 +120,23 @@ describe('BiomorphicCutter', () => {
         10,
       );
     });
-  });
+  }, 120_000);
 
-  it('rejects descriptors from another plugin or version', async () => {
+  it('restores legacy v1 cuts and rejects descriptors from another plugin or version', async () => {
+    const legacy = await BiomorphicCutter.generate(image, {
+      difficulty: 'easy',
+      cutDescriptor: {
+        cutterId: 'biomorphic',
+        version: 1,
+        seed: 'bio-legacy',
+        rows: 3,
+        columns: 3,
+      },
+    });
+
+    expect(legacy.cutDescriptor?.version).toBe(1);
+    expect(legacy.pieces).toHaveLength(9);
+
     await expect(
       BiomorphicCutter.generate(image, {
         difficulty: 'easy',

@@ -29,6 +29,7 @@ describe('OrganicCutter', () => {
       'classic',
       'organic',
       'biomorphic',
+      'amoeba',
     ]);
     expect(() => getCutter('fractal')).toThrow(
       'Puzzle cutter "fractal" is not available',

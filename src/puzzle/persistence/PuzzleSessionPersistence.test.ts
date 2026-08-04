@@ -127,7 +127,7 @@ describe('puzzle session persistence codec', () => {
             cutterId,
             cutDescriptor: {
               cutterId,
-              version: 1,
+              version: cutterId === 'biomorphic' ? 2 : 1,
               seed: 'stable-seed',
               rows: 3,
               columns: 3,
