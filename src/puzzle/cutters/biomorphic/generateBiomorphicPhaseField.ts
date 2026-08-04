@@ -18,6 +18,7 @@ import {
   type BiomorphicPhaseFieldStyle,
   type BiomorphicSeedLayout,
 } from "./phaseFieldLabConfig";
+import { measureCutThickness, type CutThickness } from "./measureCutThickness";
 
 export type { BiomorphicPhaseFieldStyle } from "./phaseFieldLabConfig";
 
@@ -86,6 +87,12 @@ export type BiomorphicPhaseFieldLabResult = {
   elapsedMs: number;
   /** Share of the board left unclaimed — the free rim, when one was asked for. */
   liquidRatio: number;
+  /**
+   * Thinnest isthmus or whisker in the finished cut, as a fraction of a piece.
+   * Connected and hole-free says nothing about this: a piece can stay simply
+   * connected while carrying a tab too thin to survive the plywood.
+   */
+  thinnest: { fraction: number } & CutThickness;
   vectorizationError?: string;
 };
 
@@ -301,6 +308,71 @@ function hasEnclosingPhase(
  * sections, so the physics keeps producing fine detail and only the parts that
  * would snap out of the plywood are removed.
  */
+/** Reduces a mask to its largest 4-connected component, in place. */
+function keepLargestComponent(
+  mask: Uint8Array,
+  seen: Uint8Array,
+  queue: Int32Array,
+  width: number,
+  height: number,
+): void {
+  seen.fill(0);
+  let bestStart = -1;
+  let bestSize = 0;
+  const pixelCount = width * height;
+  for (let start = 0; start < pixelCount; start += 1) {
+    if (!mask[start] || seen[start]) continue;
+    seen[start] = 1;
+    queue[0] = start;
+    let length = 1;
+    for (let cursor = 0; cursor < length; cursor += 1) {
+      const pixel = queue[cursor];
+      const x = pixel % width;
+      const y = (pixel - x) / width;
+      const neighbours = [
+        x > 0 ? pixel - 1 : -1,
+        x + 1 < width ? pixel + 1 : -1,
+        y > 0 ? pixel - width : -1,
+        y + 1 < height ? pixel + width : -1,
+      ];
+      for (const neighbour of neighbours) {
+        if (neighbour < 0 || !mask[neighbour] || seen[neighbour]) continue;
+        seen[neighbour] = 1;
+        queue[length] = neighbour;
+        length += 1;
+      }
+    }
+    if (length > bestSize) {
+      bestSize = length;
+      bestStart = start;
+    }
+  }
+  if (bestStart < 0) return;
+
+  seen.fill(0);
+  seen[bestStart] = 1;
+  queue[0] = bestStart;
+  let length = 1;
+  for (let cursor = 0; cursor < length; cursor += 1) {
+    const pixel = queue[cursor];
+    const x = pixel % width;
+    const y = (pixel - x) / width;
+    const neighbours = [
+      x > 0 ? pixel - 1 : -1,
+      x + 1 < width ? pixel + 1 : -1,
+      y > 0 ? pixel - width : -1,
+      y + 1 < height ? pixel + width : -1,
+    ];
+    for (const neighbour of neighbours) {
+      if (neighbour < 0 || !mask[neighbour] || seen[neighbour]) continue;
+      seen[neighbour] = 1;
+      queue[length] = neighbour;
+      length += 1;
+    }
+  }
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) mask[pixel] = seen[pixel];
+}
+
 function shaveThinNecks(
   labels: Int16Array,
   width: number,
@@ -313,6 +385,7 @@ function shaveThinNecks(
   const keep = new Uint8Array(pixelCount);
   const current = new Uint8Array(pixelCount);
   const next = new Uint8Array(pixelCount);
+  const queueScratch = new Int32Array(pixelCount);
 
   for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex += 1) {
     let present = false;
@@ -357,6 +430,19 @@ function shaveThinNecks(
       }
       continue;
     }
+
+    // Keep only the largest surviving core. Dilating every survivor back would
+    // rebuild the very isthmus the erosion just cut: both lobes come through,
+    // and the dilation joins them again. Growing one core alone is what turns
+    // "eroding by r splits this piece" into "the lobe hanging on a thread is
+    // given to a neighbour", which is the whole point of the pass.
+    //
+    // Measured caveat, and the reason minNeck still ships off: this removes
+    // material as intended but does not move the measured minimum, because the
+    // lobe handed to a neighbour arrives attached to it by a thread of its own.
+    // Repairing thin necks needs the neighbours resolved together, not one
+    // piece at a time.
+    keepLargestComponent(current, next, queueScratch, width, height);
 
     for (let step = 0; step < radius; step += 1) {
       for (let y = 0; y < height; y += 1) {
@@ -3287,6 +3373,13 @@ export function runBiomorphicPhaseFieldLab(
       },
     },
   );
+  const thickness = measureCutThickness(
+    simulation.labels,
+    simulation.width,
+    simulation.height,
+    settings.rows * settings.columns,
+    Math.max(2, Math.round(settings.numerics.samplesPerPiece * 0.12)),
+  );
   let vectorizationError: string | undefined;
   let finalSvg: string;
   try {
@@ -3357,6 +3450,7 @@ export function runBiomorphicPhaseFieldLab(
     finalSvg,
     elapsedMs: Date.now() - startedAt,
     liquidRatio: simulation.liquidRatio,
+    thinnest: { ...thickness, fraction: thickness.narrowestSamples / settings.numerics.samplesPerPiece },
     vectorizationError,
   };
 }
