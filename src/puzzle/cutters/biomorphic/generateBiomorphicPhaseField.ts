@@ -3104,11 +3104,24 @@ function smoothSegments(
     normalizedPoint(point, width, height),
   );
 
-  return normalized.slice(0, -1).map((start, index) => {
-    const end = normalized[index + 1];
-    const previous = normalized[Math.max(0, index - 1)];
-    const next = normalized[Math.min(normalized.length - 1, index + 2)];
-    const tension = smoothingPasses === 0 ? 0 : 0.52;
+  return curveThroughPoints(normalized, smoothingPasses === 0 ? 0 : 0.52);
+}
+
+/**
+ * Catmull-Rom through a point sequence, expressed as cubic Beziers.
+ *
+ * A segment's control points are a fixed function of its neighbours and the
+ * tension, which is why a baked cut stores only the points: keeping the curve
+ * and the rebuild in one function is what stops the two drifting apart.
+ */
+export function curveThroughPoints(
+  points: readonly BiomorphicPoint[],
+  tension: number,
+): BiomorphicPathSegment[] {
+  return points.slice(0, -1).map((start, index) => {
+    const end = points[index + 1];
+    const previous = points[Math.max(0, index - 1)];
+    const next = points[Math.min(points.length - 1, index + 2)];
     return {
       kind: "cubic" as const,
       start,
