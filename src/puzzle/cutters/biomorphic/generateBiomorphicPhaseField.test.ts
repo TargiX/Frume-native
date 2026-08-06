@@ -64,7 +64,13 @@ describe("createBiomorphicPhaseFieldTopology", () => {
     );
     expect(growth.maximumPenetrationSamples).toBeGreaterThanOrEqual(15);
     expect(growth.deepGrowthRatio).toBeGreaterThan(0.45);
+    // The connectivity repair must stay a repair: if it were reshaping the cut
+    // the growth would be coming from cleanup rather than from the solve.
     expect(growth.cleanupChangedLabelRatio).toBeLessThan(0.005);
+    // The manufacturability pass is a deliberate edit, so it is bounded rather
+    // than forbidden -- but it must not be quietly redrawing the whole cut.
+    expect(growth.neckChangedLabelRatio).toBeGreaterThan(0);
+    expect(growth.neckChangedLabelRatio).toBeLessThan(0.1);
     expect(growth.liquidRatio).toBeLessThan(0.15);
     expect(growth.safeAfterSimulation).toBe(true);
   }, 180_000);

@@ -101,11 +101,10 @@ export type BiomorphicPhaseFieldProfile = {
    * is shaved off and handed to the neighbour after the solve, which is where
    * the paper does its own removal of too-thin sections.
    *
-   * Off by default. The pass demonstrably removes material -- a few hundred to
-   * ten thousand samples depending on the radius -- but at 4% and 8% it made no
-   * visible difference to the cut, so there is no evidence yet that it fixes
-   * anything a reader would notice. Left in place as a manufacturing safeguard
-   * to switch on once there is a trustworthy way to measure what it changes.
+   * At 6% of a piece this takes Living from 14 pieces of 16 carrying a place
+   * under four samples wide down to 3, without visibly coarsening the cut. The
+   * radius follows the piece, so the same figure means the same thing at any
+   * resolution.
    */
   minNeck: number;
   lambda1: number;
@@ -165,7 +164,7 @@ export const BIOMORPHIC_PHASE_FIELD_PROFILES: Record<
     spectrumHarmonics: 2,
     spectrumFalloff: 1,
     freeRim: 0,
-    minNeck: 0,
+    minNeck: 0.06,
     // Off. This volume pressure is not in the paper: it adds a per-piece
     // uniform boost to the driving force, which is exactly the kind of
     // non-local correction that stops a fringe growing evenly. It existed to
@@ -197,7 +196,7 @@ export const BIOMORPHIC_PHASE_FIELD_PROFILES: Record<
     spectrumHarmonics: 2,
     spectrumFalloff: 1,
     freeRim: 0,
-    minNeck: 0,
+    minNeck: 0.06,
     // Off, for the same reason as Living.
     areaConservation: 0,
     lambda1: 40,

@@ -66,6 +66,8 @@ type PhaseFieldSimulation = {
   voronoiLabels?: Int16Array;
   perturbedLabels?: Int16Array;
   unrepairedLabels?: Int16Array;
+  /** Labels after the connectivity watershed but before the neck rounding. */
+  preNeckLabels?: Int16Array;
   /** Debug capture: labels before the residual melt was assigned. */
   rawLabels?: Int16Array;
 };
@@ -905,6 +907,13 @@ export type BiomorphicPhaseFieldDiagnostics = {
   changedLabelRatio: number;
   /** Share of samples reassigned by the post-simulation connectivity repair. */
   cleanupChangedLabelRatio: number;
+  /**
+   * Share of samples reassigned by the manufacturability pass. Kept apart from
+   * the connectivity repair on purpose: that one guards against the cut being
+   * manufactured by cleanup instead of grown, and must stay near zero, while
+   * this one is a deliberate edit whose size is the point.
+   */
+  neckChangedLabelRatio: number;
   /** Interface length of the simulated cut relative to the straight Voronoi cut. */
   boundaryAmplification: number;
   /** Share of samples changed by simulation after Perturb Edges completed. */
@@ -2202,6 +2211,8 @@ function simulatePhaseField(
     ),
   );
 
+  const preNeckLabels = captureStages ? labels.slice() : undefined;
+
   // Round off anything too thin to survive the plywood. This has to come after
   // assignConnectedPhaseLabels, which rebuilds the ownership map from the phase
   // fields and discards whatever the labels held before it -- every earlier
@@ -2234,6 +2245,7 @@ function simulatePhaseField(
     voronoiLabels,
     perturbedLabels,
     unrepairedLabels,
+    preNeckLabels,
     rawLabels,
   };
 }
@@ -3345,7 +3357,8 @@ export function measureBiomorphicPhaseFieldGrowth(
   const voronoi = simulation.voronoiLabels;
   const perturbed = simulation.perturbedLabels;
   const unrepaired = simulation.unrepairedLabels;
-  if (!voronoi || !perturbed || !unrepaired) {
+  const preNeck = simulation.preNeckLabels;
+  if (!voronoi || !perturbed || !unrepaired || !preNeck) {
     throw new Error("Biomorphic phase-field diagnostics were not captured");
   }
   const sampleCount = simulation.width * simulation.height;
@@ -3384,7 +3397,9 @@ export function measureBiomorphicPhaseFieldGrowth(
   return {
     changedLabelRatio: countChangedLabels(voronoi, unrepaired) / sampleCount,
     cleanupChangedLabelRatio:
-      countChangedLabels(unrepaired, simulation.labels) / sampleCount,
+      countChangedLabels(unrepaired, preNeck) / sampleCount,
+    neckChangedLabelRatio:
+      countChangedLabels(preNeck, simulation.labels) / sampleCount,
     boundaryAmplification:
       countInternalBoundaryUnits(
         unrepaired,
