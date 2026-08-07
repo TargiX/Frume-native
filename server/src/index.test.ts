@@ -234,7 +234,7 @@ describe('SQLite category photo pools', () => {
     }
   });
 
-  it('prefers the closest landscape aspect and excludes a near-square photo', async () => {
+  it('keeps landscape choices inside the aspect tolerance and excludes a near-square photo', async () => {
     await seedPhotos([
       photoWithDimensions('near_square_landscape', 1_050, 1_000),
       photoWithDimensions('target_landscape', 1_600, 1_000),
@@ -247,12 +247,13 @@ describe('SQLite category photo pools', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await readJson(response)).toMatchObject({
-      photo: { id: 'target_landscape', width: 1_600, height: 1_000 },
-    });
+    const body = await readJson(response);
+    expect(['target_landscape', 'wide_landscape']).toContain(
+      (body.photo as { id: string }).id,
+    );
   });
 
-  it('prefers the closest portrait aspect and excludes a near-square photo', async () => {
+  it('keeps portrait choices inside the aspect tolerance and excludes a near-square photo', async () => {
     await seedPhotos([
       photoWithDimensions('near_square_portrait', 950, 1_000),
       photoWithDimensions('target_portrait', 620, 1_000),
@@ -265,26 +266,58 @@ describe('SQLite category photo pools', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await readJson(response)).toMatchObject({
-      photo: { id: 'target_portrait', width: 620, height: 1_000 },
-    });
+    const body = await readJson(response);
+    expect(['target_portrait', 'tall_portrait']).toContain(
+      (body.photo as { id: string }).id,
+    );
   });
 
-  it('can prefer a near-square photo when the safe viewport is near square', async () => {
+  it('can return a near-square photo when the safe viewport is near square', async () => {
     await seedPhotos([
       photoWithDimensions('near_square_target', 1_060, 1_000),
       photoWithDimensions('moderately_wide', 1_200, 1_000),
+      photoWithDimensions('too_wide', 1_600, 1_000),
     ]);
 
-    const response = await fetchWorker(
-      '/photo?category=nature&orientation=landscape&aspect=1.05',
-      { headers: { 'CF-Connecting-IP': '203.0.113.22' } },
-    );
+    const ids = new Set<string>();
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const response = await fetchWorker(
+        '/photo?category=nature&orientation=landscape&aspect=1.05',
+        { headers: { 'CF-Connecting-IP': '203.0.113.22' } },
+      );
+      expect(response.status).toBe(200);
+      const body = await readJson(response);
+      ids.add((body.photo as { id: string }).id);
+    }
 
-    expect(response.status).toBe(200);
-    expect(await readJson(response)).toMatchObject({
-      photo: { id: 'near_square_target' },
-    });
+    expect(ids.has('too_wide')).toBe(false);
+    expect(ids.has('near_square_target')).toBe(true);
+  });
+
+  /**
+   * Ranking the pool by closeness to the requested aspect handed the same
+   * device the same photograph every time; only photos outside the tolerance
+   * may be excluded.
+   */
+  it('varies the photo it returns for a repeated request', async () => {
+    await seedPhotos([
+      photoWithDimensions('in_band_a', 1_500, 1_000),
+      photoWithDimensions('in_band_b', 1_600, 1_000),
+      photoWithDimensions('in_band_c', 1_700, 1_000),
+    ]);
+
+    const ids = new Set<string>();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const response = await fetchWorker(
+        '/photo?category=nature&orientation=landscape&aspect=1.6',
+        { headers: { 'CF-Connecting-IP': '203.0.113.23' } },
+      );
+      expect(response.status).toBe(200);
+      const body = await readJson(response);
+      ids.add((body.photo as { id: string }).id);
+    }
+
+    expect(ids.size).toBeGreaterThan(1);
   });
 
   it.each([

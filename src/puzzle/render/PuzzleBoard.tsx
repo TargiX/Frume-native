@@ -72,11 +72,23 @@ type PieceVisualState = {
   trayFactor: SharedValue<number>;
   /** Controls the tray-scroll coordinate space independently of React state. */
   trayAttached: SharedValue<boolean>;
-  engineX: number;
-  engineY: number;
-  engineRotation: number;
-  engineInTray: boolean;
-  engineTrayFactor: number;
+};
+
+/**
+ * The engine values a piece's visual has already been reconciled with.
+ *
+ * Deliberately a separate object: the visual itself is captured by worklet
+ * closures, and a captured object has every key replaced by a warn-only setter
+ * in development. Bookkeeping written back onto the visual would silently do
+ * nothing, leaving the reconciliation below permanently out of step with the
+ * engine.
+ */
+type PieceEngineSync = {
+  x: number;
+  y: number;
+  rotation: number;
+  inTray: boolean;
+  trayFactor: number;
 };
 
 type PieceDrawingProps = {
@@ -391,16 +403,23 @@ export function PuzzleBoard({
     () => resolveTraySurfaceFrame(trayMetrics, trayPlacement, surfaceInset),
     [surfaceInset, trayMetrics, trayPlacement],
   );
-  const visuals = useMemo(() => {
-    const next = new Map<string, PieceVisualState>();
+  const { visuals, engineSync } = useMemo(() => {
+    const nextVisuals = new Map<string, PieceVisualState>();
+    const nextSync = new Map<string, PieceEngineSync>();
+    // Read the new engine rather than the props: a replacement engine renders
+    // once paired with the outgoing puzzle's layout and pieces, and visuals
+    // born from that pairing start at the previous puzzle's tray scale and
+    // slots. The engine is always self-consistent.
+    const engineState = engine.getState();
+    const engineTrayScale = getTrayMetrics(engineState.layout).scale;
 
-    layout.pieces.forEach((definition) => {
-      const runtime = pieces[definition.id];
+    engineState.layout.pieces.forEach((definition) => {
+      const runtime = engineState.pieces[definition.id];
       if (!runtime) {
         return;
       }
-      const trayFactor = runtime.inTray ? trayMetrics.scale : 1;
-      next.set(definition.id, {
+      const trayFactor = runtime.inTray ? engineTrayScale : 1;
+      nextVisuals.set(definition.id, {
         x: makeMutable(runtime.position.x),
         y: makeMutable(runtime.position.y),
         rotation: makeMutable(runtime.rotation),
@@ -408,25 +427,34 @@ export function PuzzleBoard({
         opacity: makeMutable(runtime.locked ? 1 : 0),
         trayFactor: makeMutable(trayFactor),
         trayAttached: makeMutable(runtime.inTray),
-        engineX: runtime.position.x,
-        engineY: runtime.position.y,
-        engineRotation: runtime.rotation,
-        engineInTray: runtime.inTray,
-        engineTrayFactor: trayFactor,
+      });
+      nextSync.set(definition.id, {
+        x: runtime.position.x,
+        y: runtime.position.y,
+        rotation: runtime.rotation,
+        inTray: runtime.inTray,
+        trayFactor,
       });
     });
 
-    return next;
+    return { visuals: nextVisuals, engineSync: nextSync };
     // Geometry may change on rotation, but the engine identity stays stable.
     // Keeping these shared values avoids reconstructing loose pieces at their
     // entrance-animation state during a relayout.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
 
   useEffect(() => {
     setImageError(null);
     setDisplayImageUri(image.uri);
   }, [image.uri]);
+
+  useEffect(() => {
+    // Each puzzle deals a fresh tray, and tray-content coordinates start at
+    // zero again. Carrying the previous puzzle's scroll over would draw the new
+    // row shifted off the visible strip.
+    cancelAnimation(trayScroll);
+    trayScroll.value = 0;
+  }, [engine, trayScroll]);
 
   /**
    * Extent of the pieces still waiting in the tray, in tray-content space.
@@ -527,12 +555,16 @@ export function PuzzleBoard({
     const shouldAnimateEntrance = entranceEngineRef.current !== engine;
     entranceEngineRef.current = engine;
 
-    layout.pieces.forEach((definition, index) => {
+    // The entrance belongs to this engine's own pieces: on a replacement the
+    // props still describe the outgoing puzzle for one render.
+    const entranceState = engine.getState();
+
+    entranceState.layout.pieces.forEach((definition, index) => {
       const visual = visuals.get(definition.id);
       if (!visual) {
         return;
       }
-      if (pieces[definition.id]?.locked) {
+      if (entranceState.pieces[definition.id]?.locked) {
         visual.opacity.value = 1;
         visual.scale.value = 1;
         return;
@@ -570,19 +602,20 @@ export function PuzzleBoard({
     layout.pieces.forEach((definition) => {
       const runtime = pieces[definition.id];
       const visual = visuals.get(definition.id);
-      if (!runtime || !visual) {
+      const synced = engineSync.get(definition.id);
+      if (!runtime || !visual || !synced) {
         return;
       }
 
-      const trayTransition = runtime.inTray !== visual.engineInTray;
+      const trayTransition = runtime.inTray !== synced.inTray;
       if (trayTransition) {
         const animateProgrammaticTrayExit =
           shouldAnimateProgrammaticTrayExit({
-            engineInTray: visual.engineInTray,
+            engineInTray: synced.inTray,
             runtimeInTray: runtime.inTray,
             trayAttached: visual.trayAttached.value,
           });
-        visual.engineInTray = runtime.inTray;
+        synced.inTray = runtime.inTray;
         if (runtime.inTray) {
           // Change from surface coordinates to tray-content coordinates
           // without changing the drawn position, then animate home inside the
@@ -606,8 +639,8 @@ export function PuzzleBoard({
             visibleY -
             (trayPlacement === 'right' ? trayScroll.value : 0);
           visual.trayAttached.value = true;
-          visual.engineX = runtime.position.x;
-          visual.engineY = runtime.position.y;
+          synced.x = runtime.position.x;
+          synced.y = runtime.position.y;
           visual.x.value = reduceMotion
             ? runtime.position.x
             : withSpring(runtime.position.x, {
@@ -625,8 +658,8 @@ export function PuzzleBoard({
           // position. Assist has no gesture, so it still needs a visible move
           // from the tray slot to the newly locked engine coordinates.
           visual.trayAttached.value = false;
-          visual.engineX = runtime.position.x;
-          visual.engineY = runtime.position.y;
+          synced.x = runtime.position.x;
+          synced.y = runtime.position.y;
           if (animateProgrammaticTrayExit) {
             visual.x.value = reduceMotion
               ? runtime.position.x
@@ -643,8 +676,8 @@ export function PuzzleBoard({
           }
         }
       } else {
-        if (runtime.position.x !== visual.engineX) {
-          visual.engineX = runtime.position.x;
+        if (runtime.position.x !== synced.x) {
+          synced.x = runtime.position.x;
           visual.x.value = reduceMotion
             ? runtime.position.x
             : withSpring(runtime.position.x, {
@@ -652,8 +685,8 @@ export function PuzzleBoard({
                 stiffness: 380,
               });
         }
-        if (runtime.position.y !== visual.engineY) {
-          visual.engineY = runtime.position.y;
+        if (runtime.position.y !== synced.y) {
+          synced.y = runtime.position.y;
           visual.y.value = reduceMotion
             ? runtime.position.y
             : withSpring(runtime.position.y, {
@@ -662,8 +695,8 @@ export function PuzzleBoard({
               });
         }
       }
-      if (runtime.rotation !== visual.engineRotation) {
-        visual.engineRotation = runtime.rotation;
+      if (runtime.rotation !== synced.rotation) {
+        synced.rotation = runtime.rotation;
         visual.rotation.value = reduceMotion
           ? runtime.rotation
           : withSpring(runtime.rotation, {
@@ -672,8 +705,8 @@ export function PuzzleBoard({
             });
       }
       const nextFactor = runtime.inTray ? trayMetrics.scale : 1;
-      if (nextFactor !== visual.engineTrayFactor) {
-        visual.engineTrayFactor = nextFactor;
+      if (nextFactor !== synced.trayFactor) {
+        synced.trayFactor = nextFactor;
         // Grows to full size as it leaves the tray, shrinks back on return, and
         // adapts in place when rotation changes the tray scale.
         visual.trayFactor.value = reduceMotion
@@ -682,6 +715,7 @@ export function PuzzleBoard({
       }
     });
   }, [
+    engineSync,
     layout.pieces,
     pieces,
     reduceMotion,

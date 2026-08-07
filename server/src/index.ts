@@ -572,20 +572,18 @@ export class CategoryPhotoPool extends DurableObject<Env> {
     }
     const whereClause =
       clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-    const orderClause =
-      targetAspect === undefined
-        ? 'random()'
-        : 'ABS(((CAST(width AS REAL) / CAST(height AS REAL)) / ?) - 1.0), random()';
-    if (targetAspect !== undefined) {
-      queryParameters.push(targetAspect);
-    }
+    // Every photo left after the filters fits the caller's viewport within the
+    // tolerance the client itself accepts, so the choice among them is random.
+    // Ranking by closeness to the target instead made selection deterministic:
+    // one device asking the same category always got back the single
+    // nearest-aspect photo in the pool, puzzle after puzzle.
     const row = this.ctx.storage.sql
       .exec<PoolRow>(
         `SELECT id, width, height, alt_description, url, photographer_name,
                 photographer_url, download_location
          FROM photos
          ${whereClause}
-         ORDER BY ${orderClause}
+         ORDER BY random()
          LIMIT 1`,
         ...queryParameters,
       )
