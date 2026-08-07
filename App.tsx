@@ -10,10 +10,18 @@ import { isPhaseFieldLabUrl, PhaseFieldLabScreen } from './src/features/lab';
 import { RootNavigator } from './src/navigation';
 import { PremiumAccessProvider } from './src/premium';
 import { PuzzleSessionProvider } from './src/puzzle/context';
+import { installBakedCutLibrary } from './src/puzzle/cutters/biomorphic/bakedCutSource';
+import { BAKED_CUT_LIBRARY } from './src/puzzle/cutters/biomorphic/bakedLibrary.generated';
 import { retryPendingPhotoUses } from './src/services/unsplash';
 import { startPendingPhotoTrackingRetries } from './src/services/unsplash/pendingPhotoTracking';
 
 import 'react-native-url-polyfill/auto';
+
+// Solving a cut takes minutes on a phone, so the cutters read pre-generated
+// ones. Installed at module load rather than in an effect: the first puzzle can
+// be requested before any component has mounted, and falling back to the solver
+// for it would freeze the app on its very first board.
+installBakedCutLibrary(BAKED_CUT_LIBRARY);
 
 export default function App() {
   const isPhaseFieldLab =
