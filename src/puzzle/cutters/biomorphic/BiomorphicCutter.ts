@@ -10,6 +10,7 @@ import {
   canonicalizeBiomorphicSeed,
   generateBiomorphicPieces,
 } from './generateBiomorphic';
+import { biomorphicPiecesFrom } from './bakedCutSource';
 import { generateBiomorphicPhaseFieldPieces } from './generateBiomorphicPhaseField';
 
 const BIOMORPHIC_CUT_VERSION = 2;
@@ -98,12 +99,21 @@ export const BiomorphicCutter: PuzzleCutter = {
               height,
               cutDescriptor.seed,
             )
-          : generateBiomorphicPhaseFieldPieces(
+          : biomorphicPiecesFrom(
+              'living-fringe',
               cutDescriptor.rows,
               cutDescriptor.columns,
               width,
               height,
               cutDescriptor.seed,
+              () =>
+                generateBiomorphicPhaseFieldPieces(
+                  cutDescriptor.rows,
+                  cutDescriptor.columns,
+                  width,
+                  height,
+                  cutDescriptor.seed,
+                ),
             ),
     };
   },

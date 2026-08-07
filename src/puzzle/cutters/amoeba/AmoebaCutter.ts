@@ -6,6 +6,7 @@ import type {
   PuzzleLayout,
 } from '../../types/layout';
 import { canonicalizeBiomorphicSeed } from '../biomorphic/generateBiomorphic';
+import { biomorphicPiecesFrom } from '../biomorphic/bakedCutSource';
 import { generateBiomorphicPhaseFieldPieces } from '../biomorphic/generateBiomorphicPhaseField';
 import { resolveBoardSize } from '../resolveBoardSize';
 
@@ -82,13 +83,22 @@ export const AmoebaCutter: PuzzleCutter = {
       cutDescriptor,
       image,
       boardSize: { width, height },
-      pieces: generateBiomorphicPhaseFieldPieces(
+      pieces: biomorphicPiecesFrom(
+        'amoeba-coral',
         cutDescriptor.rows,
         cutDescriptor.columns,
         width,
         height,
         cutDescriptor.seed,
-        'amoeba',
+        () =>
+          generateBiomorphicPhaseFieldPieces(
+            cutDescriptor.rows,
+            cutDescriptor.columns,
+            width,
+            height,
+            cutDescriptor.seed,
+            'amoeba',
+          ),
       ),
     };
   },
