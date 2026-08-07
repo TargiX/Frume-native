@@ -1,0 +1,122 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+import { encodeBakedCut, type BakedCut } from "./bakedCut";
+import { CUT_STYLES, type CutStyle } from "./cutStyles";
+import { createBiomorphicPhaseFieldTopology } from "./generateBiomorphicPhaseField";
+import { BIOMORPHIC_PHASE_FIELD_NUMERICS } from "./phaseFieldLabConfig";
+
+/**
+ * The bake job for the shipped cut library.
+ *
+ * It lives as a skipped test rather than a standalone script because the repo
+ * has no TypeScript runner and one is not worth a dependency for this. Run it
+ * with FRUME_BAKE=1 and it writes the library; leave the variable unset and
+ * `npm test` steps over it.
+ *
+ *   FRUME_BAKE=1 npx vitest run src/puzzle/cutters/biomorphic/bakeCutLibrary
+ *
+ * Existing files are kept, so an interrupted bake resumes where it stopped.
+ */
+
+const GRIDS: readonly (readonly [number, number])[] = [
+  [3, 3],
+  [4, 4],
+  [5, 5],
+];
+const SEEDS_PER_GRID = Number(process.env.FRUME_BAKE_SEEDS ?? 8);
+const OUTPUT = process.env.FRUME_BAKE_OUT ?? "assets/cuts";
+
+function bakeOne(
+  style: CutStyle,
+  rows: number,
+  columns: number,
+  seedIndex: number,
+): { baked: BakedCut; seed: string } {
+  const seed = `${style.id}-${rows}x${columns}-${seedIndex}`;
+  const topology = createBiomorphicPhaseFieldTopology(
+    rows,
+    columns,
+    seed,
+    "dendrite",
+    style.profile,
+    {
+      ...BIOMORPHIC_PHASE_FIELD_NUMERICS,
+      samplesPerPiece: style.samplesPerPiece,
+    },
+  );
+  return { baked: encodeBakedCut(topology), seed };
+}
+
+describe.skipIf(!process.env.FRUME_BAKE)("bake the cut library", () => {
+  it("writes every style, grid and seed", () => {
+    const index: Record<string, string[]> = {};
+    let written = 0;
+    let skipped = 0;
+    const startedAt = Date.now();
+
+    for (const style of CUT_STYLES) {
+      for (const [rows, columns] of GRIDS) {
+        const directory = `${OUTPUT}/${style.id}/${rows}x${columns}`;
+        mkdirSync(directory, { recursive: true });
+        const key = `${style.id}/${rows}x${columns}`;
+        index[key] = [];
+        for (let seedIndex = 0; seedIndex < SEEDS_PER_GRID; seedIndex += 1) {
+          const file = `${directory}/${seedIndex}.json`;
+          index[key].push(`${seedIndex}.json`);
+          if (existsSync(file)) {
+            skipped += 1;
+            continue;
+          }
+          const { baked } = bakeOne(style, rows, columns, seedIndex);
+          writeFileSync(file, JSON.stringify(baked));
+          written += 1;
+          // eslint-disable-next-line no-console
+          console.log(
+            `${file} — ${(JSON.stringify(baked).length / 1024).toFixed(1)} KB, ` +
+              `${((Date.now() - startedAt) / 1000).toFixed(0)} s elapsed`,
+          );
+        }
+      }
+    }
+
+    writeFileSync(
+      `${OUTPUT}/index.json`,
+      JSON.stringify({ seedsPerGrid: SEEDS_PER_GRID, cuts: index }, null, 2),
+    );
+    // eslint-disable-next-line no-console
+    console.log(`baked ${written}, kept ${skipped}`);
+    expect(written + skipped).toBe(
+      CUT_STYLES.length * GRIDS.length * SEEDS_PER_GRID,
+    );
+  }, 24 * 60 * 60 * 1000);
+});
+
+describe("cut styles", () => {
+  it("bakes and decodes every shipping style", async () => {
+    // The smallest grid only: this guards the wiring -- that each style's
+    // profile survives the solver and the codec -- not the library itself.
+    const { decodeBakedCut } = await import("./bakedCut");
+    const { isBiomorphicTopologySafe } = await import("./generateBiomorphic");
+    for (const style of CUT_STYLES) {
+      const topology = createBiomorphicPhaseFieldTopology(
+        3,
+        3,
+        `smoke-${style.id}`,
+        "dendrite",
+        style.profile,
+        { ...BIOMORPHIC_PHASE_FIELD_NUMERICS, samplesPerPiece: 42 },
+      );
+      const rebuilt = decodeBakedCut(encodeBakedCut(topology));
+      expect(rebuilt.cells, style.id).toHaveLength(9);
+      expect(isBiomorphicTopologySafe(rebuilt), style.id).toBe(true);
+    }
+  }, 600_000);
+
+  it("gives every style a distinct id and name", () => {
+    const ids = CUT_STYLES.map((style) => style.id);
+    const names = CUT_STYLES.map((style) => style.name);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});

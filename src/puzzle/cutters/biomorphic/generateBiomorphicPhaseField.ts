@@ -3453,13 +3453,21 @@ export function createBiomorphicPhaseFieldTopology(
   columns: number,
   seed: string,
   style: BiomorphicPhaseFieldStyle = "dendrite",
+  /**
+   * A full profile, for the shipping cut styles, which are more than the two
+   * the solver knows by name. Omit to use the named style's own profile.
+   */
+  profile?: BiomorphicPhaseFieldProfile,
+  numerics: BiomorphicPhaseFieldNumerics = BIOMORPHIC_PHASE_FIELD_NUMERICS,
 ): BiomorphicTopology {
   assertDimensions(rows, columns);
   const simulation = simulatePhaseField(
     rows,
     columns,
     seed,
-    SIMULATION_PROFILES[style],
+    profile ?? SIMULATION_PROFILES[style],
+    false,
+    numerics,
   );
   let lastError: unknown;
   for (const smoothingPasses of [1, 0, 2]) {

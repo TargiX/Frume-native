@@ -54,7 +54,12 @@ describe('AmoebaCutter', () => {
       seed: 'amoeba-repeat',
     });
     expect(living.pieces).not.toEqual(first.pieces);
-  }, 120_000);
+    // Three production-resolution boards: an Amoeba 4x4 solves in about 49 s
+    // and a Living one in 16 s on an idle laptop, so this sat just under the
+    // old 120 s limit and tipped over it whenever the suite loaded the machine.
+    // The generation cost is the reason cuts are moving to a baked library;
+    // once the cutters read from it this test becomes instant.
+  }, 300_000);
 
   it('rejects descriptors from other cutters', async () => {
     const living = await BiomorphicCutter.generate(image, {
