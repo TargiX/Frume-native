@@ -204,13 +204,20 @@ export function DifficultyScreen({ navigation, route }: Props) {
     imageWidth > 0 && imageHeight > 0 ? imageWidth / imageHeight : 4 / 3;
   const playLayout = useMemo(
     () =>
-      computeSafeAreaPlayLayout(width, height, insets, imageAspect),
+      computeSafeAreaPlayLayout(
+        width,
+        height,
+        insets,
+        imageAspect,
+        pieceCount(selectedDifficulty),
+      ),
     [
       height,
       imageAspect,
       insets.bottom,
       insets.left,
       insets.right,
+      selectedDifficulty,
       insets.top,
       width,
     ],

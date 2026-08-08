@@ -362,6 +362,13 @@ type PuzzleBoardProps = {
   layout: PuzzleLayout;
   pieces: Record<string, PieceRuntimeState>;
   engine: PuzzleEngine;
+  /**
+   * The table's usable rectangle. A magnified board is clipped to this, so it
+   * fills the screen the player actually has rather than the rectangle the
+   * board happens to occupy at rest.
+   */
+  viewportWidth?: number;
+  viewportHeight?: number;
   snapFeedback: SnapFeedback | null;
   completed?: boolean;
   guideMode?: PuzzleGuideMode;
@@ -372,6 +379,8 @@ export function PuzzleBoard({
   layout,
   pieces,
   engine,
+  viewportWidth,
+  viewportHeight,
   snapFeedback,
   completed = false,
   guideMode = 'cuts',
@@ -515,11 +524,13 @@ export function PuzzleBoard({
     : 0;
   const maxScroll = trayExtent ? Math.max(0, -trayExtent.min + 12) : 0;
 
+  const viewWidth = Math.max(workspaceWidth, viewportWidth ?? 0);
+  const viewHeight = Math.max(workspaceHeight, viewportHeight ?? 0);
   const cameraBounds: BoardCameraBounds = {
     contentWidth: workspaceWidth,
     contentHeight: workspaceHeight,
-    viewportWidth: workspaceWidth,
-    viewportHeight: workspaceHeight,
+    viewportWidth: viewWidth,
+    viewportHeight: viewHeight,
   };
 
   /**
@@ -904,7 +915,7 @@ export function PuzzleBoard({
         style={[
           styles.workspace,
           styles.viewport,
-          { width: workspaceWidth, height: workspaceHeight },
+          { width: viewWidth, height: viewHeight },
         ]}
       >
         {/*

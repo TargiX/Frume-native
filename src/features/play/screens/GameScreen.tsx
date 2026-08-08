@@ -116,10 +116,18 @@ export function GameScreen({ navigation }: Props) {
   const currentBoardHeight = state?.layout.boardSize.height;
   const imageAspect =
     image && image.width > 0 && image.height > 0 ? image.width / image.height : 4 / 3;
+  const currentPieceCount = state?.layout.pieces.length ?? 0;
   const playLayout = useMemo(
     () =>
-      computeSafeAreaPlayLayout(width, height, insets, imageAspect),
+      computeSafeAreaPlayLayout(
+        width,
+        height,
+        insets,
+        imageAspect,
+        currentPieceCount,
+      ),
     [
+      currentPieceCount,
       height,
       imageAspect,
       insets.bottom,
@@ -251,6 +259,7 @@ export function GameScreen({ navigation }: Props) {
         height,
         insets,
         nextAspect,
+        currentPieceCount,
       );
       const startResult = await startTrackedNextPuzzle(
         buildNextPuzzleSessionParams(session, result, {
@@ -456,6 +465,12 @@ export function GameScreen({ navigation }: Props) {
           layout={state.layout}
           pieces={state.pieces}
           engine={engine}
+          viewportWidth={
+            width - insets.left - insets.right - TABLE_INSET * 2
+          }
+          viewportHeight={
+            height - insets.top - insets.bottom - TABLE_INSET * 2
+          }
           snapFeedback={state.snapFeedback}
           completed={isCompleted}
           guideMode={guideMode}
@@ -536,12 +551,9 @@ const styles = StyleSheet.create({
   boardFrame: {
     borderRadius: 4,
     overflow: 'visible',
-    // No border: the board reads as a recess in the table, held by shadow alone.
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
+    // The board carries its own depth now that a zoomed board fills the whole
+    // table: a shadow on this frame would outline the empty table around it.
+    elevation: 0,
   },
   hudLayer: {
     ...StyleSheet.absoluteFillObject,

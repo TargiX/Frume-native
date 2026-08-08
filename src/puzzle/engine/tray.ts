@@ -23,6 +23,36 @@ export const TRAY_WIDTH_RATIO = 0.15;
  */
 export const TRAY_BOARD_GAP = 16;
 
+/**
+ * How many rows the shelf is dealt into.
+ *
+ * One row is the shelf a small puzzle wants: every waiting piece is in reach
+ * with a short flick. At a hundred pieces that same row becomes a corridor
+ * several screens long, so the shelf gains depth instead of length — the same
+ * move a real player makes when the box lid runs out of room.
+ */
+export function trayLanes(pieceCount: number): number {
+  if (pieceCount > 120) {
+    return 3;
+  }
+  if (pieceCount > 40) {
+    return 2;
+  }
+  return 1;
+}
+
+/**
+ * How much taller the shelf gets, which is not the same as how many rows it
+ * holds. A third row must not take a third of the table: past two the shelf
+ * keeps its height and the rows share it, so the pieces get smaller and the
+ * player leans in with a pinch instead of losing the board.
+ */
+export const MAX_TRAY_DEPTH = 2;
+
+export function trayDepth(pieceCount: number): number {
+  return Math.min(trayLanes(pieceCount), MAX_TRAY_DEPTH);
+}
+
 export type TrayMetrics = {
   placement: PuzzleTrayPlacement;
   /** Tray rectangle in the shared board-and-tray coordinate space. */
@@ -32,6 +62,8 @@ export type TrayMetrics = {
   height: number;
   /** Scale pieces are drawn at while resting in the tray. */
   scale: number;
+  /** Rows (bottom tray) or columns (side tray) the shelf is dealt into. */
+  lanes: number;
   /** Extent of one slot along the tray's scrolling axis. */
   slotExtent: number;
   /** Full extent of the scrollable content along that axis. */
@@ -58,16 +90,20 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   const placement = layout.trayPlacement ?? 'bottom';
   const largest = largestBounds(layout.pieces);
 
+  const lanes = trayLanes(layout.pieces.length);
+
   if (placement === 'right') {
-    const width = Math.max(
-      MIN_TRAY_WIDTH,
-      (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
-    );
+    const width =
+      Math.max(
+        MIN_TRAY_WIDTH,
+        (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
+      ) * trayDepth(layout.pieces.length);
+    const laneWidth = width / lanes;
     const height = boardHeight;
-    const scale = Math.min(1, (width - TRAY_PADDING * 2) / largest.width);
+    const scale = Math.min(1, (laneWidth - TRAY_PADDING * 2) / largest.width);
     const slotExtent = largest.height * scale + TRAY_GAP;
-    const columnHeight =
-      slotExtent * layout.pieces.length + TRAY_PADDING * 2;
+    const slotsPerLane = Math.ceil(layout.pieces.length / lanes);
+    const columnHeight = slotExtent * slotsPerLane + TRAY_PADDING * 2;
     const contentExtent = Math.max(columnHeight, height);
     const origin = columnHeight < height ? (height - columnHeight) / 2 : 0;
 
@@ -78,23 +114,27 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
       width,
       height,
       scale,
+      lanes,
       slotExtent,
       contentExtent,
       origin,
     };
   }
 
-  const height = Math.max(
-    MIN_TRAY_HEIGHT,
-    (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
-  );
-  const scale = Math.min(1, (height - TRAY_PADDING * 2) / largest.height);
+  const height =
+    Math.max(
+      MIN_TRAY_HEIGHT,
+      (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+    ) * trayDepth(layout.pieces.length);
+  const laneHeight = height / lanes;
+  const scale = Math.min(1, (laneHeight - TRAY_PADDING * 2) / largest.height);
 
   // Uniform slots sized to the widest piece: every piece then sits centred in
   // an identical cell, so the row is evenly spaced whatever order it is dealt
   // in. Sizing each slot to its own piece leaves ragged gaps instead.
   const slotExtent = largest.width * scale + TRAY_GAP;
-  const rowWidth = slotExtent * layout.pieces.length + TRAY_PADDING * 2;
+  const slotsPerLane = Math.ceil(layout.pieces.length / lanes);
+  const rowWidth = slotExtent * slotsPerLane + TRAY_PADDING * 2;
   const contentExtent = Math.max(rowWidth, boardWidth);
   const origin = rowWidth < boardWidth ? (boardWidth - rowWidth) / 2 : 0;
 
@@ -105,6 +145,7 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
     width: boardWidth,
     height,
     scale,
+    lanes,
     slotExtent,
     contentExtent,
     origin,
@@ -124,18 +165,28 @@ export function getTraySlotPosition(
   piece: PuzzlePieceDefinition,
 ): { x: number; y: number } {
   const metrics = getTrayMetrics(layout);
-  const slotStart = metrics.origin + TRAY_PADDING + slot * metrics.slotExtent;
+  // Fill across the depth first, then move along: neighbouring pieces end up
+  // stacked in the same column, so scrolling reveals whole columns rather than
+  // sliding one row past three times.
+  const lane = slot % metrics.lanes;
+  const laneSlot = Math.floor(slot / metrics.lanes);
+  const slotStart =
+    metrics.origin + TRAY_PADDING + laneSlot * metrics.slotExtent;
 
   if (metrics.placement === 'right') {
+    const laneWidth = metrics.width / metrics.lanes;
     return {
       x:
         metrics.left +
-        (metrics.width - piece.bounds.width) / 2,
+        lane * laneWidth +
+        (laneWidth - piece.bounds.width) / 2,
       y:
         slotStart +
         (metrics.slotExtent - piece.bounds.height) / 2,
     };
   }
+
+  const laneHeight = metrics.height / metrics.lanes;
 
   // Tray scale is applied around the piece's own centre, so a shrunk piece is
   // drawn offset by half of what it lost. Centring on the *unscaled* bounds
@@ -144,6 +195,9 @@ export function getTraySlotPosition(
   // drops tall pieces straight out of the bottom of the tray.
   return {
     x: slotStart + (metrics.slotExtent - piece.bounds.width) / 2,
-    y: metrics.top + (metrics.height - piece.bounds.height) / 2,
+    y:
+      metrics.top +
+      lane * laneHeight +
+      (laneHeight - piece.bounds.height) / 2,
   };
 }

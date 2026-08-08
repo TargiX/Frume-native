@@ -3,6 +3,7 @@ import {
   MIN_TRAY_WIDTH,
   TRAY_BOARD_GAP,
   TRAY_HEIGHT_RATIO,
+  trayDepth,
   TRAY_WIDTH_RATIO,
 } from '../../../puzzle/engine/tray';
 import type { PuzzleTrayPlacement } from '../../../puzzle/types';
@@ -35,6 +36,12 @@ export function computePlayLayout(
   windowWidth: number,
   windowHeight: number,
   imageAspect = 4 / 3,
+  /**
+   * Known before the cut exists, and needed here: a large puzzle is dealt into
+   * a deeper shelf, and that depth has to come out of the board's share of the
+   * screen rather than off the bottom of it.
+   */
+  pieceCount = 0,
 ): PlayLayout {
   const maxSurfaceWidth = Math.max(windowWidth - TABLE_INSET * 2, 200);
   const maxSurfaceHeight = Math.max(windowHeight - TABLE_INSET * 2, 240);
@@ -42,6 +49,7 @@ export function computePlayLayout(
     Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : 4 / 3;
   const trayPlacement: PuzzleTrayPlacement =
     windowWidth > windowHeight ? 'right' : 'bottom';
+  const depth = trayDepth(pieceCount);
 
   // The gap between board and tray is table, not play area: take it off the
   // top before splitting what is left, or the surface overflows the screen.
@@ -50,16 +58,17 @@ export function computePlayLayout(
     const maxBoardWidth = Math.max(
       1,
       Math.min(
-        splittableWidth * (1 - TRAY_WIDTH_RATIO),
-        splittableWidth - MIN_TRAY_WIDTH,
+        splittableWidth / (1 + (TRAY_WIDTH_RATIO / (1 - TRAY_WIDTH_RATIO)) * depth),
+        splittableWidth - MIN_TRAY_WIDTH * depth,
       ),
     );
     const boardWidth = Math.min(maxBoardWidth, maxSurfaceHeight * safeAspect);
     const boardHeight = boardWidth / safeAspect;
-    const trayWidth = Math.max(
-      MIN_TRAY_WIDTH,
-      (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
-    );
+    const trayWidth =
+      Math.max(
+        MIN_TRAY_WIDTH,
+        (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
+      ) * depth;
 
     return {
       surfaceWidth: boardWidth + TRAY_BOARD_GAP + trayWidth,
@@ -74,16 +83,18 @@ export function computePlayLayout(
   const maxBoardHeight = Math.max(
     1,
     Math.min(
-      splittableHeight * (1 - TRAY_HEIGHT_RATIO),
-      splittableHeight - MIN_TRAY_HEIGHT,
+      splittableHeight /
+        (1 + (TRAY_HEIGHT_RATIO / (1 - TRAY_HEIGHT_RATIO)) * depth),
+      splittableHeight - MIN_TRAY_HEIGHT * depth,
     ),
   );
   const boardWidth = Math.min(maxSurfaceWidth, maxBoardHeight * safeAspect);
   const boardHeight = boardWidth / safeAspect;
-  const trayHeight = Math.max(
-    MIN_TRAY_HEIGHT,
-    (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
-  );
+  const trayHeight =
+    Math.max(
+      MIN_TRAY_HEIGHT,
+      (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+    ) * depth;
 
   return {
     surfaceWidth: boardWidth,
@@ -104,10 +115,12 @@ export function computeSafeAreaPlayLayout(
   windowHeight: number,
   insets: PlayAreaInsets,
   imageAspect = 4 / 3,
+  pieceCount = 0,
 ): PlayLayout {
   return computePlayLayout(
     windowWidth - insets.left - insets.right,
     windowHeight - insets.top - insets.bottom,
     imageAspect,
+    pieceCount,
   );
 }
