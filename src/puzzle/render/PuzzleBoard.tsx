@@ -585,6 +585,28 @@ export function PuzzleBoard({
     pinchStartScale,
   ]);
 
+  useEffect(() => {
+    // The view has to be settled against its bounds, not just clamped by
+    // gestures: a board smaller than the table must sit in the middle of it,
+    // and a rotation or a new puzzle changes both the board and the table.
+    const scale = clampScale(cameraScale.value, cameraBounds);
+    const settled = clampOffset(
+      { scale, x: cameraX.value, y: cameraY.value },
+      cameraBounds,
+    );
+    cameraScale.value = settled.scale;
+    cameraX.value = settled.x;
+    cameraY.value = settled.y;
+  }, [
+    cameraBounds.contentHeight,
+    cameraBounds.contentWidth,
+    cameraBounds.viewportHeight,
+    cameraBounds.viewportWidth,
+    cameraScale,
+    cameraX,
+    cameraY,
+  ]);
+
   const cameraStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: cameraX.value },
@@ -864,6 +886,18 @@ export function PuzzleBoard({
     engine.clearSnapFeedback();
   }, [engine, reduceMotion, snapFeedback, visuals]);
 
+  /**
+   * Pieces waiting on the shelf are drawn clipped to it. The row is longer than
+   * the shelf and scrolls inside it, so without this the ones scrolled past its
+   * ends stay visible, hanging over the table on either side.
+   */
+  const trayClip = {
+    x: trayMetrics.left,
+    y: trayMetrics.top,
+    width: trayMetrics.width,
+    height: trayMetrics.height,
+  };
+
   const orderedPieces = useMemo(
     () =>
       [...layout.pieces].sort((a, b) => {
@@ -971,10 +1005,33 @@ export function PuzzleBoard({
         >
           <Group transform={sceneTransform}>
             <Group opacity={piecesOpacity}>
+              <Group clip={trayClip}>
+                {orderedPieces.map((definition) => {
+                  const runtime = pieces[definition.id];
+                  const visual = visuals.get(definition.id);
+                  if (!runtime || !visual || !runtime.inTray) {
+                    return null;
+                  }
+                  return (
+                    <PieceDrawing
+                      key={definition.id}
+                      definition={definition}
+                      runtime={runtime}
+                      visual={visual}
+                      skiaImage={skiaImage}
+                      boardWidth={boardSize.width}
+                      boardHeight={boardSize.height}
+                      showSeams={!completed}
+                      trayScroll={trayScroll}
+                      trayPlacement={trayPlacement}
+                    />
+                  );
+                })}
+              </Group>
               {orderedPieces.map((definition) => {
                 const runtime = pieces[definition.id];
                 const visual = visuals.get(definition.id);
-                if (!runtime || !visual) {
+                if (!runtime || !visual || runtime.inTray) {
                   return null;
                 }
                 return (
