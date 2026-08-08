@@ -41,7 +41,7 @@ const params = {
     width: 1200,
     height: 800,
   },
-  difficulty: 'easy' as const,
+  difficulty: '3x3' as const,
   boardMaxWidth: 320,
   boardMaxHeight: 240,
 };
@@ -235,13 +235,13 @@ describe('puzzle session replacement identity guard', () => {
       layout,
       engine: new PuzzleEngine(layout),
       cutterId: 'classic',
-      difficulty: 'easy',
+      difficulty: '3x3',
     };
     const nextSession: PuzzleSession = {
       layout,
       engine: new PuzzleEngine(layout),
       cutterId: 'classic',
-      difficulty: 'easy',
+      difficulty: '3x3',
     };
     const replacement: PuzzleSessionReplacement = {
       previousSession,
@@ -297,7 +297,7 @@ describe('recoverAndFlushPuzzleSession', () => {
       layout,
       engine,
       cutterId: 'classic',
-      difficulty: 'easy',
+      difficulty: '3x3',
     };
     const persistence = {
       flush: async () => {
@@ -351,7 +351,7 @@ describe('syncPuzzleSessionActivity', () => {
       layout,
       engine,
       cutterId: 'classic',
-      difficulty: 'easy',
+      difficulty: '3x3',
     };
 
     engine.start(1_000);
