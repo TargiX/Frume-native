@@ -8,10 +8,14 @@ import {
   Rect,
   Skia,
   type SkImage,
+  type Transforms3d,
 } from '@shopify/react-native-skia';
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { useDerivedValue } from 'react-native-reanimated';
+import {
+  useDerivedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import type {
   PuzzleGuideMode,
@@ -28,6 +32,12 @@ type BoardSurfaceProps = {
   guideMode?: PuzzleGuideMode;
   skiaImage?: SkImage | null;
   appearance?: PuzzleTableAppearance;
+  /**
+   * The player's view, applied inside the canvas rather than to it. Magnifying
+   * what Skia already drew thickens every guide line; redrawing at the new size
+   * keeps them a hair wide at any zoom.
+   */
+  transform?: SharedValue<Transforms3d>;
 };
 
 /**
@@ -43,6 +53,7 @@ export function BoardSurface({
   guideMode = 'cuts',
   skiaImage,
   appearance = 'felt',
+  transform,
 }: BoardSurfaceProps) {
   const { width, height } = layout.boardSize;
   const material = resolveBoardMaterial(appearance);
@@ -140,6 +151,7 @@ export function BoardSurface({
 
   return (
     <Canvas style={styles.canvas} pointerEvents="none">
+      <Group transform={transform}>
       <Rect x={0} y={0} width={width} height={height}>
         <LinearGradient
           start={gradientStart}
@@ -167,6 +179,7 @@ export function BoardSurface({
       ) : null}
       {gridGuide ? <Group>{gridGuide}</Group> : null}
       {cutGuide ? <Group>{cutGuide}</Group> : null}
+      </Group>
     </Canvas>
   );
 }

@@ -1,6 +1,10 @@
 /**
  * Where the player is looking on a board larger than the screen.
  *
+ * Every function here is a worklet as well as ordinary code: the gestures that
+ * drive the view run on the UI thread and must clamp without a round trip, and
+ * the same rules are what the tests exercise.
+ *
  * Below about 25 pieces the whole board fits and there is nothing to move; past
  * that a piece drawn to fit the screen is smaller than a fingertip, so the board
  * is drawn at a workable size and the player moves over it instead. This module
@@ -40,6 +44,8 @@ export const BOARD_OVERSCROLL = 48;
 
 /** The scale at which the whole board is visible, never magnifying past 1. */
 export function fitScale(bounds: BoardCameraBounds): number {
+  'worklet';
+
   const { contentWidth, contentHeight, viewportWidth, viewportHeight } = bounds;
   if (contentWidth <= 0 || contentHeight <= 0) {
     return 1;
@@ -52,6 +58,8 @@ export function fitScale(bounds: BoardCameraBounds): number {
 }
 
 export function clampScale(scale: number, bounds: BoardCameraBounds): number {
+  'worklet';
+
   const minimum = fitScale(bounds);
   if (!Number.isFinite(scale)) {
     return minimum;
@@ -69,6 +77,8 @@ export function clampOffset(
   bounds: BoardCameraBounds,
   overscroll = 0,
 ): BoardCamera {
+  'worklet';
+
   const scaledWidth = bounds.contentWidth * camera.scale;
   const scaledHeight = bounds.contentHeight * camera.scale;
 
@@ -77,6 +87,8 @@ export function clampOffset(
     scaledExtent: number,
     viewportExtent: number,
   ): number => {
+    'worklet';
+
     if (scaledExtent <= viewportExtent) {
       return (viewportExtent - scaledExtent) / 2;
     }
@@ -102,6 +114,8 @@ export function zoomAround(
   nextScale: number,
   bounds: BoardCameraBounds,
 ): BoardCamera {
+  'worklet';
+
   const scale = clampScale(nextScale, bounds);
   const ratio = scale / camera.scale;
   return clampOffset(
@@ -116,6 +130,8 @@ export function zoomAround(
 
 /** The view a puzzle opens at: the whole board, centred. */
 export function initialCamera(bounds: BoardCameraBounds): BoardCamera {
+  'worklet';
+
   const scale = fitScale(bounds);
   return clampOffset({ scale, x: 0, y: 0 }, bounds);
 }
@@ -128,6 +144,8 @@ export function toBoardPoint(
   camera: BoardCamera,
   point: { x: number; y: number },
 ): { x: number; y: number } {
+  'worklet';
+
   return {
     x: (point.x - camera.x) / camera.scale,
     y: (point.y - camera.y) / camera.scale,

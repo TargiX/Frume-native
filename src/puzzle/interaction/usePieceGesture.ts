@@ -34,6 +34,12 @@ type UsePieceGestureParams = {
   trayAttached: SharedValue<boolean>;
   trayFactor: SharedValue<number>;
   trayScale: number;
+  /**
+   * How magnified the board is. A gesture reports movement in screen points,
+   * so at any zoom other than 1 the piece has to be moved by less than the
+   * finger travelled to stay underneath it.
+   */
+  cameraScale: SharedValue<number>;
   positionX: SharedValue<number>;
   positionY: SharedValue<number>;
 };
@@ -54,6 +60,7 @@ export function usePieceGesture({
   trayAttached,
   trayFactor,
   trayScale,
+  cameraScale,
   positionX,
   positionY,
 }: UsePieceGestureParams) {
@@ -122,8 +129,9 @@ export function usePieceGesture({
         runOnJS(beginDrag)();
       })
       .onUpdate((event) => {
-        positionX.value = originX.value + event.translationX;
-        positionY.value = originY.value + event.translationY;
+        const scale = cameraScale.value || 1;
+        positionX.value = originX.value + event.translationX / scale;
+        positionY.value = originY.value + event.translationY / scale;
       })
       .onFinalize(() => {
         if (dragActive.value) {
@@ -210,8 +218,9 @@ export function usePieceGesture({
     }
     scrollTray
       .onChange((event) => {
+        const scale = cameraScale.value || 1;
         const change =
-          trayPlacement === 'bottom' ? event.changeX : event.changeY;
+          (trayPlacement === 'bottom' ? event.changeX : event.changeY) / scale;
         trayScroll.value = Math.min(
           maxTrayScroll,
           Math.max(minTrayScroll, trayScroll.value + change),
@@ -220,6 +229,7 @@ export function usePieceGesture({
     return Gesture.Race(scrollTray, pieceDrag);
   }, [
       beginDrag,
+      cameraScale,
       dragActive,
       endDrag,
       inTray,

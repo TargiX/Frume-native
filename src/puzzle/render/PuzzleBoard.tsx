@@ -6,6 +6,7 @@ import {
   Path,
   Skia,
   type SkImage,
+  type Transforms3d,
   useImage,
 } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
@@ -39,6 +40,12 @@ import { MIN_TOUCH_TARGET } from '../../theme';
 import type { PuzzleEngine } from '../engine';
 import { getTrayMetrics } from '../engine/tray';
 import { usePieceGesture } from '../interaction';
+import {
+  clampOffset,
+  clampScale,
+  zoomAround,
+  type BoardCameraBounds,
+} from '../interaction/boardCamera';
 import type {
   PieceRuntimeState,
   PuzzleGuideMode,
@@ -222,6 +229,7 @@ type PieceGestureOverlayProps = {
   trayLeft: number;
   trayPlacement: 'bottom' | 'right';
   trayScale: number;
+  cameraScale: SharedValue<number>;
   minTrayScroll: number;
   maxTrayScroll: number;
   totalPieces: number;
@@ -239,6 +247,7 @@ function PieceGestureOverlay({
   trayLeft,
   trayPlacement,
   trayScale,
+  cameraScale,
   minTrayScroll,
   maxTrayScroll,
   totalPieces,
@@ -271,6 +280,7 @@ function PieceGestureOverlay({
     trayAttached: visual.trayAttached,
     trayFactor: visual.trayFactor,
     trayScale,
+    cameraScale,
     positionX: visual.x,
     positionY: visual.y,
   });
@@ -391,6 +401,13 @@ export function PuzzleBoard({
   const trayMetrics = useMemo(() => getTrayMetrics(layout), [layout]);
   const trayPlacement = trayMetrics.placement;
   const trayScroll = useMemo(() => makeMutable(0), []);
+  // The view onto the workspace. At 1 the whole thing is visible, which is how
+  // every puzzle opens; past that the player is looking closer at a board whose
+  // pieces are smaller than a fingertip.
+  const cameraScale = useMemo(() => makeMutable(1), []);
+  const cameraX = useMemo(() => makeMutable(0), []);
+  const cameraY = useMemo(() => makeMutable(0), []);
+  const pinchStartScale = useMemo(() => makeMutable(1), []);
   const entranceEngineRef = useRef<PuzzleEngine | null>(null);
   const surfaceWidth = trayMetrics.left + trayMetrics.width;
   const surfaceHeight = trayMetrics.top + trayMetrics.height;
@@ -498,6 +515,85 @@ export function PuzzleBoard({
     : 0;
   const maxScroll = trayExtent ? Math.max(0, -trayExtent.min + 12) : 0;
 
+  const cameraBounds: BoardCameraBounds = {
+    contentWidth: workspaceWidth,
+    contentHeight: workspaceHeight,
+    viewportWidth: workspaceWidth,
+    viewportHeight: workspaceHeight,
+  };
+
+  /**
+   * Two fingers move the view, one finger plays. Keeping the split at the
+   * number of fingers means a drag never has to be disambiguated from a pan,
+   * so picking up a piece stays immediate at any zoom.
+   */
+  const cameraGesture = useMemo(() => {
+    const pinch = Gesture.Pinch()
+      .onStart(() => {
+        pinchStartScale.value = cameraScale.value;
+      })
+      .onUpdate((event) => {
+        const next = zoomAround(
+          {
+            scale: cameraScale.value,
+            x: cameraX.value,
+            y: cameraY.value,
+          },
+          { x: event.focalX, y: event.focalY },
+          pinchStartScale.value * event.scale,
+          cameraBounds,
+        );
+        cameraScale.value = next.scale;
+        cameraX.value = next.x;
+        cameraY.value = next.y;
+      });
+
+    const pan = Gesture.Pan()
+      .minPointers(2)
+      .onChange((event) => {
+        const next = clampOffset(
+          {
+            scale: cameraScale.value,
+            x: cameraX.value + event.changeX,
+            y: cameraY.value + event.changeY,
+          },
+          cameraBounds,
+        );
+        cameraX.value = next.x;
+        cameraY.value = next.y;
+      });
+
+    return Gesture.Simultaneous(pinch, pan);
+    // Bounds change only with the workspace, which is a relayout.
+  }, [
+    cameraBounds.contentHeight,
+    cameraBounds.contentWidth,
+    cameraScale,
+    cameraX,
+    cameraY,
+    pinchStartScale,
+  ]);
+
+  const cameraStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: cameraX.value },
+      { translateY: cameraY.value },
+      { scale: cameraScale.value },
+    ],
+  }));
+
+  /**
+   * The same view, handed to Skia instead of applied to its output. Scaling the
+   * canvas as a view magnifies the pixels it already drew, which thickens every
+   * seam and doubles the guide lines; scaling inside the canvas redraws the
+   * paths at the new size and they stay a hair wide at any zoom.
+   */
+  const sceneTransform = useDerivedValue<Transforms3d>(() => [
+    { translateX: cameraX.value + surfaceInset * cameraScale.value },
+    { translateY: cameraY.value + surfaceInset * cameraScale.value },
+    { scale: cameraScale.value },
+  ]);
+
   const trayScrollGesture = useMemo(() => {
     const gesture = Gesture.Pan();
     if (trayPlacement === 'bottom') {
@@ -506,14 +602,15 @@ export function PuzzleBoard({
       gesture.activeOffsetY([-6, 6]).failOffsetX([-12, 12]);
     }
     return gesture.onChange((event) => {
+      const scale = cameraScale.value || 1;
       const change =
-        trayPlacement === 'bottom' ? event.changeX : event.changeY;
+        (trayPlacement === 'bottom' ? event.changeX : event.changeY) / scale;
       trayScroll.value = Math.min(
         maxScroll,
         Math.max(minScroll, trayScroll.value + change),
       );
     });
-  }, [maxScroll, minScroll, trayPlacement, trayScroll]);
+  }, [cameraScale, maxScroll, minScroll, trayPlacement, trayScroll]);
 
   // Keep at least one waiting piece on screen. Without this the last pieces can
   // sit entirely beyond the edge with nothing to say they are there.
@@ -802,174 +899,186 @@ export function PuzzleBoard({
   }
 
   return (
-    <View
-      style={[
-        styles.workspace,
-        { width: workspaceWidth, height: workspaceHeight },
-      ]}
-    >
+    <GestureDetector gesture={cameraGesture}>
       <View
         style={[
-          styles.boardSurface,
-          {
-            left: surfaceInset,
-            top: surfaceInset,
-            width: boardSize.width,
-            height: boardSize.height,
-          },
+          styles.workspace,
+          styles.viewport,
+          { width: workspaceWidth, height: workspaceHeight },
         ]}
-        pointerEvents="none"
       >
-        <BoardSurface
-          layout={layout}
-          guideMode={completed ? 'none' : guideMode}
-          skiaImage={skiaImage}
-          appearance={tableAppearance}
-        />
-      </View>
-
-      {/* Behind the pieces: drag anywhere on the strip to scroll the tray. */}
-      <GestureDetector gesture={trayScrollGesture}>
+        {/*
+          Skia draws at the player's zoom rather than being magnified after the
+          fact, so seams and guides stay a hair wide however close they look.
+          Only the plain views above and below it are scaled as views.
+        */}
         <View
           style={[
-            styles.tray,
-            traySurfaceFrame,
-          ]}
-        >
-          <TraySurface
-            width={traySurfaceFrame.width}
-            height={traySurfaceFrame.height}
-            placement={trayPlacement}
-            appearance={tableAppearance}
-          />
-        </View>
-      </GestureDetector>
-
-
-      <Canvas
-        style={styles.scene}
-        pointerEvents="none"
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={
-          image.accessibilityLabel ?? 'The photograph being assembled'
-        }
-      >
-        <Group
-          transform={[
-            { translateX: surfaceInset },
-            { translateY: surfaceInset },
-          ]}
-        >
-          <Group opacity={piecesOpacity}>
-            {orderedPieces.map((definition) => {
-            const runtime = pieces[definition.id];
-            const visual = visuals.get(definition.id);
-            if (!runtime || !visual) {
-              return null;
-            }
-            return (
-              <PieceDrawing
-                key={definition.id}
-                definition={definition}
-                runtime={runtime}
-                visual={visual}
-                skiaImage={skiaImage}
-                boardWidth={boardSize.width}
-                boardHeight={boardSize.height}
-                showSeams={!completed}
-                trayScroll={trayScroll}
-                trayPlacement={trayPlacement}
-              />
-            );
-            })}
-          </Group>
-          <Group
-            opacity={fullOpacity}
-            clip={{
-              x: 0,
-              y: 0,
-              width: boardSize.width,
-              height: boardSize.height,
-            }}
-          >
-            <DrawBoardImage
-              skiaImage={skiaImage}
-              boardWidth={boardSize.width}
-              boardHeight={boardSize.height}
-            />
-          </Group>
-        </Group>
-      </Canvas>
-
-      <View style={styles.gestureLayer} pointerEvents="box-none">
-        {orderedPieces.map((definition) => {
-          const runtime = pieces[definition.id];
-          const visual = visuals.get(definition.id);
-          if (!runtime || !visual) {
-            return null;
-          }
-          return (
-            <PieceGestureOverlay
-              key={definition.id}
-              definition={definition}
-              runtime={runtime}
-              visual={visual}
-              engine={engine}
-              interactive={!completed}
-              trayScroll={trayScroll}
-              trayTop={trayMetrics.top}
-              trayLeft={trayMetrics.left}
-              trayPlacement={trayPlacement}
-              trayScale={trayMetrics.scale}
-              minTrayScroll={minScroll}
-              maxTrayScroll={maxScroll}
-              totalPieces={layout.pieces.length}
-              surfaceInset={surfaceInset}
-            />
-          );
-        })}
-      </View>
-
-      {/* Above the pieces, so a hint is never hidden by what it points at. */}
-      {trayExtent ? (
-        <View
-          style={[
-            styles.tray,
-            {
-              left: trayMetrics.left + surfaceInset,
-              top: trayMetrics.top + surfaceInset,
-              width: trayMetrics.width,
-              height: trayMetrics.height,
-            },
+            styles.boardSurface,
+            { width: workspaceWidth, height: workspaceHeight },
           ]}
           pointerEvents="none"
         >
-          <TrayEdgeHint
-            side={trayPlacement === 'bottom' ? 'left' : 'top'}
-            edge={trayExtent.min}
-            trayScroll={trayScroll}
-            viewportExtent={trayViewportExtent}
-            crossExtent={
-              trayPlacement === 'bottom'
-                ? trayMetrics.height
-                : trayMetrics.width
-            }
-          />
-          <TrayEdgeHint
-            side={trayPlacement === 'bottom' ? 'right' : 'bottom'}
-            edge={trayExtent.max}
-            trayScroll={trayScroll}
-            viewportExtent={trayViewportExtent}
-            crossExtent={
-              trayPlacement === 'bottom'
-                ? trayMetrics.height
-                : trayMetrics.width
-            }
+          <BoardSurface
+            layout={layout}
+            guideMode={completed ? 'none' : guideMode}
+            skiaImage={skiaImage}
+            appearance={tableAppearance}
+            transform={sceneTransform}
           />
         </View>
-      ) : null}
-    </View>
+
+        {/* Behind the pieces: drag anywhere on the strip to scroll the tray. */}
+        <Animated.View
+          style={[
+            styles.scene,
+            { width: workspaceWidth, height: workspaceHeight },
+            cameraStyle,
+          ]}
+          pointerEvents="box-none"
+        >
+          <GestureDetector gesture={trayScrollGesture}>
+            <View style={[styles.tray, traySurfaceFrame]}>
+              <TraySurface
+                width={traySurfaceFrame.width}
+                height={traySurfaceFrame.height}
+                placement={trayPlacement}
+                appearance={tableAppearance}
+              />
+            </View>
+          </GestureDetector>
+        </Animated.View>
+
+        <Canvas
+          style={styles.scene}
+          pointerEvents="none"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={
+            image.accessibilityLabel ?? 'The photograph being assembled'
+          }
+        >
+          <Group transform={sceneTransform}>
+            <Group opacity={piecesOpacity}>
+              {orderedPieces.map((definition) => {
+                const runtime = pieces[definition.id];
+                const visual = visuals.get(definition.id);
+                if (!runtime || !visual) {
+                  return null;
+                }
+                return (
+                  <PieceDrawing
+                    key={definition.id}
+                    definition={definition}
+                    runtime={runtime}
+                    visual={visual}
+                    skiaImage={skiaImage}
+                    boardWidth={boardSize.width}
+                    boardHeight={boardSize.height}
+                    showSeams={!completed}
+                    trayScroll={trayScroll}
+                    trayPlacement={trayPlacement}
+                  />
+                );
+              })}
+            </Group>
+            <Group
+              opacity={fullOpacity}
+              clip={{
+                x: 0,
+                y: 0,
+                width: boardSize.width,
+                height: boardSize.height,
+              }}
+            >
+              <DrawBoardImage
+                skiaImage={skiaImage}
+                boardWidth={boardSize.width}
+                boardHeight={boardSize.height}
+              />
+            </Group>
+          </Group>
+        </Canvas>
+
+        <Animated.View
+          style={[
+            styles.scene,
+            { width: workspaceWidth, height: workspaceHeight },
+            cameraStyle,
+          ]}
+          pointerEvents="box-none"
+        >
+          <View style={styles.gestureLayer} pointerEvents="box-none">
+            {orderedPieces.map((definition) => {
+              const runtime = pieces[definition.id];
+              const visual = visuals.get(definition.id);
+              if (!runtime || !visual) {
+                return null;
+              }
+              return (
+                <PieceGestureOverlay
+                  key={definition.id}
+                  definition={definition}
+                  runtime={runtime}
+                  visual={visual}
+                  engine={engine}
+                  interactive={!completed}
+                  trayScroll={trayScroll}
+                  trayTop={trayMetrics.top}
+                  trayLeft={trayMetrics.left}
+                  trayPlacement={trayPlacement}
+                  trayScale={trayMetrics.scale}
+                  cameraScale={cameraScale}
+                  minTrayScroll={minScroll}
+                  maxTrayScroll={maxScroll}
+                  totalPieces={layout.pieces.length}
+                  surfaceInset={surfaceInset}
+                />
+              );
+            })}
+          </View>
+
+          {/* Above the pieces, so a hint is never hidden by what it points at. */}
+          {trayExtent ? (
+            <View
+              style={[
+                styles.tray,
+                {
+                  left: trayMetrics.left + surfaceInset,
+                  top: trayMetrics.top + surfaceInset,
+                  width: trayMetrics.width,
+                  height: trayMetrics.height,
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <TrayEdgeHint
+                side={trayPlacement === 'bottom' ? 'left' : 'top'}
+                edge={trayExtent.min}
+                trayScroll={trayScroll}
+                viewportExtent={trayViewportExtent}
+                crossExtent={
+                  trayPlacement === 'bottom'
+                    ? trayMetrics.height
+                    : trayMetrics.width
+                }
+              />
+              <TrayEdgeHint
+                side={trayPlacement === 'bottom' ? 'right' : 'bottom'}
+                edge={trayExtent.max}
+                trayScroll={trayScroll}
+                viewportExtent={trayViewportExtent}
+                crossExtent={
+                  trayPlacement === 'bottom'
+                    ? trayMetrics.height
+                    : trayMetrics.width
+                }
+              />
+            </View>
+          ) : null}
+        </Animated.View>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -977,6 +1086,13 @@ const styles = StyleSheet.create({
   workspace: {
     alignSelf: 'center',
     overflow: 'visible',
+  },
+  /**
+   * Clips the magnified board to the space the table gives it — without this a
+   * zoomed board draws over the HUD and off the edges of the screen.
+   */
+  viewport: {
+    overflow: 'hidden',
   },
   loading: {
     backgroundColor: PUZZLE_SURFACE_COLORS.boardLoading,
