@@ -74,6 +74,15 @@ module.exports = {
         },
       ],
       [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'Frume opens your photo library only when you choose a photograph to cut into a puzzle. The photograph stays on this device.',
+          // Frume never takes a picture; only an existing photograph is chosen.
+          cameraPermission: false,
+        },
+      ],
+      [
         'expo-build-properties',
         {
           ios: {

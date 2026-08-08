@@ -19,6 +19,7 @@ import {
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
+import { usePuzzleSessionContext } from '../../../puzzle/context';
 import {
   fetchPuzzlePhoto,
   PUZZLE_CATEGORIES,
@@ -32,6 +33,7 @@ import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
 } from '../utils/photoRequest';
+import { pickOwnPhoto } from '../utils/pickOwnPhoto';
 import { CATEGORY_COVERS } from './categoryCovers';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Gallery'>;
@@ -40,6 +42,9 @@ export function GalleryScreen({ navigation }: Props) {
   const { width, height, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+  const { session } = usePuzzleSessionContext();
+  // The saved puzzle's photograph must survive the cleanup an import runs.
+  const sessionImageUri = session?.layout.image.uri;
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -133,6 +138,34 @@ export function GalleryScreen({ navigation }: Props) {
         }
       }
     }
+  };
+
+  const useOwnPhoto = async () => {
+    requestRef.current?.controller.abort(
+      new Error('Replaced by an imported photograph'),
+    );
+    requestRef.current = null;
+    nextRequestIdRef.current += 1;
+    setError(null);
+
+    const result = await pickOwnPhoto([sessionImageUri]);
+    if (!mountedRef.current) {
+      return;
+    }
+    if (result.status === 'cancelled') {
+      return;
+    }
+    if (result.status === 'rejected') {
+      setError(result.message);
+      return;
+    }
+    setPending(null);
+    navigation.navigate('Difficulty', {
+      imageUri: result.photo.uri,
+      imageWidth: result.photo.width,
+      imageHeight: result.photo.height,
+      photoDescription: 'Your own photograph',
+    });
   };
 
   return (
@@ -238,18 +271,26 @@ export function GalleryScreen({ navigation }: Props) {
         })}
       </View>
 
-      {!compactLandscape ? (
+      <View style={styles.entryActions}>
+        {!compactLandscape ? (
+          <Button
+            label="Surprise me"
+            variant="secondary"
+            onPress={() => pickPhoto()}
+            accessibilityHint={
+              loading
+                ? 'Cancels the current search and finds a surprise photo instead'
+                : undefined
+            }
+          />
+        ) : null}
         <Button
-          label="Surprise me"
+          label="Use my photo"
           variant="secondary"
-          onPress={() => pickPhoto()}
-          accessibilityHint={
-            loading
-              ? 'Cancels the current search and finds a surprise photo instead'
-              : undefined
-          }
+          onPress={() => void useOwnPhoto()}
+          accessibilityHint="Opens your photo library to cut one of your own photographs"
         />
-      ) : null}
+      </View>
 
       {loadingMessage ? (
         <Text
@@ -386,6 +427,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowRadius: 8,
+  },
+  entryActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    alignItems: 'center',
   },
   status: {
     color: colors.textSecondary,

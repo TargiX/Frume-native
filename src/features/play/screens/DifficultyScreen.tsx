@@ -351,7 +351,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
       premiumStartPendingRef.current = false;
 
       // Persist required provider tracking before leaving setup. The network
-      // drain runs in the background and is retried on the next launch.
+      // drain runs in the background and is retried on the next launch. A
+      // photograph the player brought themselves has no provider to report to.
+      if (!downloadLocation || !trackingToken) {
+        navigation.navigate('Game', { difficulty: selectedDifficulty });
+        return;
+      }
       try {
         await enqueuePhotoUse(
           { links: { download_location: downloadLocation } },
