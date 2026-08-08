@@ -1,7 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
   androidAccessibilityLiveRegion,
@@ -14,6 +14,12 @@ import { isPremiumCutter, usePremiumAccess } from '../../../premium';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
 import { usePuzzleEngine } from '../../../puzzle/hooks';
 import { colors, spacing } from '../../../theme';
+import { HomeBackdrop } from '../components/HomeBackdrop';
+import { HomePhotoCard } from '../components/HomePhotoCard';
+import {
+  assetAspectRatio,
+  HOME_FALLBACK_PHOTOS,
+} from '../components/homePhotoSources';
 import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import {
   createPlayHomeActionGuard,
@@ -171,29 +177,48 @@ export function PlayHomeScreen({ navigation }: Props) {
     navigateToGame(pendingResume.session);
   };
 
+  // Home is about one photograph: the print shows it sharp, the backdrop shows
+  // the same frame out of focus. Before a first puzzle it stands in with a
+  // bundled cover, chosen once per mount so it cannot swap while being read.
+  const [fallbackIndex] = useState(() =>
+    Math.floor(Math.random() * HOME_FALLBACK_PHOTOS.length),
+  );
+  const fallbackPhoto = HOME_FALLBACK_PHOTOS[fallbackIndex];
+  const sessionImage = session?.layout.image;
+  const heroSource = sessionImage
+    ? { uri: sessionImage.uri }
+    : fallbackPhoto;
+  const heroAspectRatio =
+    sessionImage && sessionImage.width > 0 && sessionImage.height > 0
+      ? sessionImage.width / sessionImage.height
+      : assetAspectRatio(fallbackPhoto);
+  const primaryLabel = checkingAccess
+    ? 'Checking access…'
+    : sessionAccessBlocked && !premiumLoading
+      ? `Unlock to continue ${savedPremiumCutLabel}`
+      : !session
+        ? 'Choose a photograph'
+        : completed
+          ? 'Look at it again'
+          : 'Continue';
+  const openPrimary = session
+    ? () => void continuePuzzle()
+    : navigateToGallery;
+
   return (
-    <Screen centered scroll safeTop style={styles.content}>
-      <Image
-        source={require('../../../../assets/frume-adaptive-foreground.png')}
-        style={styles.mark}
-        resizeMode="contain"
-        accessible={false}
-      />
-      <Text style={styles.eyebrow}>Frume</Text>
-      <Text
-        style={styles.title}
-        accessibilityRole="header"
-        maxFontSizeMultiplier={2}
-      >
-        Photographs, cut differently
-      </Text>
-      <Text style={styles.subtitle}>
-        Choose a photograph, settle into the table, and take your time.
-      </Text>
-      <Text style={styles.accessNote}>
-        Classic cuts are free. Organic and Living cuts share one permanent
-        premium unlock.
-      </Text>
+    <Screen
+      centered
+      scroll
+      safeTop
+      style={styles.content}
+      background={<HomeBackdrop source={heroSource} />}
+    >
+      <View style={styles.masthead}>
+        <Text style={styles.wordmark} accessibilityRole="header">
+          FRUME
+        </Text>
+        <Text style={styles.tagline}>Photographs, cut differently</Text>
+      </View>
 
       {restoring ? (
         <View
@@ -203,42 +228,57 @@ export function PlayHomeScreen({ navigation }: Props) {
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.restoringText}>{restoringMessage}</Text>
         </View>
-      ) : session ? (
-        <View style={styles.actions}>
-          <Button
-            label={
-              checkingAccess
-                ? 'Checking access…'
-                : sessionAccessBlocked && !premiumLoading
-                  ? `Unlock to continue ${savedPremiumCutLabel} puzzle`
-                  : completed
-                    ? 'View completed puzzle'
-                    : `Continue · ${placed} of ${total}`
+      ) : (
+        <>
+          <HomePhotoCard
+            source={heroSource}
+            aspectRatio={heroAspectRatio}
+            onPress={openPrimary}
+            accessibilityLabel={
+              session
+                ? `${completed ? 'Completed puzzle' : 'Puzzle in progress'}, ${placed} of ${total} pieces placed`
+                : 'Choose a photograph to cut'
             }
-            onPress={() => void continuePuzzle()}
+            accessibilityHint={
+              session
+                ? 'Opens the table with this photograph'
+                : 'Opens the photograph themes'
+            }
             disabled={checkingAccess}
-            block
+            progress={
+              session && !completed ? { placed, total } : undefined
+            }
+            caption={
+              session ? undefined : 'A photograph from the library, ready to cut'
+            }
           />
+
+          <View style={styles.actions}>
+            <Button
+              label={primaryLabel}
+              onPress={openPrimary}
+              disabled={checkingAccess}
+              block
+            />
+            {session ? (
+              <View style={styles.centered}>
+                <Button
+                  label="New photograph"
+                  variant="ghost"
+                  onPress={navigateToGallery}
+                  disabled={checkingAccess}
+                />
+              </View>
+            ) : null}
+          </View>
+
           {sessionAccessBlocked && !premiumLoading ? (
             <Text style={styles.savedPremiumNotice}>
               Your {savedPremiumCutLabel} puzzle is still saved. Restore or
               unlock Premium Cuts to continue it.
             </Text>
           ) : null}
-          <Button
-            label="New puzzle"
-            variant="secondary"
-            onPress={navigateToGallery}
-            disabled={checkingAccess}
-            block
-          />
-        </View>
-      ) : (
-        <Button
-          label="Choose a puzzle"
-          onPress={navigateToGallery}
-          disabled={checkingAccess}
-        />
+        </>
       )}
 
       {persistenceError ? (
@@ -250,14 +290,16 @@ export function PlayHomeScreen({ navigation }: Props) {
         </Text>
       ) : null}
 
-      <Button
-        label="About & Support"
-        variant="ghost"
-        onPress={navigateToAbout}
-        disabled={checkingAccess}
-        accessibilityHint="Opens privacy, support, purchase restore, and app version information"
-        style={styles.aboutButton}
-      />
+      <View style={styles.centered}>
+        <Button
+          label="About & Support"
+          variant="ghost"
+          onPress={navigateToAbout}
+          disabled={checkingAccess}
+          accessibilityHint="Opens privacy, support, purchase restore, and app version information"
+          style={styles.aboutButton}
+        />
+      </View>
       <PremiumCutsSheet
         visible={showPremium}
         onClose={closePremium}
@@ -269,40 +311,30 @@ export function PlayHomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   content: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.xl,
   },
-  mark: {
-    width: 78,
-    height: 78,
-    marginBottom: spacing.lg,
+  centered: {
+    alignSelf: 'center',
   },
-  eyebrow: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    marginBottom: spacing.md,
+  masthead: {
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  title: {
+  wordmark: {
     color: colors.textPrimary,
-    fontSize: 34,
-    lineHeight: 39,
-    fontWeight: '700',
-    letterSpacing: -0.7,
-    marginBottom: spacing.md,
+    fontSize: 15,
+    fontWeight: '600',
+    // Positive tracking: small caps-only type needs the air to stay legible,
+    // and the spacing is what makes it read as a mark rather than a word.
+    letterSpacing: 7,
+    textAlign: 'center',
   },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 16,
-    lineHeight: 23,
-    marginBottom: spacing.lg,
-  },
-  accessNote: {
+  tagline: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: spacing.xl,
+    fontSize: 14,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   restoring: {
     alignSelf: 'stretch',
@@ -318,12 +350,14 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignSelf: 'stretch',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   savedPremiumNotice: {
     color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
+    textAlign: 'center',
   },
   error: {
     color: colors.danger,
@@ -332,7 +366,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   aboutButton: {
-    marginTop: spacing.xl,
     paddingHorizontal: 0,
   },
 });

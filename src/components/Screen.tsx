@@ -15,6 +15,11 @@ type ScreenProps = {
   scroll?: boolean;
   /** Include the top safe area when the native navigation header is hidden. */
   safeTop?: boolean;
+  /**
+   * Full-bleed decoration drawn behind the content, outside the content
+   * column and the safe-area padding.
+   */
+  background?: React.ReactNode;
   style?: ViewStyle;
 };
 
@@ -28,6 +33,7 @@ export function Screen({
   centered = false,
   scroll = false,
   safeTop = false,
+  background,
   style,
 }: ScreenProps) {
   const edges = safeTop
@@ -36,6 +42,7 @@ export function Screen({
 
   return (
     <SafeAreaView style={styles.root} edges={edges}>
+      {background}
       {scroll ? (
         <ScrollView
           style={styles.scroll}
