@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { TRAY_BOARD_GAP } from '../../../puzzle/engine/tray';
 import {
   computePlayLayout,
   computeSafeAreaPlayLayout,
+  TABLE_INSET,
 } from './boardLayout';
 
 describe('computePlayLayout', () => {
@@ -23,6 +25,24 @@ describe('computePlayLayout', () => {
     expect(layout.surfaceHeight).toBeLessThanOrEqual(568);
     expect(layout.boardWidth).toBeGreaterThan(0);
     expect(layout.boardHeight).toBeGreaterThan(0);
+  });
+
+  it('frames the tray with the same gap the table keeps on the sides', () => {
+    expect(TRAY_BOARD_GAP).toBe(TABLE_INSET);
+
+    const portrait = computePlayLayout(390, 844, 3 / 2);
+    const landscape = computePlayLayout(844, 390, 3 / 2);
+
+    // The surface is board + gap + tray, so the shelf reads as its own thing.
+    expect(portrait.surfaceHeight).toBeGreaterThanOrEqual(
+      portrait.boardHeight + TRAY_BOARD_GAP,
+    );
+    expect(landscape.surfaceWidth).toBeGreaterThanOrEqual(
+      landscape.boardWidth + TRAY_BOARD_GAP,
+    );
+    // And it still fits: the gap comes out of the play area, not the screen.
+    expect(portrait.surfaceHeight).toBeLessThanOrEqual(844 - TABLE_INSET * 2);
+    expect(landscape.surfaceWidth).toBeLessThanOrEqual(844 - TABLE_INSET * 2);
   });
 
   it('moves the tray to the side in landscape so the board can use full height', () => {

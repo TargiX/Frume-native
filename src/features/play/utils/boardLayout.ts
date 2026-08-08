@@ -1,6 +1,7 @@
 import {
   MIN_TRAY_HEIGHT,
   MIN_TRAY_WIDTH,
+  TRAY_BOARD_GAP,
   TRAY_HEIGHT_RATIO,
   TRAY_WIDTH_RATIO,
 } from '../../../puzzle/engine/tray';
@@ -42,12 +43,15 @@ export function computePlayLayout(
   const trayPlacement: PuzzleTrayPlacement =
     windowWidth > windowHeight ? 'right' : 'bottom';
 
+  // The gap between board and tray is table, not play area: take it off the
+  // top before splitting what is left, or the surface overflows the screen.
   if (trayPlacement === 'right') {
+    const splittableWidth = Math.max(1, maxSurfaceWidth - TRAY_BOARD_GAP);
     const maxBoardWidth = Math.max(
       1,
       Math.min(
-        maxSurfaceWidth * (1 - TRAY_WIDTH_RATIO),
-        maxSurfaceWidth - MIN_TRAY_WIDTH,
+        splittableWidth * (1 - TRAY_WIDTH_RATIO),
+        splittableWidth - MIN_TRAY_WIDTH,
       ),
     );
     const boardWidth = Math.min(maxBoardWidth, maxSurfaceHeight * safeAspect);
@@ -58,7 +62,7 @@ export function computePlayLayout(
     );
 
     return {
-      surfaceWidth: boardWidth + trayWidth,
+      surfaceWidth: boardWidth + TRAY_BOARD_GAP + trayWidth,
       surfaceHeight: boardHeight,
       boardWidth,
       boardHeight,
@@ -66,11 +70,12 @@ export function computePlayLayout(
     };
   }
 
+  const splittableHeight = Math.max(1, maxSurfaceHeight - TRAY_BOARD_GAP);
   const maxBoardHeight = Math.max(
     1,
     Math.min(
-      maxSurfaceHeight * (1 - TRAY_HEIGHT_RATIO),
-      maxSurfaceHeight - MIN_TRAY_HEIGHT,
+      splittableHeight * (1 - TRAY_HEIGHT_RATIO),
+      splittableHeight - MIN_TRAY_HEIGHT,
     ),
   );
   const boardWidth = Math.min(maxSurfaceWidth, maxBoardHeight * safeAspect);
@@ -82,7 +87,7 @@ export function computePlayLayout(
 
   return {
     surfaceWidth: boardWidth,
-    surfaceHeight: boardHeight + trayHeight,
+    surfaceHeight: boardHeight + TRAY_BOARD_GAP + trayHeight,
     boardWidth,
     boardHeight,
     trayPlacement,

@@ -16,6 +16,12 @@ export const MIN_TRAY_HEIGHT = 76;
 export const MIN_TRAY_WIDTH = 76;
 /** Share of a landscape play surface given to the side tray. */
 export const TRAY_WIDTH_RATIO = 0.15;
+/**
+ * Table left between the board and the tray shelf. Matches the inset the table
+ * keeps around the surface (TABLE_INSET), so the tray is framed on every side
+ * instead of butting straight up against the board.
+ */
+export const TRAY_BOARD_GAP = 16;
 
 export type TrayMetrics = {
   placement: PuzzleTrayPlacement;
@@ -67,7 +73,7 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
 
     return {
       placement,
-      left: boardWidth,
+      left: boardWidth + TRAY_BOARD_GAP,
       top: 0,
       width,
       height,
@@ -95,7 +101,7 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   return {
     placement,
     left: 0,
-    top: boardHeight,
+    top: boardHeight + TRAY_BOARD_GAP,
     width: boardWidth,
     height,
     scale,
