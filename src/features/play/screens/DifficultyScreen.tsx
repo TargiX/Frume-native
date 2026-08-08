@@ -91,12 +91,32 @@ const CUT_STYLES: {
   {
     id: 'biomorphic',
     label: 'Living',
-    detail: 'Crystal-grown, branching cells',
+    detail: 'An even fringe of fine teeth',
+  },
+  {
+    id: 'living-spectrum',
+    label: 'Living spectrum',
+    detail: 'Teeth on five scales, seams varied',
+  },
+  {
+    id: 'crystal',
+    label: 'Crystal',
+    detail: 'Six-fold tips, each piece its own way',
+  },
+  {
+    id: 'crystal-quartered',
+    label: 'Crystal quartered',
+    detail: 'Four headings, blockier and mineral',
   },
   {
     id: 'amoeba',
     label: 'Amoeba',
     detail: 'Blobby, pseudopod interlocks',
+  },
+  {
+    id: 'amoeba-columnar',
+    label: 'Amoeba columnar',
+    detail: 'Tall banded lobes over stretched sites',
   },
 ];
 
@@ -611,8 +631,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
       <View style={styles.guideOptions} accessibilityRole="radiogroup">
         {PUZZLE_GUIDE_OPTIONS.map((option) => {
           const active = selectedGuideMode === option.id;
+          // Every phase-field cut ignores the rectangular grid, so "Grid" is a
+          // zone hint rather than the outline of a piece.
           const livingZones =
-            (selectedCutter === 'biomorphic' || selectedCutter === 'amoeba') &&
+            selectedCutter !== 'classic' &&
+            selectedCutter !== 'organic' &&
             option.id === 'grid';
           const label = livingZones ? 'Zones' : option.label;
           const detail = livingZones

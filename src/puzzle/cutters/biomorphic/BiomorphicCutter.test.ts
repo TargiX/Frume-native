@@ -28,7 +28,11 @@ describe('BiomorphicCutter', () => {
       'classic',
       'organic',
       'biomorphic',
+      'living-spectrum',
+      'crystal',
+      'crystal-quartered',
       'amoeba',
+      'amoeba-columnar',
     ]);
     expect(() => getCutter('fractal')).toThrow(
       'Puzzle cutter "fractal" is not available',

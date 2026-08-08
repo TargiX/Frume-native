@@ -1,5 +1,11 @@
 export { BiomorphicCutter } from './BiomorphicCutter';
 export {
+  AmoebaColumnarCutter,
+  CrystalCutter,
+  CrystalQuarteredCutter,
+  LivingSpectrumCutter,
+} from './createPhaseFieldCutter';
+export {
   canonicalizeBiomorphicSeed,
   createBiomorphicTopology,
   generateBiomorphicPieces,

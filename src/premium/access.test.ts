@@ -7,7 +7,11 @@ describe('premium cut access', () => {
     expect(isPremiumCutter('classic')).toBe(false);
     expect(isPremiumCutter('organic')).toBe(true);
     expect(isPremiumCutter('biomorphic')).toBe(true);
+    expect(isPremiumCutter('living-spectrum')).toBe(true);
+    expect(isPremiumCutter('crystal')).toBe(true);
+    expect(isPremiumCutter('crystal-quartered')).toBe(true);
     expect(isPremiumCutter('amoeba')).toBe(true);
+    expect(isPremiumCutter('amoeba-columnar')).toBe(true);
     expect(isPremiumCutter('fractal')).toBe(true);
   });
 

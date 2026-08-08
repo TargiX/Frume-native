@@ -5,7 +5,11 @@ export type PuzzleCutterId =
   | 'classic'
   | 'organic'
   | 'biomorphic'
+  | 'living-spectrum'
+  | 'crystal'
+  | 'crystal-quartered'
   | 'amoeba'
+  | 'amoeba-columnar'
   | 'fractal';
 
 /** Edge of the board that owns the waiting-piece tray. */
