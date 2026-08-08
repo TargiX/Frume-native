@@ -19,12 +19,22 @@ import { BIOMORPHIC_PHASE_FIELD_NUMERICS } from "./phaseFieldLabConfig";
  * Existing files are kept, so an interrupted bake resumes where it stopped.
  */
 
-const GRIDS: readonly (readonly [number, number])[] = [
-  [3, 3],
-  [4, 4],
-  [5, 5],
+/**
+ * Seeds are set per grid, not once for the library.
+ *
+ * A small cut is taken in at a glance, so a repeat is noticed and eight
+ * variants earn their place. A 7x7 costs six minutes each to solve and is read
+ * piece by piece rather than as a whole, so four is plenty. Larger grids are
+ * deliberately absent: one 100-piece cut takes twenty minutes and one of 196
+ * over an hour, which is not a library, it is a weekend — those sizes belong to
+ * the procedural cutters.
+ */
+const GRIDS: readonly (readonly [number, number, number])[] = [
+  [3, 3, 8],
+  [4, 4, 8],
+  [5, 5, 8],
+  [7, 7, 4],
 ];
-const SEEDS_PER_GRID = Number(process.env.FRUME_BAKE_SEEDS ?? 8);
 const OUTPUT = process.env.FRUME_BAKE_OUT ?? "assets/cuts";
 
 function bakeOne(
@@ -100,12 +110,12 @@ describe.skipIf(!process.env.FRUME_BAKE)("bake the cut library", () => {
     const startedAt = Date.now();
 
     for (const style of CUT_STYLES) {
-      for (const [rows, columns] of GRIDS) {
+      for (const [rows, columns, seeds] of GRIDS) {
         const directory = `${OUTPUT}/${style.id}/${rows}x${columns}`;
         mkdirSync(directory, { recursive: true });
         const key = `${style.id}/${rows}x${columns}`;
         index[key] = [];
-        for (let seedIndex = 0; seedIndex < SEEDS_PER_GRID; seedIndex += 1) {
+        for (let seedIndex = 0; seedIndex < seeds; seedIndex += 1) {
           const file = `${directory}/${seedIndex}.json`;
           index[key].push(`${seedIndex}.json`);
           if (existsSync(file)) {
@@ -126,7 +136,19 @@ describe.skipIf(!process.env.FRUME_BAKE)("bake the cut library", () => {
 
     writeFileSync(
       `${OUTPUT}/index.json`,
-      JSON.stringify({ seedsPerGrid: SEEDS_PER_GRID, cuts: index }, null, 2),
+      JSON.stringify(
+        {
+          seedsPerGrid: Object.fromEntries(
+            GRIDS.map(([rows, columns, seeds]) => [
+              `${rows}x${columns}`,
+              seeds,
+            ]),
+          ),
+          cuts: index,
+        },
+        null,
+        2,
+      ),
     );
     // Metro cannot read a directory at runtime, so the library also needs a
     // module of static requires. Emitting it here keeps it from drifting out of
@@ -138,7 +160,8 @@ describe.skipIf(!process.env.FRUME_BAKE)("bake the cut library", () => {
     // eslint-disable-next-line no-console
     console.log(`baked ${written}, kept ${skipped}`);
     expect(written + skipped).toBe(
-      CUT_STYLES.length * GRIDS.length * SEEDS_PER_GRID,
+      CUT_STYLES.length *
+        GRIDS.reduce((total, [, , seeds]) => total + seeds, 0),
     );
   }, 24 * 60 * 60 * 1000);
 });
