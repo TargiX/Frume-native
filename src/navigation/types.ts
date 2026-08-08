@@ -11,6 +11,8 @@ export type PlayStackParamList = {
     photographerName?: string;
     photographerUrl?: string;
     photoDescription?: string;
+    /** The theme the player asked for; absent means "Surprise me". */
+    categoryId?: string;
     categoryLabel?: string;
     /** Unsplash endpoint pinged when the photo is actually played. */
     downloadLocation: string;

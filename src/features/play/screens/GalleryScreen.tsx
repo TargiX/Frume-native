@@ -21,7 +21,6 @@ import { Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
 import {
   fetchPuzzlePhoto,
-  PhotoApiError,
   PUZZLE_CATEGORIES,
   resolvePuzzlePhotoTargetAspect,
 } from '../../../services/unsplash';
@@ -29,6 +28,10 @@ import { colors, radius, spacing } from '../../../theme';
 import {
   resolveGalleryLayout,
 } from '../utils/galleryLayout';
+import {
+  buildDifficultyRouteParams,
+  describePhotoRequestError,
+} from '../utils/photoRequest';
 import { CATEGORY_COVERS } from './categoryCovers';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Gallery'>;
@@ -110,30 +113,17 @@ export function GalleryScreen({ navigation }: Props) {
         setError('No suitable photo found. Try another theme.');
         return;
       }
-      const { photo, category } = result;
-      navigation.navigate('Difficulty', {
-        imageUri: photo.urls.regular,
-        imageWidth: photo.width,
-        imageHeight: photo.height,
-        photographerName: photo.user.name,
-        photographerUrl: photo.user.links?.html,
-        photoDescription: photo.alt_description ?? undefined,
-        categoryLabel: category.label,
-        downloadLocation: photo.links.download_location,
-        trackingToken: result.tracking_token,
-      });
+      navigation.navigate(
+        'Difficulty',
+        buildDifficultyRouteParams(result, categoryId),
+      );
     } catch (requestError) {
       if (
         mountedRef.current &&
         requestRef.current?.id === requestId &&
         !controller.signal.aborted
       ) {
-        setError(
-          requestError instanceof PhotoApiError &&
-            requestError.code === 'request_timeout'
-            ? 'The photo service took too long. Please try again.'
-            : 'Failed to load photo. Please try again.',
-        );
+        setError(describePhotoRequestError(requestError));
       }
     } finally {
       if (requestRef.current?.id === requestId) {

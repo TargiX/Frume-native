@@ -28,12 +28,20 @@ import {
   type PuzzleDifficulty,
   type PuzzleGuideMode,
 } from '../../../puzzle/types';
-import { enqueuePhotoUse } from '../../../services/unsplash';
+import {
+  enqueuePhotoUse,
+  fetchPuzzlePhoto,
+  resolvePuzzlePhotoTargetAspect,
+} from '../../../services/unsplash';
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
 import { CutStylePreview } from '../components/CutStylePreview';
 import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
 import { resolveDifficultyScreenLayout } from '../utils/difficultyLayout';
+import {
+  buildDifficultyRouteParams,
+  describePhotoRequestError,
+} from '../utils/photoRequest';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Difficulty'>;
 
@@ -52,6 +60,9 @@ const GUIDE_ICONS: Record<
   cuts: 'shapes-outline',
   image: 'image-outline',
 };
+
+const PHOTO_LOAD_ERROR =
+  'The photograph could not be loaded. Try another photo.';
 
 const ATTRIBUTION_HIT_SLOP = {
   top: spacing.xs,
@@ -124,6 +135,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     photographerName,
     photographerUrl,
     photoDescription,
+    categoryId,
     categoryLabel,
     downloadLocation,
     trackingToken,
@@ -142,12 +154,20 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const [imageError, setImageError] = useState(false);
   const [starting, setStarting] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const visibleError = imageError
-    ? 'The photograph could not be loaded. Go back and choose another.'
-    : trackingError ?? error;
+    ? PHOTO_LOAD_ERROR
+    : photoError ?? trackingError ?? error;
   useAccessibilityAnnouncement(visibleError);
   const startingRef = useRef(false);
   const premiumStartPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const photoRequestRef = useRef<{
+    id: number;
+    controller: AbortController;
+  } | null>(null);
+  const nextPhotoRequestIdRef = useRef(0);
   const imageAspect =
     imageWidth > 0 && imageHeight > 0 ? imageWidth / imageHeight : 4 / 3;
   const playLayout = useMemo(
@@ -162,6 +182,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
       insets.top,
       width,
     ],
+  );
+  // Matches what the gallery asked for, so a swapped photo fits the same board.
+  const photoOrientation = height >= width ? 'portrait' : 'landscape';
+  const targetPhotoAspect = resolvePuzzlePhotoTargetAspect(
+    width - insets.left - insets.right,
+    height - insets.top - insets.bottom,
   );
   const { twoPane } = resolveDifficultyScreenLayout({
     width,
@@ -184,6 +210,65 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const onCutStylePress = (cutterId: PlayableCutterId) => {
     setSelectedCutter(cutterId);
     premiumStartPendingRef.current = false;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      photoRequestRef.current?.controller.abort();
+      photoRequestRef.current = null;
+    };
+  }, []);
+
+  /**
+   * Swaps the photograph without leaving setup, keeping the theme the player
+   * chose in the gallery. Nothing is tracked for a photo that is replaced --
+   * the use is only enqueued once a session actually starts.
+   */
+  const onAnotherPhoto = async () => {
+    photoRequestRef.current?.controller.abort(
+      new Error('Replaced by a newer photo selection'),
+    );
+    const requestId = ++nextPhotoRequestIdRef.current;
+    const controller = new AbortController();
+    photoRequestRef.current = { id: requestId, controller };
+    setSwapping(true);
+    setPhotoError(null);
+    setTrackingError(null);
+    try {
+      const result = await fetchPuzzlePhoto(
+        categoryId,
+        controller.signal,
+        photoOrientation,
+        targetPhotoAspect ?? undefined,
+      );
+      if (
+        !mountedRef.current ||
+        photoRequestRef.current?.id !== requestId ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+      setImageError(false);
+      setImageLoading(true);
+      navigation.setParams(buildDifficultyRouteParams(result, categoryId));
+    } catch (requestError) {
+      if (
+        mountedRef.current &&
+        photoRequestRef.current?.id === requestId &&
+        !controller.signal.aborted
+      ) {
+        setPhotoError(describePhotoRequestError(requestError));
+      }
+    } finally {
+      if (photoRequestRef.current?.id === requestId) {
+        photoRequestRef.current = null;
+        if (mountedRef.current) {
+          setSwapping(false);
+        }
+      }
+    }
   };
 
   useEffect(() => {
@@ -297,7 +382,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
         ) : null}
         {imageError ? (
           <Text style={styles.previewError} accessibilityLiveRegion="polite">
-            The photograph could not be loaded. Go back and choose another.
+            {PHOTO_LOAD_ERROR}
           </Text>
         ) : null}
         <Image
@@ -320,6 +405,35 @@ export function DifficultyScreen({ navigation, route }: Props) {
             setImageError(true);
           }}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Another photo"
+          accessibilityHint={
+            categoryLabel
+              ? `Replaces this photograph with another ${categoryLabel} one`
+              : 'Replaces this photograph with another one'
+          }
+          accessibilityState={{ busy: swapping, disabled: swapping || starting }}
+          disabled={swapping || starting}
+          onPress={onAnotherPhoto}
+          style={({ pressed }) => [
+            styles.swapButton,
+            pressed && styles.swapButtonPressed,
+            (swapping || starting) && styles.swapButtonDisabled,
+          ]}
+        >
+          {swapping ? (
+            <ActivityIndicator color={colors.textPrimary} size="small" />
+          ) : (
+            <Ionicons
+              name="shuffle"
+              size={20}
+              color={colors.textPrimary}
+              accessible={false}
+              importantForAccessibility="no"
+            />
+          )}
+        </Pressable>
       </View>
 
       <View style={[styles.meta, twoPane && styles.metaLandscape]}>
@@ -561,13 +675,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
 
   const actionPanel = (
     <View style={[styles.actionPanel, twoPane && styles.actionPanelLandscape]}>
-      {trackingError || error ? (
+      {photoError || trackingError || error ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion="assertive"
           numberOfLines={twoPane ? 2 : undefined}
         >
-          {trackingError ?? error}
+          {photoError ?? trackingError ?? error}
         </Text>
       ) : null}
 
@@ -580,7 +694,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
               : 'Start puzzle'
         }
         onPress={onPlay}
-        disabled={loading || starting || imageError}
+        disabled={loading || starting || swapping || imageError}
         accessibilityHint={
           selectedCutLocked
             ? `Opens the permanent Premium Cuts purchase for ${selectedCut.label}`
@@ -695,6 +809,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 21,
     paddingHorizontal: spacing.xl,
+  },
+  swapButton: {
+    position: 'absolute',
+    zIndex: 2,
+    top: spacing.sm,
+    right: spacing.sm,
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: MIN_TOUCH_TARGET / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(12, 10, 8, 0.62)',
+  },
+  swapButtonPressed: {
+    opacity: 0.78,
+  },
+  swapButtonDisabled: {
+    opacity: 0.5,
   },
   meta: {
     marginTop: spacing.md,
