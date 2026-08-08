@@ -48,10 +48,11 @@ new submission.
 
 **Promise:** a calm, tactile way to turn beautiful photographs into puzzles.
 
-**Business model:** all Classic puzzles and difficulties are free. Premium Cuts
-is a one-time lifetime purchase that unlocks Organic and Living. Fractal is a
-future cut and is not included, advertised, or selectable in 1.0. Frume does
-not sell photographs and does not paywall difficulty.
+**Business model:** all Classic puzzles and every size are free. Premium Cuts
+is a one-time lifetime purchase that unlocks the shaped cuts — Organic, Living,
+Living spectrum, Crystal, Crystal quartered, Amoeba, and Amoeba columnar.
+Fractal is a future cut and is not included, advertised, or selectable in 1.0.
+Frume does not sell photographs and does not paywall size.
 
 ## App Store draft
 
@@ -65,38 +66,49 @@ Quiet photo puzzles
 
 **Promotional text**
 
-Slow down with tactile photo puzzles. Play every Classic difficulty for free,
-or unlock Organic and Living cuts forever with one purchase.
+Slow down with tactile photo puzzles. Cut your own photograph or a curated
+one, play every size for free, and unlock the shaped cuts forever with one
+purchase.
 
 **Description**
 
 Turn a beautiful photograph into a quiet moment of focus.
 
 Frume is a tactile jigsaw puzzle designed around the picture, with a calm
-interface that stays out of the way. Choose a theme, pick your difficulty, and
-solve at your own pace.
+interface that stays out of the way. Choose a photograph, choose how many
+pieces, and solve at your own pace.
 
 FREE CLASSIC PUZZLES
 
-- Play every Classic difficulty for free
-- Choose from curated Nature, City, Animals, Travel, Food, and Ocean themes
-- Connect and arrange pieces with a scrollable tray
+- Every size is free, from 9 pieces to 196
+- Cut a photograph from your own library, or a curated Nature, City, Animals,
+  Travel, Food, or Ocean theme
+- Pinch to look closer on a large board; one finger always plays
+- Pieces wait on a shelf that gains rows as the pile grows
 - Use the photo guide whenever you need it
-- Leave and return without losing your current puzzle
+- Leave and return without losing your puzzle
+
+YOUR OWN PHOTOGRAPHS
+
+Pick a picture from your library and Frume cuts that one. It stays on your
+device: it is never uploaded, and Frume never gains access to your library —
+the system picker hands over a single photograph and nothing else.
 
 PREMIUM CUTS
 
-Organic pieces use irregular, flowing seams. Living pieces grow as non-grid,
-free-form cells with different neighbor patterns. Premium Cuts is one
-optional, non-consumable lifetime purchase. It does not lock difficulty, and
-it is not a subscription.
+Shaped cuts that leave the grid behind. Organic flows in irregular seams;
+Living grows an even fringe of fine teeth; Living spectrum varies those teeth
+across five scales; Crystal makes six-fold mineral tips and Crystal quartered
+four blockier ones; Amoeba forms blobby pseudopod interlocks and Amoeba
+columnar tall banded lobes. Premium Cuts is one optional, non-consumable
+lifetime purchase. It does not lock any size, and it is not a subscription.
 
 Frume does not require an account. Photographer credit is shown for photos
 provided through Unsplash.
 
 **Keywords draft**
 
-jigsaw,puzzle,photo,relaxing,calm,offline,brain,organic,generative,classic
+jigsaw,puzzle,photo,my photos,relaxing,calm,offline,brain,organic,generative
 
 **Primary category**
 
@@ -193,6 +205,18 @@ These are pending edits, not saved dashboard state:
   for **App Functionality**, not linked to the user's identity, and not used for
   tracking. Re-audit the final SDK graph before confirming that no other data
   types apply.
+- **Photographs the player imports are deliberately not declared as collected.**
+  Apple's definition of collection is transmission off the device: an imported
+  picture is copied into Frume's own storage, is never uploaded to the photo
+  service, Unsplash, or anywhere else, and produces no photo-use receipt. The
+  app also never gains photo-library access — `expo-image-picker` presents
+  `PHPickerViewController`, which hands over one file. Confirm both facts
+  against the final binary before answering the questionnaire; if a future
+  feature ever sends an imported picture anywhere, this answer must change to
+  **Photos or Videos**.
+- The photo-library usage string is set through the `expo-image-picker` plugin
+  in `app.config.js`; camera access is explicitly disabled there. Verify the
+  archived `Info.plist` carries that string and no camera entry.
 - Re-answer the complete age-rating questionnaire for the puzzle app, including
   the pending new social-feature questions. Do not carry forward 12+/13+ merely
   because it is the current displayed result.
