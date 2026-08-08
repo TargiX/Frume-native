@@ -145,9 +145,65 @@ export function encodeBakedCut(
   };
 }
 
-export function decodeBakedCut(baked: BakedCut): BiomorphicTopology {
+/**
+ * Quarter turns clockwise on the unit board.
+ *
+ * Turning a cut is free variety: one baked entry serves four boards, and the
+ * styles whose tips prefer a heading -- the crystals -- look most different of
+ * all when turned. Rotation keeps handedness, so every outline still winds the
+ * way it was built; mirroring would not, which is why it is not offered here.
+ */
+export type BakedCutQuarterTurns = 0 | 1 | 2 | 3;
+
+function turnPoint(
+  point: BiomorphicPoint,
+  turns: BakedCutQuarterTurns,
+): BiomorphicPoint {
+  switch (turns) {
+    case 1:
+      return { x: 1 - point.y, y: point.x };
+    case 2:
+      return { x: 1 - point.x, y: 1 - point.y };
+    case 3:
+      return { x: point.y, y: 1 - point.x };
+    default:
+      return point;
+  }
+}
+
+/** The grid coordinate the same cell occupies after the board is turned. */
+function turnCell(
+  row: number,
+  col: number,
+  rows: number,
+  columns: number,
+  turns: BakedCutQuarterTurns,
+): { row: number; col: number } {
+  switch (turns) {
+    case 1:
+      return { row: col, col: rows - 1 - row };
+    case 2:
+      return { row: rows - 1 - row, col: columns - 1 - col };
+    case 3:
+      return { row: columns - 1 - col, col: row };
+    default:
+      return { row, col };
+  }
+}
+
+export function decodeBakedCut(
+  baked: BakedCut,
+  turns: BakedCutQuarterTurns = 0,
+): BiomorphicTopology {
   if (baked.version !== BAKED_CUT_VERSION) {
     throw new Error(`Unsupported baked cut version ${baked.version}`);
+  }
+  if ((turns === 1 || turns === 3) && baked.rows !== baked.columns) {
+    // A quarter turn of an oblong board swaps rows and columns, which would
+    // no longer match the grid the caller asked for.
+    throw new Error(
+      `Cannot quarter-turn a ${baked.rows}x${baked.columns} baked cut`,
+    );
   }
   const bytes = fromBase64(baked.points);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -156,7 +212,7 @@ export function decodeBakedCut(baked: BakedCut): BiomorphicTopology {
     const x = view.getUint16(cursor * 2, true) / SCALE;
     const y = view.getUint16((cursor + 1) * 2, true) / SCALE;
     cursor += 2;
-    return { x, y };
+    return turnPoint({ x, y }, turns);
   };
 
   const edges = baked.edges.map((edge) => {
@@ -186,11 +242,18 @@ export function decodeBakedCut(baked: BakedCut): BiomorphicTopology {
     for (let index = 0; index < cell.vertexCount; index += 1) {
       vertices.push(take());
     }
+    const turned = turnCell(
+      cell.row,
+      cell.col,
+      baked.rows,
+      baked.columns,
+      turns,
+    );
     return {
       id: cell.id,
       index: cell.index,
-      row: cell.row,
-      col: cell.col,
+      row: turned.row,
+      col: turned.col,
       site,
       vertices,
       neighborIds: cell.neighborIds,

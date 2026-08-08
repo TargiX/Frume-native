@@ -1,4 +1,8 @@
-import { decodeBakedCut, type BakedCut } from "./bakedCut";
+import {
+  decodeBakedCut,
+  type BakedCut,
+  type BakedCutQuarterTurns,
+} from "./bakedCut";
 import type { CutStyleId } from "./cutStyles";
 import type { BiomorphicTopology } from "./generateBiomorphic";
 
@@ -38,20 +42,34 @@ export function hashSeed(seed: string): number {
   return hash >>> 0;
 }
 
+/**
+ * The cut a seed lands on, and how it is turned.
+ *
+ * Turning multiplies what a finite library can serve by four at no cost in
+ * bytes, so a player has to reach the thirty-third puzzle of one style and
+ * size before a board repeats rather than the ninth.
+ */
 export function pickBakedCut(
   library: BakedCutLibrary,
   style: CutStyleId,
   rows: number,
   columns: number,
   seed: string,
-): BakedCut {
+): { cut: BakedCut; turns: BakedCutQuarterTurns } {
   const entries = library[style]?.[gridKey(rows, columns)];
   if (!entries || entries.length === 0) {
     throw new Error(
       `No baked ${style} cut for a ${gridKey(rows, columns)} board`,
     );
   }
-  return entries[hashSeed(seed) % entries.length];
+  // A quarter turn of an oblong board would not fit the grid asked for.
+  const turnCount = rows === columns ? 4 : 2;
+  const variant = hashSeed(seed) % (entries.length * turnCount);
+  return {
+    cut: entries[variant % entries.length],
+    turns: (Math.floor(variant / entries.length) *
+      (turnCount === 2 ? 2 : 1)) as BakedCutQuarterTurns,
+  };
 }
 
 export function topologyFromLibrary(
@@ -61,7 +79,7 @@ export function topologyFromLibrary(
   columns: number,
   seed: string,
 ): BiomorphicTopology {
-  const baked = pickBakedCut(library, style, rows, columns, seed);
+  const { cut: baked, turns } = pickBakedCut(library, style, rows, columns, seed);
   if (baked.rows !== rows || baked.columns !== columns) {
     // A mislabelled entry would silently hand back a board of the wrong shape,
     // which surfaces much later as pieces that do not tile.
@@ -70,7 +88,7 @@ export function topologyFromLibrary(
         `${gridKey(baked.rows, baked.columns)}`,
     );
   }
-  return decodeBakedCut(baked);
+  return decodeBakedCut(baked, turns);
 }
 
 /** Which styles and grids the library can actually serve. */
