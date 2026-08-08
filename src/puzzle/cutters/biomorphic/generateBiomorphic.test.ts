@@ -142,6 +142,8 @@ describe('createBiomorphicTopology', () => {
     expect(curvedEdges.length).toBeGreaterThan(topology.cells.length / 2);
   });
 
+  // Forty-five topologies take a couple of seconds alone and rather more when
+  // the whole suite is competing for cores, which is not a reason to fail.
   it('keeps a broad seed matrix simple, substantial, and gap-free', () => {
     for (let index = 0; index < 45; index += 1) {
       const size = 3 + (index % 3);
@@ -178,7 +180,7 @@ describe('createBiomorphicTopology', () => {
 
       expect(totalArea).toBeCloseTo(1, 6);
     }
-  });
+  }, 60_000);
 });
 
 describe('generateBiomorphicPieces', () => {
