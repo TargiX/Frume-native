@@ -55,6 +55,7 @@ import {
   shouldRenderPieceEmboss,
 } from './pieceEmbossPolicy';
 import { resolvePieceRenderTranslation } from './pieceRenderPosition';
+import { PUZZLE_SEAM_DISSOLVE_MS } from './revealMotion';
 import { getPieceOverflowMargin } from './pieceOverflowMargin';
 import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
 import { TrayEdgeHint } from './TrayEdgeHint';
@@ -731,8 +732,12 @@ export function PuzzleBoard({
       fullOpacity.value = completed ? 1 : 0;
       return;
     }
-    piecesOpacity.value = withTiming(completed ? 0 : 1, { duration: 420 });
-    fullOpacity.value = withTiming(completed ? 1 : 0, { duration: 420 });
+    piecesOpacity.value = withTiming(completed ? 0 : 1, {
+      duration: PUZZLE_SEAM_DISSOLVE_MS,
+    });
+    fullOpacity.value = withTiming(completed ? 1 : 0, {
+      duration: PUZZLE_SEAM_DISSOLVE_MS,
+    });
   }, [completed, fullOpacity, piecesOpacity, reduceMotion]);
 
   useEffect(() => {

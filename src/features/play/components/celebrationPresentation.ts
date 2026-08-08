@@ -1,6 +1,9 @@
+import { PUZZLE_SEAM_DISSOLVE_MS } from '../../../puzzle/render/revealMotion';
+
 export const CELEBRATION_MOTION = {
-  cardDelayMs: 360,
-  cardDurationMs: 420,
+  /** The panel waits out the seam dissolve so the reveal lands on its own. */
+  panelDelayMs: PUZZLE_SEAM_DISSOLVE_MS + 140,
+  panelDurationMs: 320,
   confettiDurationMs: 1_500,
   reducedDurationMs: 120,
 } as const;

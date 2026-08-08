@@ -1,9 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AccessibilityInfo,
-  ScrollView,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -11,8 +11,10 @@ import {
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   Keyframe,
-  ZoomIn,
+  SlideInDown,
+  SlideOutDown,
   useReducedMotion,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,8 +44,9 @@ function formatElapsed(milliseconds: number): string {
 }
 
 /**
- * A single compact reward surface keeps the finished photograph visible while
- * giving completion a clear, joyful focal point.
+ * The finished photograph is the reward, so the completion chrome docks at the
+ * bottom edge instead of covering it, and a tap anywhere clears even that. No
+ * timed pause gates any of it: how long to look is the player's to decide.
  */
 export function PuzzleCelebration({
   elapsedMs,
@@ -55,6 +58,7 @@ export function PuzzleCelebration({
 }: PuzzleCelebrationProps) {
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
+  const [panelVisible, setPanelVisible] = useState(true);
   useAccessibilityAnnouncement(nextError ?? null);
 
   useEffect(() => {
@@ -64,12 +68,18 @@ export function PuzzleCelebration({
     );
   }, [elapsedMs, reduceMotion]);
 
-  const cardEntering = reduceMotion
+  // Only the first appearance waits for the reveal; a panel the player asked
+  // back should come straight away.
+  const [firstAppearance, setFirstAppearance] = useState(true);
+  const panelEntering = reduceMotion
     ? FadeIn.duration(CELEBRATION_MOTION.reducedDurationMs)
-    : ZoomIn
-        .delay(CELEBRATION_MOTION.cardDelayMs)
-        .duration(CELEBRATION_MOTION.cardDurationMs)
+    : SlideInDown
+        .delay(firstAppearance ? CELEBRATION_MOTION.panelDelayMs : 0)
+        .duration(CELEBRATION_MOTION.panelDurationMs)
         .easing(Easing.out(Easing.cubic));
+  const panelExiting = reduceMotion
+    ? FadeOut.duration(CELEBRATION_MOTION.reducedDurationMs)
+    : SlideOutDown.duration(CELEBRATION_MOTION.panelDurationMs);
   const particleAnimations = useMemo(
     () =>
       CONFETTI_PARTICLES.map(
@@ -144,55 +154,64 @@ export function PuzzleCelebration({
           ))}
         </View>
       ) : null}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: Math.max(insets.top, spacing.xl),
-            paddingRight: Math.max(insets.right, spacing.xl),
-            paddingBottom: Math.max(insets.bottom, spacing.xl),
-            paddingLeft: Math.max(insets.left, spacing.xl),
-          },
-        ]}
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View entering={cardEntering} style={styles.card}>
-          <View
-            style={styles.badge}
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Ionicons
-              name="sparkles"
-              size={22}
-              color={colors.onAccent}
-            />
-          </View>
-          <Text style={styles.eyebrow}>Completed</Text>
-          <Text style={styles.title} accessibilityRole="header">
-            Puzzle complete!
-          </Text>
-          <Text style={styles.subtitle}>
-            Finished in {formatElapsed(elapsedMs)}
-          </Text>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        accessibilityRole="button"
+        accessibilityLabel={
+          panelVisible
+            ? 'Hide the completion panel'
+            : 'Show the completion panel'
+        }
+        accessibilityHint="The finished photograph stays on screen either way"
+        onPress={() => {
+          setFirstAppearance(false);
+          setPanelVisible((visible) => !visible);
+        }}
+      />
 
-          <View style={styles.primaryAction}>
-            <Button
-              label={nextLoading ? 'Finding next puzzle…' : 'Next puzzle'}
-              onPress={onNext}
-              disabled={nextLoading}
-              block
-            />
+      {panelVisible ? (
+        <Animated.View
+          entering={panelEntering}
+          exiting={panelExiting}
+          style={[
+            styles.panel,
+            {
+              paddingBottom: Math.max(insets.bottom, spacing.lg),
+              paddingLeft: Math.max(insets.left, spacing.lg),
+              paddingRight: Math.max(insets.right, spacing.lg),
+            },
+          ]}
+        >
+          <View style={styles.summary}>
+            <View
+              style={styles.badge}
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons name="sparkles" size={16} color={colors.onAccent} />
+            </View>
+            <Text style={styles.title} accessibilityRole="header">
+              Puzzle complete
+            </Text>
+            <Text style={styles.elapsed}>{formatElapsed(elapsedMs)}</Text>
           </View>
+
           {nextError ? (
             <Text style={styles.error} accessibilityLiveRegion="polite">
               {nextError}
             </Text>
           ) : null}
+
           <View style={styles.actions}>
+            <View style={styles.primarySlot}>
+              <Button
+                label={nextLoading ? 'Finding next puzzle…' : 'Next puzzle'}
+                onPress={onNext}
+                disabled={nextLoading}
+                block
+              />
+            </View>
             <View style={styles.actionSlot}>
               <Button
                 label="Play again"
@@ -202,101 +221,78 @@ export function PuzzleCelebration({
               />
             </View>
             <View style={styles.actionSlot}>
-              <Button
-                label="Home"
-                variant="secondary"
-                onPress={onHome}
-                block
-              />
+              <Button label="Home" variant="secondary" onPress={onHome} block />
             </View>
           </View>
         </Animated.View>
-      </ScrollView>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
+    // No scrim: nothing dims the photograph the player just finished.
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 8, 6, 0.18)',
+    justifyContent: 'flex-end',
   },
-  scroll: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
-    borderRadius: 24,
-    backgroundColor: 'rgba(30, 27, 24, 0.94)',
-    borderWidth: 1,
-    borderColor: 'rgba(228, 170, 71, 0.46)',
+  panel: {
+    paddingTop: spacing.md,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: 'rgba(24, 21, 18, 0.92)',
+    borderTopWidth: 1,
+    borderColor: 'rgba(228, 170, 71, 0.32)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.42,
-    shadowRadius: 28,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.34,
+    shadowRadius: 20,
     elevation: 16,
   },
+  summary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
   badge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accent,
-    marginBottom: spacing.md,
-  },
-  eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: '700',
-    letterSpacing: -0.4,
-    textAlign: 'center',
-    marginTop: spacing.xs,
+    letterSpacing: -0.2,
   },
-  subtitle: {
+  elapsed: {
     color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 21,
     fontVariant: ['tabular-nums'],
-    marginTop: spacing.sm,
   },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignSelf: 'stretch',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginTop: spacing.md,
+    gap: spacing.sm,
   },
-  primaryAction: {
-    alignSelf: 'stretch',
-    marginTop: spacing.xl,
+  primarySlot: {
+    minWidth: 168,
+    flexGrow: 2,
+    flexBasis: 168,
   },
   actionSlot: {
-    minWidth: 132,
+    minWidth: 120,
     flexGrow: 1,
-    flexBasis: 132,
+    flexBasis: 120,
   },
   confetti: {
     position: 'absolute',
@@ -306,7 +302,6 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 13,
     lineHeight: 18,
-    textAlign: 'center',
-    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 });
