@@ -16,6 +16,8 @@ import type {
 } from '../types/layout';
 import {
   DEFAULT_PUZZLE_GUIDE_MODE,
+  LEGACY_DIFFICULTY_SIZES,
+  PUZZLE_SIZES,
   type PuzzleDifficulty,
 } from '../types/cutter';
 
@@ -237,9 +239,20 @@ function parseCutterId(value: unknown): PuzzleCutterId | null {
     : null;
 }
 
+/**
+ * Accepts a saved size, and also the three level names used before puzzles
+ * were measured in pieces — a game saved then must still open.
+ */
 function parseDifficulty(value: unknown): PuzzleDifficulty | null {
-  return value === 'easy' || value === 'medium' || value === 'hard'
-    ? value
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const legacy = LEGACY_DIFFICULTY_SIZES[value];
+  if (legacy) {
+    return legacy;
+  }
+  return PUZZLE_SIZES.some((size) => size.id === value)
+    ? (value as PuzzleDifficulty)
     : null;
 }
 

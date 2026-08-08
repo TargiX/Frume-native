@@ -17,8 +17,17 @@ export type {
   PuzzleCutter,
   PuzzleCutterMeta,
   PuzzleDifficulty,
+  PuzzleSize,
+  PuzzleSizeId,
 } from './cutter';
-export { DEFAULT_PUZZLE_GUIDE_MODE, DIFFICULTY_GRID } from './cutter';
+export {
+  DEFAULT_PUZZLE_GUIDE_MODE,
+  DIFFICULTY_GRID,
+  LEGACY_DIFFICULTY_SIZES,
+  pieceCount,
+  PUZZLE_SIZES,
+  puzzleSize,
+} from './cutter';
 export {
   nextPuzzleGuideMode,
   PUZZLE_GUIDE_OPTIONS,

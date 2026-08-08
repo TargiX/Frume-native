@@ -40,7 +40,7 @@ function sessionSnapshot(): PuzzleSessionSnapshot {
 
   return {
     cutterId: 'classic',
-    difficulty: 'easy',
+    difficulty: '3x3',
     engine: engine.getSnapshot(),
   };
 }
@@ -306,7 +306,7 @@ describe('PuzzleSessionPersistence', () => {
       status: 'loaded',
       session: {
         cutterId: 'classic',
-        difficulty: 'easy',
+        difficulty: '3x3',
         savedAt: 4_321,
       },
     });

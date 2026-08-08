@@ -23,7 +23,9 @@ import { usePuzzleSessionContext } from '../../../puzzle/context';
 import { PREMIUM_CUTS_REQUIRED_ERROR } from '../../../puzzle/hooks/usePuzzleSession';
 import {
   DIFFICULTY_GRID,
+  pieceCount,
   PUZZLE_GUIDE_OPTIONS,
+  PUZZLE_SIZES,
   type PuzzleCutterId,
   type PuzzleDifficulty,
   type PuzzleGuideMode,
@@ -37,6 +39,10 @@ import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
 import { CutStylePreview } from '../components/CutStylePreview';
 import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
+import {
+  availableSizes,
+  nearestAvailableSize,
+} from '../../../puzzle/cutters/availableSizes';
 import { resolveDifficultyScreenLayout } from '../utils/difficultyLayout';
 import {
   buildDifficultyRouteParams,
@@ -45,11 +51,16 @@ import {
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Difficulty'>;
 
-const DIFFICULTIES: { id: PuzzleDifficulty; label: string }[] = [
-  { id: 'easy', label: 'Easy' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'hard', label: 'Hard' },
-];
+/**
+ * Sizes are named by their piece count, not by a level. Difficulty here is a
+ * comfort setting, every rung is free, and "Hard = 25 pieces" reads as a joke
+ * to anyone who actually likes jigsaws.
+ */
+const SIZE_OPTIONS: { id: PuzzleDifficulty; label: string }[] =
+  PUZZLE_SIZES.map((size) => ({
+    id: size.id,
+    label: `${size.rows * size.columns}`,
+  }));
 
 const GUIDE_ICONS: Record<
   PuzzleGuideMode,
@@ -164,11 +175,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
     usePuzzleSessionContext();
   const { isPremium } = usePremiumAccess();
   const [selectedDifficulty, setSelectedDifficulty] =
-    useState<PuzzleDifficulty>('easy');
+    useState<PuzzleDifficulty>('4x4');
   const [selectedCutter, setSelectedCutter] =
     useState<PlayableCutterId>('classic');
   const [selectedGuideMode, setSelectedGuideMode] =
     useState<PuzzleGuideMode>('cuts');
+  const sizesForCut = availableSizes(selectedCutter);
   const [showPremium, setShowPremium] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -303,6 +315,18 @@ export function DifficultyScreen({ navigation, route }: Props) {
       openPremiumCuts();
     }
   }, [error, selectedCutter]);
+
+  useEffect(() => {
+    // A simulated cut may not exist at the size already chosen; move the choice
+    // to the nearest one it does have rather than refusing to start.
+    if (sizesForCut.includes(selectedDifficulty)) {
+      return;
+    }
+    const fallback = nearestAvailableSize(selectedCutter, selectedDifficulty);
+    if (fallback) {
+      setSelectedDifficulty(fallback);
+    }
+  }, [selectedCutter, selectedDifficulty, sizesForCut]);
 
   const onPlay = async () => {
     if (selectedCutLocked) {
@@ -575,14 +599,16 @@ export function DifficultyScreen({ navigation, route }: Props) {
       </View>
 
       <Text style={styles.title} accessibilityRole="header">
-        Choose difficulty
+        Choose a size
       </Text>
       <Text style={styles.sectionHint}>
-        Every piece count is free. Pick what feels comfortable.
+        {sizesForCut.length < SIZE_OPTIONS.length
+          ? `Every size is free. ${selectedCut.label} is cut by simulation, so it comes in the sizes that were prepared.`
+          : 'Every size is free. Pick what feels comfortable.'}
       </Text>
 
       <View style={styles.difficultyOptions} accessibilityRole="radiogroup">
-        {DIFFICULTIES.map((option) => {
+        {SIZE_OPTIONS.filter((option) => sizesForCut.includes(option.id)).map((option) => {
           const active = selectedDifficulty === option.id;
           const { rows, columns } = DIFFICULTY_GRID[option.id];
 
@@ -591,7 +617,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
               key={option.id}
               accessibilityRole="radio"
               accessibilityState={{ selected: active, disabled: loading }}
-              accessibilityLabel={`${option.label}, ${rows * columns} pieces`}
+              accessibilityLabel={`${rows * columns} pieces`}
               disabled={loading}
               style={({ pressed }) => [
                 styles.difficultyOption,
@@ -620,7 +646,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
                   />
                 ) : null}
               </View>
-              <Text style={styles.optionDetail}>{rows * columns} pieces</Text>
+              <Text style={styles.optionDetail}>
+                {rows} × {columns}
+              </Text>
             </Pressable>
           );
         })}
@@ -726,7 +754,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
         accessibilityHint={
           selectedCutLocked
             ? `Opens the permanent Premium Cuts purchase for ${selectedCut.label}`
-            : `Starts ${selectedDifficulty === 'easy' ? 'an' : 'a'} ${selectedDifficulty} ${selectedCut.label} puzzle`
+            : `Starts a ${pieceCount(selectedDifficulty)} piece ${selectedCut.label} puzzle`
         }
         block
       />

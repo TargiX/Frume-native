@@ -41,7 +41,7 @@ describe('BiomorphicCutter', () => {
 
   it('creates stable IDs, variable adjacency, and closed flowing SVG paths', async () => {
     const layout = await BiomorphicCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       seed: 'first-biomorphic-cut',
     });
 
@@ -76,7 +76,7 @@ describe('BiomorphicCutter', () => {
 
   it('rebuilds identical normalized geometry from its descriptor after resize', async () => {
     const initial = await BiomorphicCutter.generate(image, {
-      difficulty: 'hard',
+      difficulty: '5x5',
       seed: 'rotation-stable-biomorph',
       boardMaxWidth: 320,
       boardMaxHeight: 240,
@@ -86,7 +86,7 @@ describe('BiomorphicCutter', () => {
     }
 
     const resized = await BiomorphicCutter.generate(image, {
-      difficulty: 'easy',
+      difficulty: '3x3',
       cutDescriptor: initial.cutDescriptor,
       boardMaxWidth: 700,
       boardMaxHeight: 440,
@@ -128,7 +128,7 @@ describe('BiomorphicCutter', () => {
 
   it('restores legacy v1 cuts and rejects descriptors from another plugin or version', async () => {
     const legacy = await BiomorphicCutter.generate(image, {
-      difficulty: 'easy',
+      difficulty: '3x3',
       cutDescriptor: {
         cutterId: 'biomorphic',
         version: 1,
@@ -143,7 +143,7 @@ describe('BiomorphicCutter', () => {
 
     await expect(
       BiomorphicCutter.generate(image, {
-        difficulty: 'easy',
+        difficulty: '3x3',
         cutDescriptor: {
           cutterId: 'organic',
           version: 1,
@@ -156,7 +156,7 @@ describe('BiomorphicCutter', () => {
 
     await expect(
       BiomorphicCutter.generate(image, {
-        difficulty: 'easy',
+        difficulty: '3x3',
         cutDescriptor: {
           cutterId: 'biomorphic',
           version: 99,

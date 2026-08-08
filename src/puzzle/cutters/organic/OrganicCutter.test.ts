@@ -42,7 +42,7 @@ describe('OrganicCutter', () => {
 
   it('creates stable IDs, neighbor relationships, and organic SVG paths', async () => {
     const layout = await OrganicCutter.generate(image, {
-      difficulty: 'easy',
+      difficulty: '3x3',
       seed: 'first-paid-cut',
     });
 
@@ -76,7 +76,7 @@ describe('OrganicCutter', () => {
 
   it('rebuilds the same normalized geometry from its cut descriptor after resize', async () => {
     const initial = await OrganicCutter.generate(image, {
-      difficulty: 'hard',
+      difficulty: '5x5',
       seed: 'rotation-safe',
       boardMaxWidth: 320,
       boardMaxHeight: 240,
@@ -86,7 +86,7 @@ describe('OrganicCutter', () => {
     }
 
     const resized = await OrganicCutter.generate(image, {
-      difficulty: 'easy',
+      difficulty: '3x3',
       cutDescriptor: initial.cutDescriptor,
       boardMaxWidth: 640,
       boardMaxHeight: 420,
@@ -128,12 +128,12 @@ describe('OrganicCutter', () => {
 
   it('uses a deterministic default seed that is independent of board size', async () => {
     const first = await OrganicCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       boardMaxWidth: 300,
       boardMaxHeight: 240,
     });
     const second = await OrganicCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       boardMaxWidth: 600,
       boardMaxHeight: 480,
     });

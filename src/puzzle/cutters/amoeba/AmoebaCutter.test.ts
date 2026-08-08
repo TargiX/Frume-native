@@ -18,7 +18,7 @@ describe('AmoebaCutter', () => {
 
   it('produces a version-1 descriptor without leaking the source seed', async () => {
     const layout = await AmoebaCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       seed: 'first-amoeba-cut',
     });
 
@@ -40,17 +40,17 @@ describe('AmoebaCutter', () => {
 
   it('reproduces a layout from its descriptor and differs from Living', async () => {
     const first = await AmoebaCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       seed: 'amoeba-repeat',
     });
     const second = await AmoebaCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       cutDescriptor: first.cutDescriptor,
     });
     expect(second.pieces).toEqual(first.pieces);
 
     const living = await BiomorphicCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       seed: 'amoeba-repeat',
     });
     expect(living.pieces).not.toEqual(first.pieces);
@@ -63,12 +63,12 @@ describe('AmoebaCutter', () => {
 
   it('rejects descriptors from other cutters', async () => {
     const living = await BiomorphicCutter.generate(image, {
-      difficulty: 'medium',
+      difficulty: '4x4',
       seed: 'wrong-descriptor',
     });
     await expect(
       AmoebaCutter.generate(image, {
-        difficulty: 'medium',
+        difficulty: '4x4',
         cutDescriptor: living.cutDescriptor,
       }),
     ).rejects.toThrow('Cannot use a biomorphic cut descriptor with Amoeba');

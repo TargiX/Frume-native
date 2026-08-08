@@ -15,7 +15,7 @@ describe('next puzzle session', () => {
   it('keeps the current play settings while replacing the photograph', () => {
     const current = {
       cutterId: 'organic',
-      difficulty: 'hard',
+      difficulty: '5x5',
       guideMode: 'grid',
     } as PuzzleSession;
     const result = {
@@ -47,7 +47,7 @@ describe('next puzzle session', () => {
     });
 
     expect(params.cutterId).toBe('organic');
-    expect(params.difficulty).toBe('hard');
+    expect(params.difficulty).toBe('5x5');
     expect(params.guideMode).toBe('grid');
     expect(params.image.uri).toBe(result.photo.urls.regular);
     expect(params.image.attribution?.photographerName).toBe('Ada');

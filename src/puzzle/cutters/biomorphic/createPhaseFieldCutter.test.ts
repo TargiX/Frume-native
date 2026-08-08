@@ -38,9 +38,9 @@ describe('phase-field cutters', () => {
     installBakedCutLibrary(BAKED_CUT_LIBRARY);
     for (const cutter of NEW_CUTTERS) {
       for (const [difficulty, count] of [
-        ['easy', 9],
-        ['medium', 16],
-        ['hard', 25],
+        ['3x3', 9],
+        ['4x4', 16],
+        ['5x5', 25],
       ] as const) {
         const layout = await cutter.generate(image, {
           difficulty,
@@ -59,7 +59,7 @@ describe('phase-field cutters', () => {
     installBakedCutLibrary(BAKED_CUT_LIBRARY);
     const seeds = await Promise.all(
       NEW_CUTTERS.map(async (cutter) => {
-        const layout = await cutter.generate(image, { difficulty: 'easy' });
+        const layout = await cutter.generate(image, { difficulty: '3x3' });
         return layout.cutDescriptor?.seed;
       }),
     );
@@ -69,7 +69,7 @@ describe('phase-field cutters', () => {
   it('refuses a descriptor belonging to another cutter', async () => {
     await expect(
       CrystalCutter.generate(image, {
-        difficulty: 'easy',
+        difficulty: '3x3',
         cutDescriptor: {
           cutterId: 'amoeba',
           version: 1,
