@@ -191,6 +191,11 @@ export function GameScreen({ navigation }: Props) {
     if (
       Math.abs(currentBoardWidth - playLayout.boardWidth) < 0.5 &&
       Math.abs(currentBoardHeight - playLayout.boardHeight) < 0.5 &&
+      // A puzzle saved before the shelf ran the width of the table carries no
+      // extent; re-cutting it here is what widens its shelf on this screen.
+      Math.abs(
+        (session.layout.traySurfaceExtent ?? 0) - playLayout.trayRunExtent,
+      ) < 0.5 &&
       (session.layout.trayPlacement ?? 'bottom') === playLayout.trayPlacement
     ) {
       return;
@@ -198,6 +203,7 @@ export function GameScreen({ navigation }: Props) {
     void resizeSession({
       boardMaxWidth: playLayout.boardWidth,
       boardMaxHeight: playLayout.boardHeight,
+      traySurfaceExtent: playLayout.trayRunExtent,
       trayPlacement: playLayout.trayPlacement,
     });
   }, [
@@ -265,6 +271,7 @@ export function GameScreen({ navigation }: Props) {
         buildNextPuzzleSessionParams(session, result, {
           boardMaxWidth: nextLayout.boardWidth,
           boardMaxHeight: nextLayout.boardHeight,
+          traySurfaceExtent: nextLayout.trayRunExtent,
           trayPlacement: nextLayout.trayPlacement,
         }),
         {

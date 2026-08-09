@@ -38,6 +38,8 @@ export type StartPuzzleSessionParams = {
   /** Initial solve-area bounds, resolved from the actual Game safe area. */
   boardMaxWidth: number;
   boardMaxHeight: number;
+  /** Width of the table the shelf runs across; defaults to the board. */
+  traySurfaceExtent?: number;
   trayPlacement?: PuzzleTrayPlacement;
 };
 
@@ -93,6 +95,7 @@ export type UsePuzzleSessionResult = {
   resizeSession: (params: {
     boardMaxWidth: number;
     boardMaxHeight: number;
+    traySurfaceExtent?: number;
     trayPlacement: PuzzleTrayPlacement;
   }) => Promise<void>;
   /** Updates and durably schedules the board-help choice for this puzzle. */
@@ -177,6 +180,7 @@ export async function preparePuzzleSession(
     guideMode = DEFAULT_PUZZLE_GUIDE_MODE,
     boardMaxWidth,
     boardMaxHeight,
+    traySurfaceExtent,
     trayPlacement = 'bottom',
   }: StartPuzzleSessionParams,
   resolveCutter = getCutter,
@@ -195,6 +199,7 @@ export async function preparePuzzleSession(
       difficulty,
       boardMaxWidth,
       boardMaxHeight,
+      traySurfaceExtent,
       trayPlacement,
     };
     const layout = await cutter.generate(image, options);
@@ -825,10 +830,12 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     async ({
       boardMaxWidth,
       boardMaxHeight,
+      traySurfaceExtent,
       trayPlacement,
     }: {
       boardMaxWidth: number;
       boardMaxHeight: number;
+      traySurfaceExtent?: number;
       trayPlacement: PuzzleTrayPlacement;
     }) => {
       const current = sessionRef.current;
@@ -838,6 +845,9 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       if (
         Math.abs(current.layout.boardSize.width - boardMaxWidth) < 0.5 &&
         Math.abs(current.layout.boardSize.height - boardMaxHeight) < 0.5 &&
+        Math.abs(
+          (current.layout.traySurfaceExtent ?? 0) - (traySurfaceExtent ?? 0),
+        ) < 0.5 &&
         (current.layout.trayPlacement ?? 'bottom') === trayPlacement
       ) {
         return;
@@ -850,6 +860,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           difficulty: current.difficulty,
           boardMaxWidth,
           boardMaxHeight,
+          traySurfaceExtent,
           trayPlacement,
           cutDescriptor: current.layout.cutDescriptor,
         };

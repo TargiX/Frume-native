@@ -100,5 +100,15 @@ export type PuzzleLayout = {
   cutDescriptor?: PuzzleCutDescriptor;
   image: PuzzleImageSource;
   boardSize: Size;
+  /**
+   * How wide the shelf is allowed to be, across the tray's scrolling axis.
+   *
+   * The board is sized by the photograph, so on a wide screen it leaves table
+   * either side of it. The shelf is furniture, not part of the picture: it runs
+   * the full width the table gives it and the waiting pieces spread out along
+   * that whole run. Absent on puzzles saved before the shelf could do this, and
+   * then it falls back to the board's own extent.
+   */
+  traySurfaceExtent?: number;
   pieces: readonly PuzzlePieceDefinition[];
 };

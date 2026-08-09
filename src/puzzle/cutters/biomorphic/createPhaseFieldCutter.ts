@@ -109,6 +109,7 @@ export function createPhaseFieldCutter({
         cutDescriptor,
         image,
         boardSize: { width, height },
+        traySurfaceExtent: options.traySurfaceExtent,
         pieces: biomorphicPiecesFrom(
           styleId,
           cutDescriptor.rows,

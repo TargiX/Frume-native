@@ -397,6 +397,19 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     }
     trayPlacement = parsed;
   }
+  // Absent on puzzles saved before the shelf ran the width of the table; those
+  // restore with a shelf the width of their board, exactly as they were saved.
+  let traySurfaceExtent: number | undefined;
+  if (value.traySurfaceExtent !== undefined) {
+    if (
+      typeof value.traySurfaceExtent !== 'number' ||
+      !Number.isFinite(value.traySurfaceExtent) ||
+      value.traySurfaceExtent <= 0
+    ) {
+      return null;
+    }
+    traySurfaceExtent = value.traySurfaceExtent;
+  }
 
   return {
     cutterId,
@@ -404,6 +417,7 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     ...(cutDescriptor ? { cutDescriptor } : {}),
     image,
     boardSize,
+    ...(traySurfaceExtent !== undefined ? { traySurfaceExtent } : {}),
     pieces,
   };
 }

@@ -89,6 +89,14 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   const { width: boardWidth, height: boardHeight } = layout.boardSize;
   const placement = layout.trayPlacement ?? 'bottom';
   const largest = largestBounds(layout.pieces);
+  // The shelf runs the width of the table, not the width of the board. It is
+  // centred on the board, so it reaches equally into the table on both sides.
+  const runExtent = Math.max(
+    placement === 'right' ? boardHeight : boardWidth,
+    layout.traySurfaceExtent ?? 0,
+  );
+  const runOrigin =
+    (runExtent - (placement === 'right' ? boardHeight : boardWidth)) / -2;
 
   const lanes = trayLanes(layout.pieces.length);
 
@@ -99,18 +107,19 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
         (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
       ) * trayDepth(layout.pieces.length);
     const laneWidth = width / lanes;
-    const height = boardHeight;
+    const height = runExtent;
     const scale = Math.min(1, (laneWidth - TRAY_PADDING * 2) / largest.width);
     const slotExtent = largest.height * scale + TRAY_GAP;
     const slotsPerLane = Math.ceil(layout.pieces.length / lanes);
     const columnHeight = slotExtent * slotsPerLane + TRAY_PADDING * 2;
     const contentExtent = Math.max(columnHeight, height);
-    const origin = columnHeight < height ? (height - columnHeight) / 2 : 0;
+    const origin =
+      runOrigin + (columnHeight < height ? (height - columnHeight) / 2 : 0);
 
     return {
       placement,
       left: boardWidth + TRAY_BOARD_GAP,
-      top: 0,
+      top: runOrigin,
       width,
       height,
       scale,
@@ -135,14 +144,15 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   const slotExtent = largest.width * scale + TRAY_GAP;
   const slotsPerLane = Math.ceil(layout.pieces.length / lanes);
   const rowWidth = slotExtent * slotsPerLane + TRAY_PADDING * 2;
-  const contentExtent = Math.max(rowWidth, boardWidth);
-  const origin = rowWidth < boardWidth ? (boardWidth - rowWidth) / 2 : 0;
+  const contentExtent = Math.max(rowWidth, runExtent);
+  const origin =
+    runOrigin + (rowWidth < runExtent ? (runExtent - rowWidth) / 2 : 0);
 
   return {
     placement,
-    left: 0,
+    left: runOrigin,
     top: boardHeight + TRAY_BOARD_GAP,
-    width: boardWidth,
+    width: runExtent,
     height,
     scale,
     lanes,

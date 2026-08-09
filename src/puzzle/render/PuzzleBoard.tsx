@@ -234,6 +234,7 @@ type PieceGestureOverlayProps = {
   maxTrayScroll: number;
   totalPieces: number;
   surfaceInset: number;
+  surfaceInsetY: number;
 };
 
 function PieceGestureOverlay({
@@ -252,6 +253,7 @@ function PieceGestureOverlay({
   maxTrayScroll,
   totalPieces,
   surfaceInset,
+  surfaceInsetY,
 }: PieceGestureOverlayProps) {
   const inTray = runtime.inTray;
   const hitWidth = Math.max(
@@ -296,7 +298,7 @@ function PieceGestureOverlay({
       (visual.trayAttached.value && trayPlacement === 'right'
         ? trayScroll.value
         : 0) +
-      hitOffsetY + surfaceInset,
+      hitOffsetY + surfaceInsetY,
     opacity: visual.opacity.value,
     transform: [{ rotate: `${visual.rotation.value}deg` }],
   }));
@@ -418,17 +420,39 @@ export function PuzzleBoard({
   const cameraY = useMemo(() => makeMutable(0), []);
   const pinchStartScale = useMemo(() => makeMutable(1), []);
   const entranceEngineRef = useRef<PuzzleEngine | null>(null);
-  const surfaceWidth = trayMetrics.left + trayMetrics.width;
-  const surfaceHeight = trayMetrics.top + trayMetrics.height;
+  /**
+   * The shelf runs the width of the table and is centred on the board, so it
+   * starts to the left of the board's own origin. Everything is drawn from this
+   * origin rather than from the board's corner, which is what keeps the shelf
+   * from being cut off at nought.
+   */
+  const surfaceOriginX = Math.max(0, -trayMetrics.left);
+  const surfaceOriginY = Math.max(0, -trayMetrics.top);
+  const surfaceWidth =
+    Math.max(boardSize.width, trayMetrics.left + trayMetrics.width) +
+    surfaceOriginX;
+  const surfaceHeight =
+    Math.max(boardSize.height, trayMetrics.top + trayMetrics.height) +
+    surfaceOriginY;
   const surfaceInset = useMemo(
     () => getPieceOverflowMargin(layout.pieces),
     [layout.pieces],
   );
   const workspaceWidth = surfaceWidth + surfaceInset * 2;
   const workspaceHeight = surfaceHeight + surfaceInset * 2;
+  // Where the board's own (0, 0) lands inside the drawn workspace.
+  const originX = surfaceInset + surfaceOriginX;
+  const originY = surfaceInset + surfaceOriginY;
   const traySurfaceFrame = useMemo(
-    () => resolveTraySurfaceFrame(trayMetrics, trayPlacement, surfaceInset),
-    [surfaceInset, trayMetrics, trayPlacement],
+    () =>
+      resolveTraySurfaceFrame(
+        trayMetrics,
+        trayPlacement,
+        surfaceInset,
+        originX,
+        originY,
+      ),
+    [originX, originY, surfaceInset, trayMetrics, trayPlacement],
   );
   const { visuals, engineSync } = useMemo(() => {
     const nextVisuals = new Map<string, PieceVisualState>();
@@ -622,8 +646,8 @@ export function PuzzleBoard({
    * paths at the new size and they stay a hair wide at any zoom.
    */
   const sceneTransform = useDerivedValue<Transforms3d>(() => [
-    { translateX: cameraX.value + surfaceInset * cameraScale.value },
-    { translateY: cameraY.value + surfaceInset * cameraScale.value },
+    { translateX: cameraX.value + originX * cameraScale.value },
+    { translateY: cameraY.value + originY * cameraScale.value },
     { scale: cameraScale.value },
   ]);
 
@@ -1100,7 +1124,8 @@ export function PuzzleBoard({
                   minTrayScroll={minScroll}
                   maxTrayScroll={maxScroll}
                   totalPieces={layout.pieces.length}
-                  surfaceInset={surfaceInset}
+                  surfaceInset={originX}
+                  surfaceInsetY={originY}
                 />
               );
             })}
@@ -1112,8 +1137,8 @@ export function PuzzleBoard({
               style={[
                 styles.tray,
                 {
-                  left: trayMetrics.left + surfaceInset,
-                  top: trayMetrics.top + surfaceInset,
+                  left: trayMetrics.left + originX,
+                  top: trayMetrics.top + originY,
                   width: trayMetrics.width,
                   height: trayMetrics.height,
                 },

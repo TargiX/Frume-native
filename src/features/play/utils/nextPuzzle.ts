@@ -7,7 +7,10 @@ import type { PuzzlePhotoResult } from '../../../services/unsplash';
 
 type NextPuzzleLayout = Pick<
   StartPuzzleSessionParams,
-  'boardMaxWidth' | 'boardMaxHeight' | 'trayPlacement'
+  | 'boardMaxWidth'
+  | 'boardMaxHeight'
+  | 'traySurfaceExtent'
+  | 'trayPlacement'
 >;
 
 export type NextPuzzleStartResult =

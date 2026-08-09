@@ -374,6 +374,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
         guideMode: selectedGuideMode,
         boardMaxWidth: playLayout.boardWidth,
         boardMaxHeight: playLayout.boardHeight,
+        traySurfaceExtent: playLayout.trayRunExtent,
         trayPlacement: playLayout.trayPlacement,
       });
       if (!started) {

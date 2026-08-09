@@ -17,6 +17,12 @@ export type PlayLayout = {
   /** Board plus tray — the size of the interactive surface as a whole. */
   surfaceWidth: number;
   surfaceHeight: number;
+  /**
+   * How far the shelf runs across its scrolling axis. The board is sized by the
+   * photograph and can leave table either side of it; the shelf is furniture
+   * and uses the whole width of the table instead.
+   */
+  trayRunExtent: number;
   trayPlacement: PuzzleTrayPlacement;
 };
 
@@ -73,6 +79,7 @@ export function computePlayLayout(
     return {
       surfaceWidth: boardWidth + TRAY_BOARD_GAP + trayWidth,
       surfaceHeight: boardHeight,
+      trayRunExtent: maxSurfaceHeight,
       boardWidth,
       boardHeight,
       trayPlacement,
@@ -99,6 +106,7 @@ export function computePlayLayout(
   return {
     surfaceWidth: boardWidth,
     surfaceHeight: boardHeight + TRAY_BOARD_GAP + trayHeight,
+    trayRunExtent: maxSurfaceWidth,
     boardWidth,
     boardHeight,
     trayPlacement,

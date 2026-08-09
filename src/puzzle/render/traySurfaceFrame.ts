@@ -13,23 +13,25 @@ export function resolveTraySurfaceFrame(
   tray: TrayFrame,
   placement: 'bottom' | 'right',
   surfaceInset: number,
+  /** Where the board's origin sits in the drawn workspace. */
+  originX: number = surfaceInset,
+  originY: number = surfaceInset,
 ): TrayFrame {
-  const workspaceWidth = tray.left + tray.width + surfaceInset * 2;
-  const workspaceHeight = tray.top + tray.height + surfaceInset * 2;
-
   if (placement === 'bottom') {
     return {
-      left: 0,
-      top: tray.top + surfaceInset,
-      width: workspaceWidth,
+      // The shelf keeps its own run and gains the overflow margin at each end,
+      // so it reaches the edges of the table rather than the board's corner.
+      left: tray.left + originX - surfaceInset,
+      top: tray.top + originY,
+      width: tray.width + surfaceInset * 2,
       height: tray.height + surfaceInset,
     };
   }
 
   return {
-    left: tray.left + surfaceInset,
-    top: 0,
-    width: tray.width,
-    height: workspaceHeight,
+    left: tray.left + originX,
+    top: tray.top + originY - surfaceInset,
+    width: tray.width + surfaceInset,
+    height: tray.height + surfaceInset * 2,
   };
 }

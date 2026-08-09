@@ -65,6 +65,12 @@ export type CutOptions = {
   boardMaxWidth?: number;
   /** Max board height in logical pixels; used with boardMaxWidth to fit the play area. */
   boardMaxHeight?: number;
+  /**
+   * Extent of the table across the tray's scrolling axis. The shelf runs this
+   * wide rather than stopping at the board, so slots are dealt across the whole
+   * of it. Defaults to the board when the caller does not know the table.
+   */
+  traySurfaceExtent?: number;
   /** Stable input for procedural cutters. Equal seeds produce equal normalized cuts. */
   seed?: string | number;
   /** Reuses an existing procedural cut exactly, for example after a resize. */
