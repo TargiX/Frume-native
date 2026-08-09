@@ -911,15 +911,27 @@ export function PuzzleBoard({
   }, [engine, reduceMotion, snapFeedback, visuals]);
 
   /**
-   * Pieces waiting on the shelf are drawn clipped to it. The row is longer than
-   * the shelf and scrolls inside it, so without this the ones scrolled past its
-   * ends stay visible, hanging over the table on either side.
+   * Everything is drawn clipped to the table — board and shelf together, plus
+   * the margin a piece's shadow needs.
+   *
+   * Clipping to the shelf alone looked right until a piece was picked up: a
+   * piece still counts as being on the shelf until the engine says otherwise,
+   * so the drag was sliced off at the shelf's edge and read as the piece
+   * sliding under the board. The whole table hides what has scrolled past the
+   * ends of the row — that is off the table — while leaving a dragged piece
+   * visible wherever it goes.
    */
-  const trayClip = {
-    x: trayMetrics.left,
-    y: trayMetrics.top,
-    width: trayMetrics.width,
-    height: trayMetrics.height,
+  const tableClip = {
+    x: Math.min(0, trayMetrics.left) - surfaceInset,
+    y: Math.min(0, trayMetrics.top) - surfaceInset,
+    width:
+      Math.max(boardSize.width, trayMetrics.left + trayMetrics.width) -
+      Math.min(0, trayMetrics.left) +
+      surfaceInset * 2,
+    height:
+      Math.max(boardSize.height, trayMetrics.top + trayMetrics.height) -
+      Math.min(0, trayMetrics.top) +
+      surfaceInset * 2,
   };
 
   const orderedPieces = useMemo(
@@ -1028,34 +1040,11 @@ export function PuzzleBoard({
           }
         >
           <Group transform={sceneTransform}>
-            <Group opacity={piecesOpacity}>
-              <Group clip={trayClip}>
-                {orderedPieces.map((definition) => {
-                  const runtime = pieces[definition.id];
-                  const visual = visuals.get(definition.id);
-                  if (!runtime || !visual || !runtime.inTray) {
-                    return null;
-                  }
-                  return (
-                    <PieceDrawing
-                      key={definition.id}
-                      definition={definition}
-                      runtime={runtime}
-                      visual={visual}
-                      skiaImage={skiaImage}
-                      boardWidth={boardSize.width}
-                      boardHeight={boardSize.height}
-                      showSeams={!completed}
-                      trayScroll={trayScroll}
-                      trayPlacement={trayPlacement}
-                    />
-                  );
-                })}
-              </Group>
+            <Group opacity={piecesOpacity} clip={tableClip}>
               {orderedPieces.map((definition) => {
                 const runtime = pieces[definition.id];
                 const visual = visuals.get(definition.id);
-                if (!runtime || !visual || runtime.inTray) {
+                if (!runtime || !visual) {
                   return null;
                 }
                 return (
