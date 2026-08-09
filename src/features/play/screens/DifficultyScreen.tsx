@@ -181,6 +181,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const [selectedGuideMode, setSelectedGuideMode] =
     useState<PuzzleGuideMode>('cuts');
   const sizesForCut = availableSizes(selectedCutter);
+  /**
+   * Eight cuts in a single column is a scroll with nothing to look at. Two
+   * columns fit them on one screen — until the text is scaled up, where a
+   * half-width card would break its own labels.
+   */
+  const singleColumnCuts = fontScale >= 1.35;
   const [showPremium, setShowPremium] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -562,12 +568,18 @@ export function DifficultyScreen({ navigation, route }: Props) {
               disabled={loading}
               style={({ pressed }) => [
                 styles.cutOption,
+                singleColumnCuts ? styles.cutOptionWide : styles.cutOptionHalf,
                 active && styles.optionSelected,
                 pressed && styles.optionPressed,
               ]}
               onPress={() => onCutStylePress(option.id)}
             >
-              <CutStylePreview cutterId={option.id} active={active} />
+              <CutStylePreview
+                cutterId={option.id}
+                active={active}
+                width={singleColumnCuts ? 64 : 104}
+                height={singleColumnCuts ? 50 : 78}
+              />
               <View style={styles.cutCopy}>
                 <View style={styles.cutTitleRow}>
                   <Text
@@ -952,18 +964,31 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   cutOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
   },
   cutOption: {
-    minHeight: 86,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.interactiveBorder,
     backgroundColor: colors.surface,
+  },
+  /** Two to a row: the sample sits above its name rather than beside it. */
+  cutOptionHalf: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 150,
+    gap: spacing.sm,
+  },
+  cutOptionWide: {
+    flexGrow: 1,
+    flexBasis: '100%',
+    minHeight: 86,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   cutCopy: {
     flex: 1,

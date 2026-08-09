@@ -27,9 +27,14 @@ function toPaths(sources: readonly string[]): SkPath[] {
 export function CutStylePreview({
   cutterId,
   active,
+  width = PREVIEW_WIDTH,
+  height = PREVIEW_HEIGHT,
 }: {
   cutterId: PreviewCutterId;
   active: boolean;
+  /** The sample is drawn to fit, so a bigger frame shows a bigger cut. */
+  width?: number;
+  height?: number;
 }) {
   const [sample, setSample] = useState<CutPreviewSample | null>(() => {
     const ready = cutPreviewSample(cutterId);
@@ -60,20 +65,22 @@ export function CutStylePreview({
     () => (sample ? toPaths(sample.paths) : []),
     [sample],
   );
+  const fit = Math.min(width / PREVIEW_WIDTH, height / PREVIEW_HEIGHT);
   const seamColor = active ? colors.accent : colors.textSecondary;
 
   return (
     <View
-      style={[styles.frame, active && styles.frameActive]}
+      style={[styles.frame, { width, height }, active && styles.frameActive]}
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Canvas style={styles.canvas} pointerEvents="none">
+      <Canvas style={{ width, height }} pointerEvents="none">
         <Group
           transform={
             sample
               ? [
+                  { scale: fit },
                   { translateX: sample.transform.translateX },
                   { translateY: sample.transform.translateY },
                   { scale: sample.transform.scale },
@@ -87,7 +94,8 @@ export function CutStylePreview({
               path={path}
               style="stroke"
               strokeWidth={
-                (active ? 1.4 : 1.1) / (sample?.transform.scale ?? 1)
+                (active ? 1.4 : 1.1) /
+                ((sample?.transform.scale ?? 1) * fit)
               }
               strokeCap="round"
               strokeJoin="round"
@@ -102,8 +110,6 @@ export function CutStylePreview({
 
 const styles = StyleSheet.create({
   frame: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
     flexShrink: 0,
     overflow: 'hidden',
     borderRadius: radius.sm,
@@ -114,9 +120,5 @@ const styles = StyleSheet.create({
   frameActive: {
     borderColor: colors.accent,
     backgroundColor: colors.surface,
-  },
-  canvas: {
-    width: PREVIEW_WIDTH,
-    height: PREVIEW_HEIGHT,
   },
 });
