@@ -577,8 +577,8 @@ export function DifficultyScreen({ navigation, route }: Props) {
               <CutStylePreview
                 cutterId={option.id}
                 active={active}
-                width={singleColumnCuts ? 64 : 104}
-                height={singleColumnCuts ? 50 : 78}
+                width={singleColumnCuts ? 64 : 92}
+                height={singleColumnCuts ? 50 : 64}
               />
               <View style={styles.cutCopy}>
                 <View style={styles.cutTitleRow}>
@@ -608,15 +608,37 @@ export function DifficultyScreen({ navigation, route }: Props) {
                     />
                   ) : null}
                 </View>
-                <Text style={styles.cutDetail}>{option.detail}</Text>
-                <Text style={locked ? styles.premiumBadge : styles.freeBadge}>
-                  {status}
-                </Text>
+                {singleColumnCuts ? (
+                  <>
+                    <Text style={styles.cutDetail}>{option.detail}</Text>
+                    <Text
+                      style={locked ? styles.premiumBadge : styles.freeBadge}
+                    >
+                      {status}
+                    </Text>
+                  </>
+                ) : null}
               </View>
             </Pressable>
           );
         })}
       </View>
+
+      {/*
+        The description and price live here rather than in every card: repeated
+        on eight cards they cost half a screen and say the same thing twice,
+        while the one that matters is the cut currently chosen.
+      */}
+      {!singleColumnCuts ? (
+        <Text style={styles.cutSummary}>
+          {selectedCut.detail}
+          {selectedCutLocked
+            ? ' · Premium · Unlock to play'
+            : selectedCutter === 'classic'
+              ? ' · Free'
+              : ' · Premium unlocked'}
+        </Text>
+      ) : null}
 
       <Text style={styles.title} accessibilityRole="header">
         Choose a size
@@ -975,12 +997,17 @@ const styles = StyleSheet.create({
     borderColor: colors.interactiveBorder,
     backgroundColor: colors.surface,
   },
-  /** Two to a row: the sample sits above its name rather than beside it. */
+  /**
+   * Two to a row: the sample sits above its name, and nothing else is in the
+   * card. Eight cards carrying a description and a price line each turned the
+   * picker back into the scroll the two columns were meant to remove.
+   */
   cutOptionHalf: {
     flexGrow: 1,
     flexBasis: '46%',
-    minWidth: 150,
+    minWidth: 140,
     gap: spacing.sm,
+    padding: spacing.sm,
   },
   cutOptionWide: {
     flexGrow: 1,
@@ -1004,6 +1031,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: spacing.xs,
+  },
+  cutSummary: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.md,
   },
   premiumBadge: {
     alignSelf: 'flex-start',
