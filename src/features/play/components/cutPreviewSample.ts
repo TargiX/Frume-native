@@ -55,9 +55,22 @@ async function buildSample(
   });
 
   const paths = layout.pieces.map((piece) => piece.path);
-  const middle =
-    layout.pieces.find((piece) => piece.row === 1 && piece.col === 1) ??
-    layout.pieces[Math.floor(layout.pieces.length / 2)];
+  // Chosen by geometry, not by row and column: a phase-field cut grows cells
+  // that do not sit on the grid its indices describe, so asking for row 1,
+  // column 1 handed back an edge piece and the icon framed the board's border.
+  const boardCentreX = layout.boardSize.width / 2;
+  const boardCentreY = layout.boardSize.height / 2;
+  const middle = layout.pieces.reduce((closest, piece) => {
+    const distance = Math.hypot(
+      piece.bounds.x + piece.bounds.width / 2 - boardCentreX,
+      piece.bounds.y + piece.bounds.height / 2 - boardCentreY,
+    );
+    const closestDistance = Math.hypot(
+      closest.bounds.x + closest.bounds.width / 2 - boardCentreX,
+      closest.bounds.y + closest.bounds.height / 2 - boardCentreY,
+    );
+    return distance < closestDistance ? piece : closest;
+  }, layout.pieces[0]);
   const bounds = middle?.bounds;
   if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
     return {

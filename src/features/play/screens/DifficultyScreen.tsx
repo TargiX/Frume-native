@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccessibilityAnnouncement } from '../../../accessibility';
 import { Button } from '../../../components/Button';
-import { Screen } from '../../../components/Screen';
+import { MAX_CONTENT_WIDTH, Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
 import { isPremiumCutter, usePremiumAccess } from '../../../premium';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
@@ -182,11 +182,18 @@ export function DifficultyScreen({ navigation, route }: Props) {
     useState<PuzzleGuideMode>('cuts');
   const sizesForCut = availableSizes(selectedCutter);
   /**
-   * Eight cuts in a single column is a scroll with nothing to look at. Two
-   * columns fit them on one screen — until the text is scaled up, where a
-   * half-width card would break its own labels.
+   * The cuts are a contact sheet: samples laid out to be compared, each with
+   * its name under it and no card around it. Three to a row fits the set on
+   * one screen; larger text takes fewer columns, and past that the list falls
+   * back to one wide row per cut, where a name has somewhere to go.
    */
-  const singleColumnCuts = fontScale >= 1.35;
+  const cutColumns = fontScale >= 1.6 ? 1 : fontScale >= 1.3 ? 2 : 3;
+  const singleColumnCuts = cutColumns === 1;
+  const cutTileWidth =
+    (Math.min(width, MAX_CONTENT_WIDTH) -
+      spacing.xl * 2 -
+      spacing.md * (cutColumns - 1)) /
+    cutColumns;
   const [showPremium, setShowPremium] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -567,26 +574,31 @@ export function DifficultyScreen({ navigation, route }: Props) {
               accessibilityLabel={`${option.label}. ${option.detail}. ${status}`}
               disabled={loading}
               style={({ pressed }) => [
-                styles.cutOption,
-                singleColumnCuts ? styles.cutOptionWide : styles.cutOptionHalf,
-                active && styles.optionSelected,
+                singleColumnCuts ? styles.cutOption : styles.cutTile,
+                singleColumnCuts && styles.cutOptionWide,
+                singleColumnCuts && active && styles.optionSelected,
                 pressed && styles.optionPressed,
+                !singleColumnCuts && { width: cutTileWidth },
               ]}
               onPress={() => onCutStylePress(option.id)}
             >
               <CutStylePreview
                 cutterId={option.id}
                 active={active}
-                width={singleColumnCuts ? 64 : 92}
-                height={singleColumnCuts ? 50 : 64}
+                width={singleColumnCuts ? 64 : cutTileWidth}
+                height={
+                  singleColumnCuts ? 50 : Math.round(cutTileWidth * 0.74)
+                }
               />
-              <View style={styles.cutCopy}>
+              <View style={singleColumnCuts ? styles.cutCopy : styles.cutTileCopy}>
                 <View style={styles.cutTitleRow}>
                   <Text
                     style={[
                       styles.optionLabel,
+                      !singleColumnCuts && styles.cutTileLabel,
                       active && styles.optionLabelActive,
                     ]}
+                    numberOfLines={singleColumnCuts ? undefined : 1}
                   >
                     {option.label}
                   </Text>
@@ -1019,6 +1031,19 @@ const styles = StyleSheet.create({
   },
   cutCopy: {
     flex: 1,
+  },
+  /**
+   * No card: the sample's own frame carries the selection, so a second border
+   * around it would be a box inside a box.
+   */
+  cutTile: {
+    gap: spacing.xs,
+  },
+  cutTileCopy: {
+    width: '100%',
+  },
+  cutTileLabel: {
+    fontSize: 14,
   },
   cutTitleRow: {
     flexDirection: 'row',

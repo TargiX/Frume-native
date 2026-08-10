@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
 
 /** Beyond this a text column stops being readable and starts being a banner. */
-const MAX_CONTENT_WIDTH = 680;
+export const MAX_CONTENT_WIDTH = 680;
 
 type ScreenProps = {
   children: React.ReactNode;
