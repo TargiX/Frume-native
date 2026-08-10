@@ -43,7 +43,10 @@ import {
   availableSizes,
   nearestAvailableSize,
 } from '../../../puzzle/cutters/availableSizes';
-import { resolveDifficultyScreenLayout } from '../utils/difficultyLayout';
+import {
+  resolveCutColumns,
+  resolveDifficultyScreenLayout,
+} from '../utils/difficultyLayout';
 import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
@@ -187,13 +190,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
    * one screen; larger text takes fewer columns, and past that the list falls
    * back to one wide row per cut, where a name has somewhere to go.
    */
-  const cutColumns = fontScale >= 1.6 ? 1 : fontScale >= 1.3 ? 2 : 3;
+  const cutContentWidth = Math.min(width, MAX_CONTENT_WIDTH) - spacing.xl * 2;
+  const cutColumns = resolveCutColumns(cutContentWidth, fontScale);
   const singleColumnCuts = cutColumns === 1;
   const cutTileWidth =
-    (Math.min(width, MAX_CONTENT_WIDTH) -
-      spacing.xl * 2 -
-      spacing.md * (cutColumns - 1)) /
-    cutColumns;
+    (cutContentWidth - spacing.md * (cutColumns - 1)) / cutColumns;
   const [showPremium, setShowPremium] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);

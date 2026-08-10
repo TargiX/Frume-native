@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDifficultyScreenLayout } from './difficultyLayout';
+import {
+  resolveCutColumns,
+  resolveDifficultyScreenLayout,
+} from './difficultyLayout';
 
 describe('difficulty screen layout', () => {
   it('keeps the photo and primary action fixed beside landscape choices', () => {
@@ -51,5 +54,30 @@ describe('difficulty screen layout', () => {
         fontScale: 1,
       }),
     ).toEqual({ twoPane: false });
+  });
+});
+
+describe('resolveCutColumns', () => {
+  it('keeps a phone at three samples across', () => {
+    // 440pt screen minus the content padding.
+    expect(resolveCutColumns(392, 1)).toBe(3);
+  });
+
+  it('gives a tablet more samples rather than bigger ones', () => {
+    // The content column caps at 680pt, so a 13-inch iPad lands here.
+    expect(resolveCutColumns(632, 1)).toBe(4);
+  });
+
+  it('never goes past four, however wide the column', () => {
+    expect(resolveCutColumns(2_000, 1)).toBe(4);
+  });
+
+  it('takes columns away as the text grows', () => {
+    expect(resolveCutColumns(632, 1.3)).toBe(2);
+    expect(resolveCutColumns(632, 1.6)).toBe(1);
+  });
+
+  it('falls back to one column on a very narrow screen', () => {
+    expect(resolveCutColumns(100, 1)).toBe(1);
   });
 });
