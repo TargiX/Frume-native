@@ -180,7 +180,7 @@ describe('createBiomorphicTopology', () => {
 
       expect(totalArea).toBeCloseTo(1, 6);
     }
-  }, 60_000);
+  }, 120_000);
 });
 
 describe('generateBiomorphicPieces', () => {

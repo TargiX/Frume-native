@@ -80,7 +80,9 @@ describe("createBiomorphicPhaseFieldTopology", () => {
     expect(recipe(4, 4, "phase-other")).not.toEqual(
       recipe(4, 4, "phase-repeat"),
     );
-  }, 90_000);
+    // Three 4x4 phase-field evolutions land just past 90 s on a loaded
+    // machine; the file's other evolutions already budget 180 s.
+  }, 180_000);
 
   it("grows the amoeba regime into its own interlocked, safe cut", () => {
     const growth = measureBiomorphicPhaseFieldGrowth(
@@ -143,7 +145,7 @@ describe("createBiomorphicPhaseFieldTopology", () => {
           expect(reverse[index].y).toBeCloseTo(point.y, 13);
         });
       });
-  }, 60_000);
+  }, 120_000);
 
   it("produces irregular multi-scale interfaces instead of a fixed lobe template", () => {
     const topology = createBiomorphicPhaseFieldTopology(

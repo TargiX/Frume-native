@@ -30,5 +30,8 @@ describe("the shipped cut library", () => {
         });
       }
     }
-  });
+    // The whole 3.8 MB shipped library decodes in about 2 s on an idle
+    // laptop, but the parallel full-suite run and simulator load pushed it
+    // past the 5 s vitest default. Give it the room it actually needs.
+  }, 30_000);
 });

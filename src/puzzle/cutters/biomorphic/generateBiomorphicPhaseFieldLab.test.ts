@@ -46,7 +46,7 @@ describe("runBiomorphicPhaseFieldLab", () => {
     // The fringe keeps refining after the depth stops: 2990 units of interface
     // at frame 125 against 3077 at frame 350.
     expect(frame350.boundaryUnits).toBeGreaterThan(frame125.boundaryUnits);
-  }, 15_000);
+  }, 60_000);
 
   it("retains developed Living petals while their tips keep advancing", () => {
     const settings = createPhaseFieldLabSettings("dendrite");
@@ -66,7 +66,7 @@ describe("runBiomorphicPhaseFieldLab", () => {
     expect(evolved.maximumPenetrationFromInitial).toBeGreaterThan(
       developed.maximumPenetrationFromInitial,
     );
-  }, 15_000);
+  }, 60_000);
 
   it("grows existing Amoeba buds instead of replacing them with smooth lobes", () => {
     const settings = createPhaseFieldLabSettings("amoeba");
@@ -83,7 +83,7 @@ describe("runBiomorphicPhaseFieldLab", () => {
     expect(evolved.maximumPenetrationFromInitial).toBeGreaterThan(
       developed.maximumPenetrationFromInitial,
     );
-  }, 15_000);
+  }, 60_000);
 
   it("keeps dense Living boards connected and hole-free through frame 8", () => {
     for (const [rows, columns] of [
@@ -135,5 +135,5 @@ describe("runBiomorphicPhaseFieldLab", () => {
         0,
       );
     });
-  }, 15_000);
+  }, 60_000);
 });

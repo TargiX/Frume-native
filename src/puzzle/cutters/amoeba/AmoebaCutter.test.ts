@@ -36,7 +36,9 @@ describe('AmoebaCutter', () => {
       expect(piece.path.startsWith('M ')).toBe(true);
       expect(piece.path.endsWith('Z')).toBe(true);
     });
-  }, 60_000);
+    // A 4x4 Amoeba solves in about 49 s on an idle laptop and 75 s under
+    // full-suite load; 60 s made this test fail on time, not on geometry.
+  }, 120_000);
 
   it('reproduces a layout from its descriptor and differs from Living', async () => {
     const first = await AmoebaCutter.generate(image, {
@@ -72,5 +74,5 @@ describe('AmoebaCutter', () => {
         cutDescriptor: living.cutDescriptor,
       }),
     ).rejects.toThrow('Cannot use a biomorphic cut descriptor with Amoeba');
-  }, 60_000);
+  }, 120_000);
 });

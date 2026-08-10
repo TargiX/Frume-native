@@ -72,7 +72,7 @@ describe('BiomorphicCutter', () => {
         ).toContain(piece.id);
       });
     });
-  }, 60_000);
+  }, 120_000);
 
   it('rebuilds identical normalized geometry from its descriptor after resize', async () => {
     const initial = await BiomorphicCutter.generate(image, {
@@ -124,7 +124,9 @@ describe('BiomorphicCutter', () => {
         10,
       );
     });
-  }, 120_000);
+    // Re-cutting a production-resolution board after resize takes 110-150 s
+    // depending on machine load; 120 s timed out under the parallel suite.
+  }, 300_000);
 
   it('restores legacy v1 cuts and rejects descriptors from another plugin or version', async () => {
     const legacy = await BiomorphicCutter.generate(image, {
