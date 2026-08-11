@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#05063b">
+    <meta name="color-scheme" content="dark">
+    <meta
+      name="description"
+      content="Frume Privacy Policy: how the iPhone and iPad app handles saved puzzles, attributed photos, purchase access, and support messages."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Frume Privacy Policy">
+    <meta
+      property="og:description"
+      content="How Frume handles local puzzle data, attributed photos, and the optional Premium Cuts purchase."
+    >
+    <title>Frume Privacy Policy</title>
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to privacy policy</a>
+
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/" aria-label="Frume support home">
+          <span class="brand-pieces" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+          <span>Frume</span>
+        </a>
+        <nav aria-label="Support pages">
+          <a href="/">Support</a>
+          <a href="/privacy/" aria-current="page">Privacy</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="policy-hero shell" aria-labelledby="privacy-title">
+        <div>
+          <p class="eyebrow">Privacy policy · Effective July 31, 2026</p>
+          <h1 id="privacy-title">A puzzle,<br>not a profile.</h1>
+        </div>
+        <div class="policy-summary">
+          <p>
+            Frume does not require an account and does not include ads,
+            analytics, or cross-app tracking. This policy explains the limited
+            data needed to save one puzzle, provide attributed photographs,
+            and verify the optional Premium Cuts purchase.
+          </p>
+          <ul class="privacy-badges" aria-label="Privacy summary">
+            <li>No Frume account</li>
+            <li>No advertising</li>
+            <li>No analytics</li>
+            <li>No cross-app tracking</li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="policy-layout shell">
+        <aside class="policy-nav" aria-label="On this page">
+          <p>On this page</p>
+          <ol>
+            <li><a href="#scope">Scope</a></li>
+            <li><a href="#data">Data Frume handles</a></li>
+            <li><a href="#tracking">What “tracking receipt” means</a></li>
+            <li><a href="#providers">Service providers</a></li>
+            <li><a href="#retention">Retention and deletion</a></li>
+            <li><a href="#choices">Your choices</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ol>
+        </aside>
+
+        <article class="policy-content">
+          <section id="scope" aria-labelledby="scope-title">
+            <p class="section-number" aria-hidden="true">01</p>
+            <h2 id="scope-title">Scope</h2>
+            <p>
+              This policy applies to the Frume app for iPhone and iPad and to
+              these static support pages. Frume is a photo-puzzle app. You do
+              not create a Frume account or provide a profile to play.
+            </p>
+            <p>
+              These support pages do not set cookies, run analytics, show ads,
+              or load third-party scripts. If you follow an external link, the
+              destination’s own privacy policy applies.
+            </p>
+          </section>
+
+          <section id="data" aria-labelledby="data-title">
+            <p class="section-number" aria-hidden="true">02</p>
+            <h2 id="data-title">Data Frume handles</h2>
+
+            <div class="policy-cards">
+              <div class="policy-card">
+                <h3>One saved puzzle on your device</h3>
+                <p>
+                  Frume stores one current puzzle in local app storage so you
+                  can continue later. The save includes the selected photo and
+                  its attribution, cut style, difficulty, piece positions,
+                  progress, moves, and elapsed play time.
+                </p>
+                <p>
+                  The puzzle image is cached in the app’s private document
+                  storage. While replacing a puzzle, Frume may briefly keep the
+                  old and new image so an interrupted save does not destroy
+                  existing progress; the older file is removed after the new
+                  save succeeds.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Photographs you choose yourself</h3>
+                <p>
+                  You can cut a photograph from your own library instead of a
+                  curated one. Frume never gains access to your photo library:
+                  the system picker shows it to you, and hands Frume only the
+                  single photograph you pick.
+                </p>
+                <p>
+                  That photograph is copied into Frume’s private storage so a
+                  saved puzzle still has its picture later, and it is deleted
+                  when it is no longer used by a saved puzzle or when you delete
+                  the app. It is never uploaded: it is not sent to Frume’s photo
+                  service, to Unsplash, or anywhere else, and no photo-use
+                  receipt is created for it.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Curated photo information</h3>
+                <p>
+                  When you choose a theme, Frume asks its photo service for a
+                  curated Unsplash photograph. The app receives limited public
+                  metadata: photo identifier and dimensions, image URL,
+                  description when available, photographer name and profile
+                  link, and Unsplash’s download-registration endpoint.
+                </p>
+                <p>
+                  The service keeps a rotating pool of that public photo
+                  metadata. Frume does not send your puzzle moves or saved
+                  progress with a photo request.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Photo-use receipts</h3>
+                <p>
+                  When you start a puzzle, Frume sends its service the
+                  Unsplash download-registration endpoint and a short-lived,
+                  opaque, single-use token. If the device is offline, the
+                  pending receipt remains in a bounded queue in local app
+                  storage and is retried when Frume launches or returns to the
+                  foreground.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Premium Cuts purchase access</h3>
+                <p>
+                  Premium Cuts is an optional, one-time, non-consumable App
+                  Store purchase—not a subscription. RevenueCat processes an
+                  anonymous app-user identifier, product and offering
+                  information, store entitlement status, and purchase or
+                  transaction history received from Apple so Frume can unlock
+                  and restore access.
+                </p>
+                <p>
+                  Apple handles payment. Frume does not receive your full card
+                  number or Apple Account password.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Messages you send to support</h3>
+                <p>
+                  If you email support, the email address, message, and any
+                  attachments you choose to send are used to investigate and
+                  reply to your request. Do not send passwords or full payment
+                  details.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="tracking" aria-labelledby="tracking-title">
+            <p class="section-number" aria-hidden="true">03</p>
+            <h2 id="tracking-title">What “tracking receipt” means</h2>
+            <div class="definition-callout">
+              <p>
+                Unsplash calls its required photo-use registration “download
+                tracking.” In Frume, this is a technical receipt that tells
+                Unsplash a selected photograph was used. It is not advertising
+                tracking, and Frume does not use it to follow you across apps,
+                websites, or companies.
+              </p>
+            </div>
+            <p>
+              Frume contains no advertising SDK and no product-analytics SDK.
+              It does not request an advertising identifier, contact list,
+              precise location, microphone, or camera access, and no access to your
+              photo library — choosing your own photograph goes through the
+              system picker, which hands over one file and nothing else.
+            </p>
+          </section>
+
+          <section id="providers" aria-labelledby="providers-title">
+            <p class="section-number" aria-hidden="true">04</p>
+            <h2 id="providers-title">Service providers</h2>
+            <p>
+              These providers handle only the parts of Frume needed to deliver
+              photos, purchases, and network service. Network providers may
+              process request information such as an IP address to deliver and
+              secure their services under their own policies.
+            </p>
+            <ul class="provider-list">
+              <li>
+                <div>
+                  <strong>Unsplash</strong>
+                  <span>Photographs, attribution, and required use registration</span>
+                </div>
+                <a
+                  href="https://unsplash.com/privacy"
+                  aria-label="Read the Unsplash privacy policy"
+                >Privacy policy</a>
+              </li>
+              <li>
+                <div>
+                  <strong>Cloudflare</strong>
+                  <span>Hosting and protection for Frume’s photo service</span>
+                </div>
+                <a
+                  href="https://www.cloudflare.com/privacypolicy/"
+                  aria-label="Read the Cloudflare privacy policy"
+                >Privacy policy</a>
+              </li>
+              <li>
+                <div>
+                  <strong>RevenueCat</strong>
+                  <span>Anonymous purchase-entitlement verification and restore</span>
+                </div>
+                <a
+                  href="https://www.revenuecat.com/privacy/"
+                  aria-label="Read the RevenueCat privacy policy"
+                >Privacy policy</a>
+              </li>
+              <li>
+                <div>
+                  <strong>Apple</strong>
+                  <span>App distribution, payment, and transaction records</span>
+                </div>
+                <a
+                  href="https://www.apple.com/legal/privacy/"
+                  aria-label="Read the Apple privacy policy"
+                >Privacy policy</a>
+              </li>
+            </ul>
+          </section>
+
+          <section id="retention" aria-labelledby="retention-title">
+            <p class="section-number" aria-hidden="true">05</p>
+            <h2 id="retention-title">Retention and deletion</h2>
+            <ul class="plain-list">
+              <li>
+                <strong>Saved puzzle and image:</strong> kept on your device
+                until you start another puzzle, clear its app data, or delete
+                Frume.
+              </li>
+              <li>
+                <strong>A photograph you chose yourself:</strong> kept in
+                Frume’s private storage while a saved puzzle uses it, replaced
+                when you import another, and gone when you delete Frume. It is
+                never uploaded.
+              </li>
+              <li>
+                <strong>Pending photo-use receipts:</strong> kept locally
+                until they are delivered or rejected as invalid. Deleting
+                Frume clears the local queue.
+              </li>
+              <li>
+                <strong>Server photo-use grant:</strong> expires after seven
+                days and is scheduled for removal about one day after expiry.
+                Public curated photo metadata remains in the rotating service
+                pool until it is refreshed or removed for operational reasons.
+              </li>
+              <li>
+                <strong>Purchase records:</strong> retained by Apple and
+                RevenueCat according to their legal, fraud-prevention, and
+                service requirements. They may remain available so a purchase
+                can be restored after reinstalling Frume.
+              </li>
+              <li>
+                <strong>Support email:</strong> kept only as long as reasonably
+                needed to answer the request and meet applicable legal or
+                operational obligations.
+              </li>
+            </ul>
+          </section>
+
+          <section id="choices" aria-labelledby="choices-title">
+            <p class="section-number" aria-hidden="true">06</p>
+            <h2 id="choices-title">Your choices</h2>
+            <p>
+              You can remove local Frume data by deleting the app. You can play
+              an already saved puzzle without requesting a new photo, but an
+              internet connection is required to load another curated photo
+              and to purchase or restore Premium Cuts.
+            </p>
+            <p>
+              Privacy rights vary by location. You may contact Frume to ask
+              about a support message or data connected to the service.
+              Anonymous purchase records may require information that lets
+              RevenueCat or Apple locate the relevant transaction, and some
+              records may need to be retained by those providers.
+            </p>
+          </section>
+
+          <section id="contact" aria-labelledby="contact-title">
+            <p class="section-number" aria-hidden="true">07</p>
+            <h2 id="contact-title">Contact</h2>
+            <p>
+              For privacy questions or support, email:
+            </p>
+            <!--
+              RELEASE_CONTACT: targix8@gmail.com was verified as public on the
+              legacy Frume privacy page on 2026-07-31. Replace this address in
+              both visible text and mailto only after release-owner approval.
+            -->
+            <a
+              class="contact-email"
+              href="mailto:targix8@gmail.com?subject=Frume%20privacy"
+            >targix8@gmail.com</a>
+            <p class="small-note">
+              This policy may change if Frume’s features or providers change.
+              The effective date at the top will be updated when a revised
+              policy is published.
+            </p>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <p>Frume · Quiet photo puzzles for iPhone and iPad.</p>
+        <nav aria-label="Footer">
+          <a href="/">Support</a>
+          <a href="/privacy/" aria-current="page">Privacy</a>
+          <!-- RELEASE_CONTACT: keep synchronized with the policy contact above. -->
+          <a href="mailto:targix8@gmail.com?subject=Frume%20support">Contact</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

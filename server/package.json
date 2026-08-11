@@ -1,0 +1,20 @@
+{
+  "name": "frume-photos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.client.config.ts",
+    "test:worker": "vitest run --config vitest.config.ts",
+    "test:client": "vitest run --config vitest.client.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.19.1",
+    "@cloudflare/workers-types": "^5.20260730.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.0.0"
+  }
+}

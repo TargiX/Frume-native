@@ -1,0 +1,8 @@
+# Local Worker development only. Copy to server/.dev.vars, then paste a newly
+# rotated Unsplash access key. Never reuse the legacy key from the root .env,
+# commit the populated file, or put this value in an EXPO_PUBLIC_* variable.
+UNSPLASH_ACCESS_KEY=
+
+# Optional comma-separated HTTPS origins for browser builds. Native clients do
+# not send an Origin header.
+ALLOWED_ORIGINS=

@@ -1,0 +1,226 @@
+{
+  "seedsPerGrid": {
+    "3x3": 8,
+    "4x4": 8,
+    "5x5": 8,
+    "7x7": 4
+  },
+  "cuts": {
+    "living-fringe/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-fringe/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-fringe/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-fringe/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ],
+    "living-spectrum/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-spectrum/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-spectrum/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "living-spectrum/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ],
+    "crystal-six/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-six/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-six/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-six/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ],
+    "crystal-four/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-four/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-four/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "crystal-four/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ],
+    "amoeba-coral/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-coral/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-coral/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-coral/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ],
+    "amoeba-columnar/3x3": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-columnar/4x4": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-columnar/5x5": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json",
+      "4.json",
+      "5.json",
+      "6.json",
+      "7.json"
+    ],
+    "amoeba-columnar/7x7": [
+      "0.json",
+      "1.json",
+      "2.json",
+      "3.json"
+    ]
+  }
+}

@@ -1,0 +1,1187 @@
+import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useAccessibilityAnnouncement } from '../../../accessibility';
+import { Button } from '../../../components/Button';
+import { MAX_CONTENT_WIDTH, Screen } from '../../../components/Screen';
+import type { PlayStackParamList } from '../../../navigation/types';
+import { isPremiumCutter, usePremiumAccess } from '../../../premium';
+import { usePuzzleSessionContext } from '../../../puzzle/context';
+import { PREMIUM_CUTS_REQUIRED_ERROR } from '../../../puzzle/hooks/usePuzzleSession';
+import {
+  DIFFICULTY_GRID,
+  pieceCount,
+  PUZZLE_GUIDE_OPTIONS,
+  PUZZLE_SIZES,
+  type PuzzleCutterId,
+  type PuzzleDifficulty,
+  type PuzzleGuideMode,
+} from '../../../puzzle/types';
+import {
+  enqueuePhotoUse,
+  fetchPuzzlePhoto,
+  resolvePuzzlePhotoTargetAspect,
+} from '../../../services/unsplash';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
+import { CutStylePreview } from '../components/CutStylePreview';
+import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
+import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
+import {
+  availableSizes,
+  nearestAvailableSize,
+} from '../../../puzzle/cutters/availableSizes';
+import {
+  resolveCutColumns,
+  resolveDifficultyScreenLayout,
+} from '../utils/difficultyLayout';
+import {
+  buildDifficultyRouteParams,
+  describePhotoRequestError,
+} from '../utils/photoRequest';
+
+type Props = NativeStackScreenProps<PlayStackParamList, 'Difficulty'>;
+
+/**
+ * Sizes are named by their piece count, not by a level. Difficulty here is a
+ * comfort setting, every rung is free, and "Hard = 25 pieces" reads as a joke
+ * to anyone who actually likes jigsaws.
+ */
+const SIZE_OPTIONS: { id: PuzzleDifficulty; label: string }[] =
+  PUZZLE_SIZES.map((size) => ({
+    id: size.id,
+    label: `${size.rows * size.columns}`,
+  }));
+
+const GUIDE_ICONS: Record<
+  PuzzleGuideMode,
+  React.ComponentProps<typeof Ionicons>['name']
+> = {
+  none: 'eye-off-outline',
+  grid: 'grid-outline',
+  cuts: 'shapes-outline',
+  image: 'image-outline',
+};
+
+const PHOTO_LOAD_ERROR =
+  'The photograph could not be loaded. Try another photo.';
+
+const ATTRIBUTION_HIT_SLOP = {
+  top: spacing.xs,
+  right: spacing.xs,
+  bottom: spacing.xs,
+  left: spacing.xs,
+} as const;
+
+type PlayableCutterId = Exclude<PuzzleCutterId, 'fractal'>;
+
+const CUT_STYLES: {
+  id: PlayableCutterId;
+  label: string;
+  detail: string;
+}[] = [
+  {
+    id: 'classic',
+    label: 'Classic',
+    detail: 'Familiar interlocking tabs',
+  },
+  {
+    id: 'organic',
+    label: 'Organic',
+    detail: 'Flowing, irregular seams',
+  },
+  {
+    id: 'biomorphic',
+    label: 'Living',
+    detail: 'An even fringe of fine teeth',
+  },
+  {
+    id: 'living-spectrum',
+    label: 'Living spectrum',
+    detail: 'Teeth on five scales, seams varied',
+  },
+  {
+    id: 'crystal',
+    label: 'Crystal',
+    detail: 'Six-fold tips, each piece its own way',
+  },
+  {
+    id: 'crystal-quartered',
+    label: 'Crystal quartered',
+    detail: 'Four headings, blockier and mineral',
+  },
+  {
+    id: 'amoeba',
+    label: 'Amoeba',
+    detail: 'Blobby, pseudopod interlocks',
+  },
+  {
+    id: 'amoeba-columnar',
+    label: 'Amoeba columnar',
+    detail: 'Tall banded lobes over stretched sites',
+  },
+];
+
+function GridPreview({
+  difficulty,
+  active,
+}: {
+  difficulty: PuzzleDifficulty;
+  active: boolean;
+}) {
+  const { rows, columns } = DIFFICULTY_GRID[difficulty];
+
+  return (
+    <View style={styles.gridPreview} importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: rows }).map((_, row) => (
+        <View key={row} style={styles.gridRow}>
+          {Array.from({ length: columns }).map((__, col) => (
+            <View
+              key={col}
+              style={[styles.gridCell, active && styles.gridCellActive]}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function DifficultyScreen({ navigation, route }: Props) {
+  const { width, height, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const {
+    imageUri,
+    imageWidth,
+    imageHeight,
+    photographerName,
+    photographerUrl,
+    photoDescription,
+    categoryId,
+    categoryLabel,
+    downloadLocation,
+    trackingToken,
+  } = route.params;
+  const { startSession, clearSession, loading, error } =
+    usePuzzleSessionContext();
+  const { isPremium } = usePremiumAccess();
+  const [selectedDifficulty, setSelectedDifficulty] =
+    useState<PuzzleDifficulty>('4x4');
+  const [selectedCutter, setSelectedCutter] =
+    useState<PlayableCutterId>('classic');
+  const [selectedGuideMode, setSelectedGuideMode] =
+    useState<PuzzleGuideMode>('cuts');
+  const sizesForCut = availableSizes(selectedCutter);
+  /**
+   * The cuts are a contact sheet: samples laid out to be compared, each with
+   * its name under it and no card around it. Three to a row fits the set on
+   * one screen; larger text takes fewer columns, and past that the list falls
+   * back to one wide row per cut, where a name has somewhere to go.
+   */
+  const cutContentWidth = Math.min(width, MAX_CONTENT_WIDTH) - spacing.xl * 2;
+  const cutColumns = resolveCutColumns(cutContentWidth, fontScale);
+  const singleColumnCuts = cutColumns === 1;
+  const cutTileWidth =
+    (cutContentWidth - spacing.md * (cutColumns - 1)) / cutColumns;
+  const [showPremium, setShowPremium] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const visibleError = imageError
+    ? PHOTO_LOAD_ERROR
+    : photoError ?? trackingError ?? error;
+  useAccessibilityAnnouncement(visibleError);
+  const startingRef = useRef(false);
+  const premiumStartPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const photoRequestRef = useRef<{
+    id: number;
+    controller: AbortController;
+  } | null>(null);
+  const nextPhotoRequestIdRef = useRef(0);
+  const imageAspect =
+    imageWidth > 0 && imageHeight > 0 ? imageWidth / imageHeight : 4 / 3;
+  const playLayout = useMemo(
+    () =>
+      computeSafeAreaPlayLayout(
+        width,
+        height,
+        insets,
+        imageAspect,
+        pieceCount(selectedDifficulty),
+      ),
+    [
+      height,
+      imageAspect,
+      insets.bottom,
+      insets.left,
+      insets.right,
+      selectedDifficulty,
+      insets.top,
+      width,
+    ],
+  );
+  // Matches what the gallery asked for, so a swapped photo fits the same board.
+  const photoOrientation = height >= width ? 'portrait' : 'landscape';
+  const targetPhotoAspect = resolvePuzzlePhotoTargetAspect(
+    width - insets.left - insets.right,
+    height - insets.top - insets.bottom,
+  );
+  const { twoPane } = resolveDifficultyScreenLayout({
+    width,
+    height,
+    fontScale,
+  });
+  const selectedCut =
+    CUT_STYLES.find((option) => option.id === selectedCutter) ?? CUT_STYLES[0];
+  const selectedCutLocked =
+    isPremiumCutter(selectedCutter) && !isPremium;
+
+  const openPremiumCuts = () => {
+    setShowPremium(true);
+  };
+
+  const closePremiumCuts = () => {
+    setShowPremium(false);
+  };
+
+  const onCutStylePress = (cutterId: PlayableCutterId) => {
+    setSelectedCutter(cutterId);
+    premiumStartPendingRef.current = false;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      photoRequestRef.current?.controller.abort();
+      photoRequestRef.current = null;
+    };
+  }, []);
+
+  /**
+   * Swaps the photograph without leaving setup, keeping the theme the player
+   * chose in the gallery. Nothing is tracked for a photo that is replaced --
+   * the use is only enqueued once a session actually starts.
+   */
+  const onAnotherPhoto = async () => {
+    photoRequestRef.current?.controller.abort(
+      new Error('Replaced by a newer photo selection'),
+    );
+    const requestId = ++nextPhotoRequestIdRef.current;
+    const controller = new AbortController();
+    photoRequestRef.current = { id: requestId, controller };
+    setSwapping(true);
+    setPhotoError(null);
+    setTrackingError(null);
+    try {
+      const result = await fetchPuzzlePhoto(
+        categoryId,
+        controller.signal,
+        photoOrientation,
+        targetPhotoAspect ?? undefined,
+      );
+      if (
+        !mountedRef.current ||
+        photoRequestRef.current?.id !== requestId ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+      setImageError(false);
+      setImageLoading(true);
+      navigation.setParams(buildDifficultyRouteParams(result, categoryId));
+    } catch (requestError) {
+      if (
+        mountedRef.current &&
+        photoRequestRef.current?.id === requestId &&
+        !controller.signal.aborted
+      ) {
+        setPhotoError(describePhotoRequestError(requestError));
+      }
+    } finally {
+      if (photoRequestRef.current?.id === requestId) {
+        photoRequestRef.current = null;
+        if (mountedRef.current) {
+          setSwapping(false);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!premiumStartPendingRef.current || !error) {
+      return;
+    }
+    premiumStartPendingRef.current = false;
+    if (
+      error === PREMIUM_CUTS_REQUIRED_ERROR &&
+      isPremiumCutter(selectedCutter)
+    ) {
+      openPremiumCuts();
+    }
+  }, [error, selectedCutter]);
+
+  useEffect(() => {
+    // A simulated cut may not exist at the size already chosen; move the choice
+    // to the nearest one it does have rather than refusing to start.
+    if (sizesForCut.includes(selectedDifficulty)) {
+      return;
+    }
+    const fallback = nearestAvailableSize(selectedCutter, selectedDifficulty);
+    if (fallback) {
+      setSelectedDifficulty(fallback);
+    }
+  }, [selectedCutter, selectedDifficulty, sizesForCut]);
+
+  const onPlay = async () => {
+    if (selectedCutLocked) {
+      openPremiumCuts();
+      return;
+    }
+    if (startingRef.current) {
+      return;
+    }
+    startingRef.current = true;
+    setStarting(true);
+    setTrackingError(null);
+    premiumStartPendingRef.current = isPremiumCutter(selectedCutter);
+    try {
+      const started = await startSession({
+        image: {
+          uri: imageUri,
+          width: imageWidth,
+          height: imageHeight,
+          accessibilityLabel:
+            photoDescription ??
+            (categoryLabel
+              ? `${categoryLabel} puzzle photograph`
+              : 'Puzzle photograph'),
+          attribution:
+            photographerName && photographerUrl
+              ? {
+                  photographerName,
+                  photographerUrl,
+                  sourceName: 'Unsplash',
+                  sourceUrl:
+                    'https://unsplash.com/?utm_source=frume&utm_medium=referral',
+                }
+              : undefined,
+        },
+        cutterId: selectedCutter,
+        difficulty: selectedDifficulty,
+        guideMode: selectedGuideMode,
+        boardMaxWidth: playLayout.boardWidth,
+        boardMaxHeight: playLayout.boardHeight,
+        traySurfaceExtent: playLayout.trayRunExtent,
+        trayPlacement: playLayout.trayPlacement,
+      });
+      if (!started) {
+        return;
+      }
+      premiumStartPendingRef.current = false;
+
+      // Persist required provider tracking before leaving setup. The network
+      // drain runs in the background and is retried on the next launch. A
+      // photograph the player brought themselves has no provider to report to.
+      if (!downloadLocation || !trackingToken) {
+        navigation.navigate('Game', { difficulty: selectedDifficulty });
+        return;
+      }
+      try {
+        await enqueuePhotoUse(
+          { links: { download_location: downloadLocation } },
+          trackingToken,
+        );
+      } catch {
+        // Do not leave a resumable session behind when its required photo-use
+        // event could not be persisted.
+        clearSession();
+        setTrackingError(
+          'This photo could not be prepared for play. Check your connection or device storage, then try again.',
+        );
+        return;
+      }
+      navigation.navigate('Game', { difficulty: selectedDifficulty });
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
+    }
+  };
+
+  const openPhotographer = () => {
+    if (photographerUrl) {
+      void Linking.openURL(photographerUrl).catch(() => undefined);
+    }
+  };
+
+  const openUnsplash = () => {
+    void Linking.openURL(
+      'https://unsplash.com/?utm_source=frume&utm_medium=referral',
+    ).catch(() => undefined);
+  };
+
+  const photoPanel = (
+    <>
+      <View
+        style={[
+          styles.previewCard,
+          twoPane && styles.previewCardLandscape,
+        ]}
+      >
+        {imageLoading && !imageError ? (
+          <ActivityIndicator
+            style={styles.previewStatus}
+            color={colors.accent}
+            accessibilityLabel="Loading puzzle photograph"
+          />
+        ) : null}
+        {imageError ? (
+          <Text style={styles.previewError} accessibilityLiveRegion="polite">
+            {PHOTO_LOAD_ERROR}
+          </Text>
+        ) : null}
+        <Image
+          source={{ uri: imageUri }}
+          style={[styles.preview, imageError && styles.previewHidden]}
+          resizeMode="contain"
+          accessibilityLabel={
+            photoDescription ??
+            (categoryLabel
+              ? `${categoryLabel} puzzle photograph`
+              : 'Puzzle photograph')
+          }
+          onLoadStart={() => {
+            setImageLoading(true);
+            setImageError(false);
+          }}
+          onLoadEnd={() => setImageLoading(false)}
+          onError={() => {
+            setImageLoading(false);
+            setImageError(true);
+          }}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Another photo"
+          accessibilityHint={
+            categoryLabel
+              ? `Replaces this photograph with another ${categoryLabel} one`
+              : 'Replaces this photograph with another one'
+          }
+          accessibilityState={{ busy: swapping, disabled: swapping || starting }}
+          disabled={swapping || starting}
+          onPress={onAnotherPhoto}
+          style={({ pressed }) => [
+            styles.swapButton,
+            pressed && styles.swapButtonPressed,
+            (swapping || starting) && styles.swapButtonDisabled,
+          ]}
+        >
+          {swapping ? (
+            <ActivityIndicator color={colors.textPrimary} size="small" />
+          ) : (
+            <Ionicons
+              name="shuffle"
+              size={20}
+              color={colors.textPrimary}
+              accessible={false}
+              importantForAccessibility="no"
+            />
+          )}
+        </Pressable>
+      </View>
+
+      <View style={[styles.meta, twoPane && styles.metaLandscape]}>
+        {categoryLabel ? <Text style={styles.category}>{categoryLabel}</Text> : null}
+        {photographerName ? (
+          <View style={styles.credit}>
+            <Text style={styles.creditText}>Photo by</Text>
+            {photographerUrl ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${photographerName}'s Unsplash profile`}
+                hitSlop={ATTRIBUTION_HIT_SLOP}
+                onPress={openPhotographer}
+                style={({ pressed }) => [
+                  styles.creditLinkTarget,
+                  pressed && styles.creditLinkPressed,
+                ]}
+              >
+                <Text style={styles.creditLink}>{photographerName}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.creditText}>{photographerName}</Text>
+            )}
+            <Text style={styles.creditText}>on</Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Open the Unsplash home page"
+              hitSlop={ATTRIBUTION_HIT_SLOP}
+              onPress={openUnsplash}
+              style={({ pressed }) => [
+                styles.creditLinkTarget,
+                pressed && styles.creditLinkPressed,
+              ]}
+            >
+              <Text style={styles.creditLink}>Unsplash</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </>
+  );
+
+  const choicesPanel = (
+    <>
+      <Text
+        style={[styles.title, twoPane && styles.firstLandscapeTitle]}
+        accessibilityRole="header"
+      >
+        Choose a cut
+      </Text>
+      <View style={styles.cutOptions} accessibilityRole="radiogroup">
+        {CUT_STYLES.map((option) => {
+          const active = selectedCutter === option.id;
+          const locked = isPremiumCutter(option.id) && !isPremium;
+          const status = locked
+            ? active
+              ? 'Premium · Unlock to play'
+              : 'Premium'
+            : option.id === 'classic'
+              ? 'Free'
+              : 'Premium unlocked';
+
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: loading }}
+              accessibilityLabel={`${option.label}. ${option.detail}. ${status}`}
+              disabled={loading}
+              style={({ pressed }) => [
+                singleColumnCuts ? styles.cutOption : styles.cutTile,
+                singleColumnCuts && styles.cutOptionWide,
+                singleColumnCuts && active && styles.optionSelected,
+                pressed && styles.optionPressed,
+                !singleColumnCuts && { width: cutTileWidth },
+              ]}
+              onPress={() => onCutStylePress(option.id)}
+            >
+              <CutStylePreview
+                cutterId={option.id}
+                active={active}
+                width={singleColumnCuts ? 64 : cutTileWidth}
+                height={
+                  singleColumnCuts ? 50 : Math.round(cutTileWidth * 0.74)
+                }
+              />
+              <View style={singleColumnCuts ? styles.cutCopy : styles.cutTileCopy}>
+                <View style={styles.cutTitleRow}>
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      !singleColumnCuts && styles.cutTileLabel,
+                      active && styles.optionLabelActive,
+                    ]}
+                    numberOfLines={singleColumnCuts ? undefined : 1}
+                  >
+                    {option.label}
+                  </Text>
+                  {locked ? (
+                    <Ionicons
+                      name="lock-closed"
+                      size={16}
+                      color={colors.accent}
+                      accessible={false}
+                      importantForAccessibility="no"
+                    />
+                  ) : active ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color={colors.accent}
+                      accessible={false}
+                      importantForAccessibility="no"
+                    />
+                  ) : null}
+                </View>
+                {singleColumnCuts ? (
+                  <>
+                    <Text style={styles.cutDetail}>{option.detail}</Text>
+                    <Text
+                      style={locked ? styles.premiumBadge : styles.freeBadge}
+                    >
+                      {status}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/*
+        The description and price live here rather than in every card: repeated
+        on eight cards they cost half a screen and say the same thing twice,
+        while the one that matters is the cut currently chosen.
+      */}
+      {!singleColumnCuts ? (
+        <Text style={styles.cutSummary}>
+          {selectedCut.detail}
+          {selectedCutLocked
+            ? ' · Premium · Unlock to play'
+            : selectedCutter === 'classic'
+              ? ' · Free'
+              : ' · Premium unlocked'}
+        </Text>
+      ) : null}
+
+      <Text style={styles.title} accessibilityRole="header">
+        Choose a size
+      </Text>
+      <Text style={styles.sectionHint}>
+        {sizesForCut.length < SIZE_OPTIONS.length
+          ? `Every size is free. ${selectedCut.label} is cut by simulation, so it comes in the sizes that were prepared.`
+          : 'Every size is free. Pick what feels comfortable.'}
+      </Text>
+
+      <View style={styles.difficultyOptions} accessibilityRole="radiogroup">
+        {SIZE_OPTIONS.filter((option) => sizesForCut.includes(option.id)).map((option) => {
+          const active = selectedDifficulty === option.id;
+          const { rows, columns } = DIFFICULTY_GRID[option.id];
+
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: loading }}
+              accessibilityLabel={`${rows * columns} pieces`}
+              disabled={loading}
+              style={({ pressed }) => [
+                styles.difficultyOption,
+                active && styles.optionSelected,
+                pressed && styles.optionPressed,
+              ]}
+              onPress={() => setSelectedDifficulty(option.id)}
+            >
+              <GridPreview difficulty={option.id} active={active} />
+              <View style={styles.optionTitleRow}>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    active && styles.optionLabelActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {active ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={17}
+                    color={colors.accent}
+                    accessible={false}
+                    importantForAccessibility="no"
+                  />
+                ) : null}
+              </View>
+              <Text style={styles.optionDetail}>
+                {rows} × {columns}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.title} accessibilityRole="header">
+        Board help
+      </Text>
+      <Text style={styles.sectionHint}>
+        Independent from piece count. You can change it while playing.
+      </Text>
+
+      <View style={styles.guideOptions} accessibilityRole="radiogroup">
+        {PUZZLE_GUIDE_OPTIONS.map((option) => {
+          const active = selectedGuideMode === option.id;
+          // Every phase-field cut ignores the rectangular grid, so "Grid" is a
+          // zone hint rather than the outline of a piece.
+          const livingZones =
+            selectedCutter !== 'classic' &&
+            selectedCutter !== 'organic' &&
+            option.id === 'grid';
+          const label = livingZones ? 'Zones' : option.label;
+          const detail = livingZones
+            ? 'Approximate placement zones'
+            : option.detail;
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: loading }}
+              accessibilityLabel={`${label}. ${detail}`}
+              disabled={loading}
+              onPress={() => setSelectedGuideMode(option.id)}
+              style={({ pressed }) => [
+                styles.guideOption,
+                active && styles.optionSelected,
+                pressed && styles.optionPressed,
+              ]}
+            >
+              <View
+                style={styles.guideIcon}
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Ionicons
+                  name={GUIDE_ICONS[option.id]}
+                  size={23}
+                  color={active ? colors.accent : colors.textSecondary}
+                />
+              </View>
+              <View style={styles.guideCopy}>
+                <View style={styles.optionTitleRow}>
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      active && styles.optionLabelActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                  {active ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={17}
+                      color={colors.accent}
+                      accessible={false}
+                      importantForAccessibility="no"
+                    />
+                  ) : null}
+                </View>
+                <Text style={styles.optionDetail}>{detail}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </>
+  );
+
+  const actionPanel = (
+    <View style={[styles.actionPanel, twoPane && styles.actionPanelLandscape]}>
+      {photoError || trackingError || error ? (
+        <Text
+          style={styles.error}
+          accessibilityLiveRegion="assertive"
+          numberOfLines={twoPane ? 2 : undefined}
+        >
+          {photoError ?? trackingError ?? error}
+        </Text>
+      ) : null}
+
+      <Button
+        label={
+          selectedCutLocked
+            ? `Unlock ${selectedCut.label} cuts`
+            : loading || starting
+              ? 'Preparing…'
+              : 'Start puzzle'
+        }
+        onPress={onPlay}
+        disabled={loading || starting || swapping || imageError}
+        accessibilityHint={
+          selectedCutLocked
+            ? `Opens the permanent Premium Cuts purchase for ${selectedCut.label}`
+            : `Starts a ${pieceCount(selectedDifficulty)} piece ${selectedCut.label} puzzle`
+        }
+        block
+      />
+    </View>
+  );
+
+  return (
+    <>
+      {twoPane ? (
+        <Screen style={styles.landscapeScreen}>
+          <View style={styles.landscapeColumns}>
+            <View style={styles.landscapePhotoColumn}>
+              {photoPanel}
+              {actionPanel}
+            </View>
+            <View style={styles.landscapeDivider} />
+            <ScrollView
+              style={styles.landscapeChoices}
+              contentContainerStyle={styles.landscapeChoicesContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+              {choicesPanel}
+            </ScrollView>
+          </View>
+        </Screen>
+      ) : (
+        <Screen scroll style={styles.content}>
+          {photoPanel}
+          {choicesPanel}
+          {actionPanel}
+        </Screen>
+      )}
+
+      <PremiumCutsSheet
+        visible={showPremium}
+        onClose={closePremiumCuts}
+        onUnlocked={closePremiumCuts}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  landscapeScreen: {
+    flex: 1,
+    maxWidth: 1_100,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  landscapeColumns: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+  },
+  landscapePhotoColumn: {
+    flex: 0.84,
+    minWidth: 270,
+    maxWidth: 420,
+  },
+  landscapeDivider: {
+    width: 1,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.borderStrong,
+  },
+  landscapeChoices: {
+    flex: 1,
+  },
+  landscapeChoicesContent: {
+    flexGrow: 1,
+    paddingRight: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+  previewCard: {
+    height: 220,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  previewCardLandscape: {
+    height: 0,
+    minHeight: 116,
+    maxHeight: 230,
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  preview: {
+    width: '100%',
+    height: '100%',
+  },
+  previewHidden: {
+    opacity: 0,
+  },
+  previewStatus: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  previewError: {
+    position: 'absolute',
+    zIndex: 1,
+    color: colors.danger,
+    textAlign: 'center',
+    lineHeight: 21,
+    paddingHorizontal: spacing.xl,
+  },
+  swapButton: {
+    position: 'absolute',
+    zIndex: 2,
+    top: spacing.sm,
+    right: spacing.sm,
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: MIN_TOUCH_TARGET / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(12, 10, 8, 0.62)',
+  },
+  swapButtonPressed: {
+    opacity: 0.78,
+  },
+  swapButtonDisabled: {
+    opacity: 0.5,
+  },
+  meta: {
+    marginTop: spacing.md,
+  },
+  metaLandscape: {
+    marginTop: spacing.sm,
+  },
+  category: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  credit: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  creditText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  creditLinkTarget: {
+    minWidth: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creditLink: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    textDecorationLine: 'underline',
+  },
+  creditLinkPressed: {
+    opacity: 0.72,
+  },
+  title: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  firstLandscapeTitle: {
+    marginTop: 0,
+  },
+  sectionHint: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  cutOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  cutOption: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.interactiveBorder,
+    backgroundColor: colors.surface,
+  },
+  /**
+   * Two to a row: the sample sits above its name, and nothing else is in the
+   * card. Eight cards carrying a description and a price line each turned the
+   * picker back into the scroll the two columns were meant to remove.
+   */
+  cutOptionHalf: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 140,
+    gap: spacing.sm,
+    padding: spacing.sm,
+  },
+  cutOptionWide: {
+    flexGrow: 1,
+    flexBasis: '100%',
+    minHeight: 86,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  cutCopy: {
+    flex: 1,
+  },
+  /**
+   * No card: the sample's own frame carries the selection, so a second border
+   * around it would be a box inside a box.
+   */
+  cutTile: {
+    gap: spacing.xs,
+  },
+  cutTileCopy: {
+    width: '100%',
+  },
+  cutTileLabel: {
+    fontSize: 14,
+  },
+  cutTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  cutDetail: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+  },
+  cutSummary: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.md,
+  },
+  premiumBadge: {
+    alignSelf: 'flex-start',
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: spacing.sm,
+  },
+  freeBadge: {
+    alignSelf: 'flex-start',
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+  },
+  difficultyOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  difficultyOption: {
+    flexGrow: 1,
+    flexBasis: 108,
+    minWidth: 88,
+    minHeight: 138,
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.interactiveBorder,
+    backgroundColor: colors.surface,
+  },
+  guideOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  guideOption: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 142,
+    minHeight: MIN_TOUCH_TARGET * 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.interactiveBorder,
+    backgroundColor: colors.surface,
+  },
+  guideIcon: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: MIN_TOUCH_TARGET / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+  },
+  guideCopy: {
+    flex: 1,
+  },
+  optionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surfaceRaised,
+  },
+  optionPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.985 }],
+  },
+  gridPreview: {
+    width: 46,
+    height: 46,
+    gap: 2,
+    marginBottom: spacing.md,
+  },
+  gridRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 2,
+  },
+  gridCell: {
+    flex: 1,
+    borderRadius: 1.5,
+    backgroundColor: colors.borderStrong,
+  },
+  gridCellActive: {
+    backgroundColor: colors.accent,
+  },
+  optionTitleRow: {
+    minHeight: MIN_TOUCH_TARGET / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  optionLabel: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  optionLabelActive: {
+    color: colors.textPrimary,
+  },
+  optionDetail: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  actionPanel: {},
+  actionPanelLandscape: {
+    marginTop: 'auto',
+    paddingTop: spacing.md,
+  },
+  error: {
+    color: colors.danger,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+});
