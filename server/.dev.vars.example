@@ -17,7 +17,4 @@ PROVIDER_REQUESTS_PER_HOUR=1000
 PROVIDER_RESERVE_PER_HOUR=100
 MAX_RETAINED_TRACKING_GRANTS=10000
 TRACKING_GRANT_ISSUES_PER_MINUTE=5
-# Local-only acknowledgement so local requests can run. Production must set 1
-# only after the intended Cloudflare account is actually verified on Paid.
-WORKERS_PAID_PLAN_CONFIRMED=1
 PHOTO_API_DISABLED=0

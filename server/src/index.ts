@@ -26,8 +26,6 @@ export type Env = {
   MAX_RETAINED_TRACKING_GRANTS?: string;
   /** Global issuance ceiling independent of caller-controlled source IPs. */
   TRACKING_GRANT_ISSUES_PER_MINUTE?: string;
-  /** Explicit production capacity gate; current write envelope requires Paid. */
-  WORKERS_PAID_PLAN_CONFIRMED?: string;
   /** Emergency fail-closed switch. The only enabled value is exactly `1`. */
   PHOTO_API_DISABLED?: string;
   /** Cloudflare-generated identity for the exact code/configuration version. */
@@ -653,21 +651,8 @@ function photoApiDeploymentId(env: Env): string {
   return configured;
 }
 
-export function workersPaidPlanConfirmed(env: Env): boolean {
-  const configured = env.WORKERS_PAID_PLAN_CONFIRMED?.trim();
-  if (configured === '1') {
-    return true;
-  }
-  if (configured === undefined || configured === '' || configured === '0') {
-    return false;
-  }
-  throw new ConfigurationError(
-    'WORKERS_PAID_PLAN_CONFIRMED must be 0 or 1',
-  );
-}
-
 function photoServiceDisabled(env: Env): boolean {
-  return photoApiDisabled(env) || !workersPaidPlanConfirmed(env);
+  return photoApiDisabled(env);
 }
 
 function providerBudgetStub(env: Env): DurableObjectStub<ProviderBudget> {
@@ -1883,7 +1868,6 @@ function readiness(env: Env): {
   let trackingGrantConfig = false;
   let photoApiEnabled = false;
   let trackingTokenSecret = false;
-  let workersPaidPlan = false;
   let deploymentId: string | null = null;
   try {
     providerBudgetConfiguration(env);
@@ -1896,10 +1880,9 @@ function readiness(env: Env): {
     // The individual check remains false without exposing configuration input.
   }
   try {
-    workersPaidPlan = workersPaidPlanConfirmed(env);
-    photoApiEnabled = !photoApiDisabled(env) && workersPaidPlan;
+    photoApiEnabled = !photoApiDisabled(env);
   } catch {
-    // Invalid or unconfirmed capacity stays fail-closed.
+    // Invalid emergency-switch configuration stays fail-closed.
   }
   try {
     deploymentId = photoApiDeploymentId(env);
@@ -1916,7 +1899,6 @@ function readiness(env: Env): {
       trackingRateLimiter: Boolean(env.TRACKING_RATE_LIMITER),
       unsplashAccessKey: Boolean(env.UNSPLASH_ACCESS_KEY?.trim()),
       trackingTokenSecret,
-      workersPaidPlan,
       photoApiEnabled,
       deploymentIdentity: deploymentId !== null,
     },

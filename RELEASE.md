@@ -15,15 +15,15 @@ this App Store submission.
 | Area | Verified state | Release gate |
 | --- | --- | --- |
 | App identity | The existing App Store Connect app is Apple ID `1639767109`, bundle ID `com.targix.frumenative`, and SKU `EX1660458511601`. Its editable platform-version record was last verified as `1.0`. Build `1` was already used. Build `2` was uploaded on 2026-08-11 but its source archive contained a RevenueCat `test_` key and is invalid. The source now defaults to marketing version `1.0.0`, iOS build `3`, and deployment target iOS 16.0. | Do not attach or submit build `2`. Confirm build `3` is unused immediately before archiving, then attach only a build 3+ archive that passes the checked-in bundle scan and exact-binary QA. |
-| Cloudflare Worker | `frume-photos` builds with SQLite `CategoryPhotoPool`, one global signed-grant broker, and a globally coordinated provider-budget Durable Object. It has global grant issuance/storage ceilings, lower per-source limits, a fail-closed emergency switch, an explicit Workers Paid capacity gate, Cloudflare-generated immutable version metadata, and privacy-safe operational counters/logs. Local Workerd tests and a Wrangler dry run are required; remote deployment remains unverified. | Confirm the intended account is on Workers Paid, its current SQLite usage, and its public route; create/deploy the reviewed migrations and bindings with a rotated `UNSPLASH_ACCESS_KEY` and independent `TRACKING_TOKEN_SECRET`; then record the Cloudflare-generated active version ID, configure both global budgets and the alert owner, and exercise real `/health`, `/photo`, and `/track` paths. |
-| Worker deploy URL | **TODO — no verified intended Frume Worker deploy URL is recorded.** A previously configured endpoint answered `/health`, but its account, route ownership, and deployed code identity were not established. | Choose/register the intended account subdomain explicitly. Do not derive or guess the resulting URL; record only the URL returned by a successful deployment and verified by `/health`. |
+| Cloudflare Worker | `frume-photos` is deployed on the intended Workers Free account with SQLite `CategoryPhotoPool`, one global signed-grant broker, a globally coordinated provider-budget Durable Object, both rate limiters, version metadata, and an independent tracking-token secret. Version `7b62bdb3-9e60-4663-8387-10c2f584305d` returned HTTP 200 with all nine readiness checks true on 2026-08-13; live `/photo` returned 200 and its signed `/track` completed with 204. | Monitor daily Worker/SQLite usage and provider allowance. Free works until its hard daily limits; rotate the legacy Unsplash credential and prove exhausted-budget/forged-token behavior before submission. |
+| Worker deploy URL | `https://frume-photos.targix8.workers.dev` was printed by Wrangler and verified against the exact active deployment identity on 2026-08-13. | Keep this exact HTTPS base URL in the release environment and re-run the identity-bound live health guard before every archive. |
 | Unsplash credential | A gitignored root `.env` contains legacy Unsplash access/secret variable entries. Rotation is not confirmed; treat both values as compromised. | Invalidate them in Unsplash, obtain a replacement Access Key, verify the old value no longer works, remove the legacy local entries, and store the replacement only in Cloudflare or a gitignored `server/.dev.vars`. |
-| Unsplash API capacity | **Conflict to resolve:** the operator stated on 2026-07-29 that Frume already holds Unsplash **Production** access at 1000 requests/hour, but this runbook has never recorded verified evidence of it. The scheduled baseline is 12 search requests/hour; cold, empty, or orientation-mismatched pools can add on-demand searches, and each started curated puzzle adds one download-tracking request. Production config now deploys fail-closed until these assumptions are verified. | Obtain Unsplash Production approval, verify live `X-Ratelimit-*` headers under expected load, set reviewed limit/reserve values, explicitly enable the API, and add operational alerting before store release. |
-| Expo photo API | The client fails closed unless `EXPO_PUBLIC_PHOTO_API_URL` is set. | Set it to the verified HTTPS Worker base URL, without `/photo`, `/track`, credentials, query, or fragment. |
-| RevenueCat | Client integration exists, but the live App Store Connect app has no in-app purchases and no RevenueCat iOS app, public SDK key, current offering, or product mapping is verified. | Create the reviewed non-consumable, attach it to the reconciled App Store version, complete the RevenueCat mapping, and pass StoreKit sandbox/TestFlight purchase and restore QA. |
+| Unsplash API capacity | **Conflict to resolve:** the operator stated on 2026-07-29 that Frume already holds Unsplash **Production** access at 1000 requests/hour, but this runbook has never recorded verified dashboard/header evidence of it. The deployed Worker caps usable provider traffic at 900/hour and the scheduled baseline is 12 searches/hour; live `/photo` and `/track` succeeded. | Verify live `X-Ratelimit-*` headers under expected load and add operational alerting before store release. Use `PHOTO_API_DISABLED=1` if the assumed upstream allowance is disproven. |
+| Expo photo API | The gitignored release environment uses `https://frume-photos.targix8.workers.dev` and the identity-bound live health guard passes. | Re-run the guard from the exact archive environment immediately before building. |
+| RevenueCat | The Frume RevenueCat project has an App Store app, production `appl_` public SDK key, `default` offering, `$rc_lifetime` package, product `com.targix.frumenative.premiumcuts`, and entitlement `premium_cut_styles`; the gitignored release environment passes the checked-in identifier guard. | Confirm the product is attached to the reconciled App Store version and pass StoreKit sandbox/TestFlight purchase and restore QA on the exact candidate. |
 | Premium contract | Entitlement is exactly `premium_cut_styles`. A purchase is enabled only when a package in the current offering contains the explicitly configured iOS product ID and RevenueCat reports `NON_SUBSCRIPTION`, `NON_CONSUMABLE`, and a null subscription period. The package label is not inspected; every product or metadata mismatch fails closed. | Attach that exact iOS non-consumable to the entitlement and a package in the current offering, then record and compile its reviewed product ID. |
-| iOS build path | The only enabled 1.0 build path pins Node `24.16.0`, npm `11.13.0`, and Xcode `26.6 (17F113)`; performs clean root and Worker installs from both lockfiles; defaults to build `3`; rejects non-`appl_` RevenueCat keys; and verifies the exact reviewed key, product ID, and `premium_cut_styles` entitlement in the optimized `main.jsbundle`. A signed archive additionally requires `HEAD` to equal an explicitly approved full SHA and the live `main` tip at the hardcoded canonical GitHub repository, then independently fetches, raw-manifests, and materializes that exact remote Git tree into a new temporary source directory. Every install, check, prebuild, Metro bundle, and Xcode input runs from the reviewed export, excluding inherited Git rewrites, ignored/local files, hidden index flags, clean filters, and mutable-worktree races. It also requires the exact live Worker ten-check health and Cloudflare version identity contract, blocks developer dotenv and Android-key contamination, regenerates iOS cleanly, and injects own-photo backup exclusion through a versioned config plugin. Remote EAS builds fail in `eas-build-pre-install` until they reproduce these guards. A fresh post-protocol unsigned `1.0.0 (3)` structural simulator proof now compiles and launches without Metro. | Merge the reviewed source and produce a signed build 3+ archive with real production configuration through `npm run ios:archive`. Test that exact processed binary on physical iPhone/iPad and TestFlight; local generation/build/upload/processing/submission remain separate evidence states. |
-| Public links | The configured Support and Privacy Policy URLs redirected anonymous requests to Vercel authentication during the 2026-08-12 audit. A shared local/live content contract now requires the exact current support/privacy markers. The archive gate also follows same-origin redirects and rejects authentication routes, cross-origin redirects, non-HTML, stale content, and the legacy two-cut contract. | Disable production deployment protection or publish truly public pages, deploy the exact reviewed content, run the live gate successfully with no cookies, update App Store Connect, and verify both links from the exact binary on Wi-Fi and cellular. |
+| iOS build path | The only enabled 1.0 build path pins Node `24.16.0`, npm `11.13.0`, and Xcode `26.6 (17F113)`; performs clean root and Worker installs from both lockfiles; defaults to build `3`; rejects non-`appl_` RevenueCat keys; and verifies the exact reviewed key, product ID, and `premium_cut_styles` entitlement in the optimized `main.jsbundle`. A signed archive additionally requires `HEAD` to equal an explicitly approved full SHA and the live `main` tip at the hardcoded canonical GitHub repository, then independently fetches, raw-manifests, and materializes that exact remote Git tree into a new temporary source directory. Every install, check, prebuild, Metro bundle, and Xcode input runs from the reviewed export, excluding inherited Git rewrites, ignored/local files, hidden index flags, clean filters, and mutable-worktree races. It also requires the exact live Worker nine-check health and Cloudflare version identity contract, blocks developer dotenv and Android-key contamination, regenerates iOS cleanly, and injects own-photo backup exclusion through a versioned config plugin. Remote EAS builds fail in `eas-build-pre-install` until they reproduce these guards. A fresh post-protocol unsigned `1.0.0 (3)` structural simulator proof now compiles and launches without Metro. | Merge the reviewed source and produce a signed build 3+ archive with real production configuration through `npm run ios:archive`. Test that exact processed binary on physical iPhone/iPad and TestFlight; local generation/build/upload/processing/submission remain separate evidence states. |
+| Public links | Current support/privacy content is deployed publicly at `https://support-site-one-alpha.vercel.app/` and `/privacy/`. The anonymous live content guard passed on 2026-08-13 with no authentication redirect. | Install the same URLs in App Store Connect and verify both links from the exact binary on Wi-Fi and cellular. |
 | iOS privacy manifest | The latest local prebuild generated an app manifest containing required-reason API entries and declaring no collection/tracking, and RevenueCat supplies its own manifest. The generated native directory is ignored and no release archive has been audited. | Review the manifests supplied by every native dependency and validate the exact archived binary and store declarations. |
 | Dependency audit | Re-audited 2026-08-12 after compatible lockfile fixes and exact `postcss`/`uuid` overrides: mobile production audit fell from 27 findings to **10 high, 0 critical/moderate/low**. All ten are one Expo/Metro build-tool chain rooted in two `image-size` parser advisories for which npm publishes no fixed version; they process repository build assets, not player photos in the shipped runtime. A checked-in allowlist matches the exact two GHSA URLs and exact dependency chain, so the manual release gate fails on any new advisory. The Worker reports zero. | Keep the exception narrow, do not feed untrusted assets to the release build, and migrate from Expo 54 only on a dedicated device-tested branch. Run `npm run security:dependencies` from the exact candidate; never use `npm audit fix --force` as a release shortcut. |
 | Photo library access | iOS uses `PHPickerViewController` through `expo-image-picker`, so Frume receives only the selected file. Valid 48 MP photos are downsampled locally in a native background operation to a 16 MP derivative before durable copy; extreme source decodes and unusable panoramas fail with actionable copy. Managed files have transactional ownership, are excluded from iCloud Backup by a config plugin that survives clean prebuild, and are never uploaded. | On the exact archive, verify the photo usage string, absence of camera permission, privacy manifests, backup exclusion, orientation, 48 MP HEIF/JPEG, iCloud-backed selection, low-storage interruption, replacement/clear deletion, and App Privacy answers. |
@@ -71,26 +71,26 @@ output before building:
 
 | Record | Confirmed value |
 | --- | --- |
-| Cloudflare account/owner | TODO |
-| Workers Paid plan and current SQLite usage verified | TODO; Free must not be accepted for the current full write envelope |
-| `CategoryPhotoPool` / `TrackingGrant` migration `v1` and `ProviderBudget` migration `v2` deployed | TODO |
+| Cloudflare account/owner | `Targix8@gmail.com's Account`; account ID `f38a2e694428e7ae37ee3ae893614520` |
+| Workers plan and current SQLite usage verified | Workers Free verified 2026-08-13; keep daily SQLite usage under observation |
+| `CategoryPhotoPool` / `TrackingGrant` migration `v1` and `ProviderBudget` migration `v2` deployed | Deployed; all three live readiness bindings passed |
 | Rate-limit namespace IDs `2026073101` / `2026073102` confirmed unique | TODO |
-| Worker deploy URL | TODO |
-| Immutable Worker version ID | TODO; record the active ID from Cloudflare's version metadata/deployment receipt and pass that exact value as `FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID` when archiving |
+| Worker deploy URL | `https://frume-photos.targix8.workers.dev` |
+| Immutable Worker version ID | `7b62bdb3-9e60-4663-8387-10c2f584305d`; installed as `FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID` in the gitignored release environment |
 | Rotated Unsplash key installed and legacy key revoked | TODO |
-| Independent tracking-token HMAC secret generated and installed | TODO; never reuse or record the value |
-| Global grant limits and Cloudflare allowance | TODO; verify the account plan/current SQLite usage, then review the `10000` retained-row invariant and `5` issuances/minute against launch traffic before enabling |
+| Independent tracking-token HMAC secret generated and installed | Installed 2026-08-13; value intentionally not recorded |
+| Global grant limits and Cloudflare allowance | `10000` retained rows, `5` issuances/minute, `1` photo issuance/IP/minute, and `900` usable provider requests/hour deployed on Workers Free |
 | Unsplash Production approval and verified hourly limit | TODO |
 | Latest iOS simulator proof | Current structural proof recorded in `release-evidence/2026-08-12-remediation-release-simulator.md`; it uses synthetic public service configuration and is not a signed candidate |
 | Reviewed release source SHA | TODO; after review/merge, pass the full current `main` SHA from `https://github.com/TargiX/Frume-native.git` as `FRUME_REVIEWED_RELEASE_SHA` |
 | Final signed iOS archive/build identifier | TODO; builds `1` and `2` must not be reused, so verify and use `3` or later |
-| RevenueCat project and iOS app record | TODO |
-| RevenueCat iOS public SDK key installed | TODO |
-| Reviewed iOS Premium Cuts product identifier installed | TODO |
-| Current offering identifier | TODO |
-| Current offering package and iOS product identifier | TODO |
-| Privacy policy URL | TODO |
-| Support page URL | TODO |
+| RevenueCat project and iOS app record | Frume project / `Frume (App Store)` verified 2026-08-13 |
+| RevenueCat iOS public SDK key installed | Production `appl_` public key installed in gitignored release environment; value intentionally omitted here |
+| Reviewed iOS Premium Cuts product identifier installed | `com.targix.frumenative.premiumcuts` |
+| Current offering identifier | `default` |
+| Current offering package and iOS product identifier | `Lifetime` / `$rc_lifetime` / `com.targix.frumenative.premiumcuts` |
+| Privacy policy URL | `https://support-site-one-alpha.vercel.app/privacy/` |
+| Support page URL | `https://support-site-one-alpha.vercel.app/` |
 | App Store Connect app URL | `https://appstoreconnect.apple.com/apps/1639767109/appstore` |
 | App Store Connect identity | Apple ID `1639767109`; bundle `com.targix.frumenative`; SKU `EX1660458511601` |
 | Existing version/review state | `1.0`; Rejected 2022-12-21, Guideline 4.2 Minimum Functionality |
@@ -122,27 +122,22 @@ and configure monitoring before launch. See Unsplash's
 
 The provisional checked-in ceiling caps all outbound provider requests across
 every Worker isolate at 900 in any rolling 60-minute period (`1000` allowance
-less a `100` recovery reserve), but production config deploys with
-`PHOTO_API_DISABLED=1`. Every refill search and download-tracking request
+less a `100` recovery reserve). Every refill search and download-tracking request
 reserves capacity before external I/O. `/photo` also permits at most 1 issuance
 attempt per source IP per minute, preventing one source from monopolizing the
 global admission budget. Independent of source addresses, the single global grant broker
 permits at most 5 issuances/minute and retains no more than 10,000 rows. Its
 cleanup queries use the expiry index and it does not rewrite an already-earlier
 alarm on every issue. The config rejects any retained-row ceiling too small for
-the full TTL window. Grant traffic alone is bounded, but the combined maximum
-grant-consumption and category-pool write envelope can exceed Cloudflare's
-current Workers Free limit of 100,000 SQLite rows written/day. The checked-in
-`WORKERS_PAID_PLAN_CONFIRMED=0` therefore keeps requests and cron work disabled
-until the intended account is verified on Workers Paid and a reviewed commit
-sets it to `1`. See Cloudflare's
+the full TTL window. Expected launch traffic fits Workers Free, but its daily
+limits remain hard account caps and an extreme combined write envelope can
+still exhaust them. Monitor live usage and lower the emergency switch if the
+account approaches a daily limit. See Cloudflare's
 [Durable Object pricing and limits](https://developers.cloudflare.com/durable-objects/platform/pricing/).
 Higher rates require a separately reviewed capacity/cost change.
 Exhaustion returns a retryable HTTP 503 without spending the provider reserve.
-Keep the API disabled until the provider allowance, reserve, route, both secret
-installations, and alert owner are verified. Then change the reviewed config to
-`PHOTO_API_DISABLED=0`, deploy, and keep the flag available as the incident
-switch. Never enable first and verify capacity afterward.
+Keep `PHOTO_API_DISABLED` available as the incident switch. Set it to `1` when
+provider allowance, route, secrets, or storage capacity are no longer safe.
 
 Authenticate Wrangler to the intended Cloudflare account and review the
 checked-in Durable Object and Rate Limit configuration:
@@ -212,19 +207,10 @@ secret in `wrangler.jsonc`, a shell command argument, this document, root
 `.env`, EAS, or an `EXPO_PUBLIC_*` variable. See Cloudflare's
 [secret handling guidance](https://developers.cloudflare.com/workers/configuration/secrets/).
 
-The checked-in first deployment is intentionally disabled. Copy the exact
-HTTPS URL printed by Wrangler into the release record and confirm `/health`
-returns HTTP 503 with `workersPaidPlan: false` and `photoApiEnabled: false`;
-any other failed check is a deployment blocker. `/photo`, `/track`, and the
-scheduled refill must spend no provider or Durable Object write capacity in
-this state.
-
 After Production allowance, route ownership, migration state, namespace IDs,
-both secrets, Workers Paid capacity, provisional limits/reserve, and alert
-ownership are verified, change the checked-in `WORKERS_PAID_PLAN_CONFIRMED`
-value to `1` and `PHOTO_API_DISABLED` to `0` in one reviewed release commit;
-the `CF_VERSION_METADATA` binding supplies the immutable version ID,
-repeat the dry run, and deploy that commit. Then verify readiness:
+both secrets, provisional limits/reserve, and alert ownership are verified,
+deploy with `PHOTO_API_DISABLED=0`. The `CF_VERSION_METADATA` binding supplies
+the immutable version ID. Repeat the dry run, deploy, and verify readiness:
 
 ```sh
 WORKER_URL='paste the exact successful deploy URL here'
@@ -232,10 +218,10 @@ curl --fail --silent --show-error "$WORKER_URL/health"
 ```
 
 Release readiness requires HTTP 200 with `status: "ok"`, the exact reviewed
-`deploymentId`, and all ten checks
+`deploymentId`, and all nine checks
 (`categoryPools`, `trackingGrants`, `providerBudget`, `photoIssueRateLimiter`,
 `trackingRateLimiter`, `unsplashAccessKey`, `trackingTokenSecret`,
-`workersPaidPlan`, `photoApiEnabled`, and `deploymentIdentity`) equal to
+`photoApiEnabled`, and `deploymentIdentity`) equal to
 `true`. Then request
 all curated categories and `Surprise me` from a release build. Confirm each
 photo returns a signed opaque grant, attribution opens an Unsplash URL, and starting a

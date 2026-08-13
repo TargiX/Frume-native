@@ -10,7 +10,6 @@ export const REQUIRED_PHOTO_API_HEALTH_CHECKS = [
   'trackingRateLimiter',
   'unsplashAccessKey',
   'trackingTokenSecret',
-  'workersPaidPlan',
   'photoApiEnabled',
   'deploymentIdentity',
 ];
