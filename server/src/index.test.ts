@@ -27,7 +27,6 @@ const TEST_PHOTO_API_DEPLOYMENT_ID =
 const enabledTestEnv = {
   ...testEnv,
   PHOTO_API_DISABLED: '0',
-  WORKERS_PAID_PLAN_CONFIRMED: '1',
   CF_VERSION_METADATA: {
     id: TEST_PHOTO_API_DEPLOYMENT_ID,
     tag: 'test',
@@ -175,7 +174,6 @@ describe('configuration and URL validation', () => {
         trackingRateLimiter: true,
         unsplashAccessKey: true,
         trackingTokenSecret: true,
-        workersPaidPlan: true,
         photoApiEnabled: true,
         deploymentIdentity: true,
       },
@@ -270,15 +268,14 @@ describe('configuration and URL validation', () => {
     );
     expect(missingSwitch.status).toBe(503);
 
-    const unconfirmedCapacity = await worker.fetch(
+    const freePlanConfiguration = await worker.fetch(
       new Request('https://worker.example/photo?category=nature'),
       {
         ...testEnv,
         PHOTO_API_DISABLED: '0',
-        WORKERS_PAID_PLAN_CONFIRMED: '0',
       } as Env,
     );
-    expect(unconfirmedCapacity.status).toBe(503);
+    expect(freePlanConfiguration.status).not.toBe(503);
   });
 
   it('rejects a retained-grant ceiling below the full issuance window', () => {

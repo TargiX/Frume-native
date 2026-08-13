@@ -43,15 +43,13 @@
     // Signed grants are all stored in one global broker so caller-controlled
     // source addresses cannot multiply either issuance or SQLite storage.
     // Five global grants/minute bounds grant traffic independently of source
-    // addresses. The complete pool + grant write envelope still requires the
-    // Workers Paid attestation below; review capacity before raising this value.
+    // addresses. Workers Free remains the final daily capacity limit, so
+    // monitor SQLite writes before raising this value.
     "MAX_RETAINED_TRACKING_GRANTS": "10000",
     "TRACKING_GRANT_ISSUES_PER_MINUTE": "5",
-    // The full category-pool + grant write envelope can exceed the Workers
-    // Free daily SQLite allowance. Keep both this attestation and the API off
-    // until the intended account is verified on Workers Paid.
-    "WORKERS_PAID_PLAN_CONFIRMED": "0",
-    "PHOTO_API_DISABLED": "1"
+    // Emergency incident switch. Set to 1 to fail closed without deleting the
+    // Worker, bindings, migrations, or secrets.
+    "PHOTO_API_DISABLED": "0"
   },
   "ratelimits": [
     {
@@ -84,8 +82,8 @@
   // 1. On the first deploy, upload both the rotated API credential and an
   //    independent TRACKING_TOKEN_SECRET atomically with
   //    `wrangler deploy --secrets-file`; `secret put` is for an existing Worker.
-  // 2. Confirm Workers Paid is active and both rate-limit namespace IDs are
-  //    unique in the account before changing either fail-closed flag.
+  // 2. Confirm both rate-limit namespace IDs are unique in the account before
+  //    deploying. The reviewed limits support the Workers Free plan.
   // 3. For a web build, set ALLOWED_ORIGINS to a comma-separated origin list.
   //    Native clients do not send an Origin header.
 }

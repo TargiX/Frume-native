@@ -18,9 +18,9 @@ work is intentionally deferred and does not block App Store submission.
   Unsplash Access Key plus an independent tracking-token HMAC secret, review
   and observe its global provider/grant budgets and emergency switch, and
   verify its real `/health`, `/photo`, and `/track` paths under normal, forged,
-  and exhausted-budget behavior. The current write envelope requires verified
-  Workers Paid capacity and the Cloudflare-generated active version ID; the
-  checked-in gate must remain `0` on Free or unknown accounts.
+  and exhausted-budget behavior. The reviewed limits support the Workers Free
+  plan; record the Cloudflare-generated active version ID and monitor daily
+  SQLite usage before raising either global ceiling.
 - Revoke the legacy local Unsplash credential and obtain Unsplash Production
   approval with enough verified capacity for launch traffic.
 - Remove authentication from the final privacy policy and support deployment

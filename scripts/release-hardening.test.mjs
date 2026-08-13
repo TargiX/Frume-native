@@ -528,17 +528,14 @@ test('remote EAS builds fail before installation until they reproduce archive gu
   assert.match(result.stderr, /npm run ios:archive/);
 });
 
-test('first Worker deployment keeps the public photo API disabled', () => {
+test('Worker deployment supports the Free plan and keeps an emergency switch', () => {
   const workerConfiguration = readFileSync(
     new URL('../server/wrangler.jsonc', import.meta.url),
     'utf8',
   );
 
-  assert.match(workerConfiguration, /"PHOTO_API_DISABLED": "1"/);
-  assert.match(
-    workerConfiguration,
-    /"WORKERS_PAID_PLAN_CONFIRMED": "0"/,
-  );
+  assert.match(workerConfiguration, /"PHOTO_API_DISABLED": "0"/);
+  assert.doesNotMatch(workerConfiguration, /WORKERS_PAID_PLAN_CONFIRMED/);
   assert.match(workerConfiguration, /"version_metadata"/);
   assert.match(workerConfiguration, /"binding": "CF_VERSION_METADATA"/);
   assert.doesNotMatch(workerConfiguration, /PHOTO_API_DEPLOYMENT_ID/);
