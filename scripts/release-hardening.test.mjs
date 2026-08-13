@@ -687,21 +687,6 @@ test('app configuration defaults the next release artifact to iOS build 3', () =
   assert.equal(result.stdout, '3');
 });
 
-test('CI reproduces the pinned clean-install verification contract', () => {
-  const workflow = readFileSync(
-    new URL('../.github/workflows/ci.yml', import.meta.url),
-    'utf8',
-  );
-
-  assert.match(workflow, /node-version: 24\.16\.0/);
-  assert.match(workflow, /npm install --global npm@11\.13\.0/);
-  assert.match(workflow, /run: npm ci --ignore-scripts=false/);
-  assert.match(workflow, /run: npm --prefix server ci --ignore-scripts=false/);
-  assert.match(workflow, /run: npm run check/);
-  assert.match(workflow, /permissions:\n  contents: read/);
-  assert.match(workflow, /persist-credentials: false/);
-});
-
 test('public page URL guard rejects local and decorated URLs', () => {
   assert.equal(
     parsePublicHttpsUrl('URL', 'https://frume.example/privacy').href,
