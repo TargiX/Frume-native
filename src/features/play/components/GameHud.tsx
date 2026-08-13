@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -10,6 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, MIN_TOUCH_TARGET, spacing } from '../../../theme';
 import { puzzleMenuHudSide } from './puzzleMenuPresentation';
+import {
+  formatPuzzleElapsed,
+  puzzleStatusLabel,
+} from './gameStatusPresentation';
 
 type GameHudProps = {
   placedCount: number;
@@ -18,13 +23,6 @@ type GameHudProps = {
   activeStartedAt: number | null;
   onOpenMenu: () => void;
 };
-
-function formatElapsed(milliseconds: number): string {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1_000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 export function GameHud({
   placedCount,
@@ -44,10 +42,10 @@ export function GameHud({
     return () => clearInterval(timer);
   }, []);
 
-  const elapsed = formatElapsed(
+  const elapsedMs =
     activeElapsedMs +
-      (activeStartedAt === null ? 0 : Math.max(0, now - activeStartedAt)),
-  );
+    (activeStartedAt === null ? 0 : Math.max(0, now - activeStartedAt));
+  const elapsed = formatPuzzleElapsed(elapsedMs);
   return (
     <View
       style={[
@@ -64,24 +62,31 @@ export function GameHud({
       ]}
       pointerEvents="box-none"
     >
-      <Pressable
-        onPress={onOpenMenu}
-        style={({ pressed }) => [
-          styles.menuButton,
-          pressed && styles.menuButtonPressed,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Open puzzle menu. ${placedCount} of ${totalCount} pieces placed. ${elapsed} elapsed.`}
-        accessibilityHint="Shows progress, board help, Assist, photo credit, and puzzle options"
-      >
-        <Ionicons
-          name="menu-outline"
-          size={22}
-          color="#fff"
-          accessible={false}
-          importantForAccessibility="no"
-        />
-      </Pressable>
+      <View style={styles.statusRow}>
+        <View style={styles.statusPlate} accessible={false}>
+          <Text style={styles.statusText}>
+            {puzzleStatusLabel(placedCount, totalCount, elapsedMs)}
+          </Text>
+        </View>
+        <Pressable
+          onPress={onOpenMenu}
+          style={({ pressed }) => [
+            styles.menuButton,
+            pressed && styles.menuButtonPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open puzzle menu. ${placedCount} of ${totalCount} pieces placed. ${elapsed} elapsed.`}
+          accessibilityHint="Shows progress, board help, Assist, photo credit, and puzzle options"
+        >
+          <Ionicons
+            name="menu-outline"
+            size={22}
+            color="#fff"
+            accessible={false}
+            importantForAccessibility="no"
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -89,6 +94,26 @@ export function GameHud({
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statusPlate: {
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: 16,
+    backgroundColor: 'rgba(12, 10, 8, 0.72)',
+    borderWidth: 1,
+    borderColor: colors.interactiveBorder,
+  },
+  statusText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   menuButton: {
     width: MIN_TOUCH_TARGET,

@@ -12,6 +12,11 @@
  */
 
 const DIRECTORY_NAME = 'frume-own-photos';
+const MAX_FILENAME_COLLISIONS = 1_000;
+const MANAGED_OWN_PHOTO_URI =
+  /\/frume-own-photos\/own-\d+(?:-\d+)?\.(?:heic|jpeg|jpg|png)$/i;
+const activeCandidateUris = new Set<string>();
+let ownershipReconciliationQueue: Promise<void> = Promise.resolve();
 
 /** Matches the offline cache ceiling for provider photographs. */
 export const MAX_OWN_PHOTO_BYTES = 20 * 1024 * 1024;
@@ -31,6 +36,34 @@ function extensionFor(uri: string): string {
   return extension === 'png' || extension === 'heic' || extension === 'jpeg'
     ? extension
     : 'jpg';
+}
+
+export function isManagedOwnPhotoUri(uri: string | undefined): uri is string {
+  return typeof uri === 'string' &&
+    uri.startsWith('file://') &&
+    MANAGED_OWN_PHOTO_URI.test(uri);
+}
+
+/**
+ * Produces a stable, duplicate-free deletion plan for the managed library.
+ * Unknown files are never treated as Frume-owned and therefore never deleted.
+ */
+export function resolveOwnPhotoPrunePlan(
+  libraryUris: readonly string[],
+  ownedUris: readonly (string | undefined)[],
+): string[] {
+  const owned = new Set(ownedUris.filter(isManagedOwnPhotoUri));
+  return [...new Set(libraryUris.filter(isManagedOwnPhotoUri))]
+    .filter((uri) => !owned.has(uri))
+    .sort();
+}
+
+function destinationFilename(
+  now: number,
+  extension: string,
+  collision: number,
+): string {
+  return `own-${now}${collision === 0 ? '' : `-${collision}`}.${extension}`;
 }
 
 /**
@@ -54,33 +87,126 @@ export async function storeOwnPhoto(
     throw new Error('That photograph is too large to keep for offline play');
   }
 
-  const destination = new File(
-    directory,
-    `own-${now}.${extensionFor(sourceUri)}`,
-  );
-  source.copy(destination);
-  if (!destination.exists) {
+  if (!Number.isSafeInteger(now) || now < 0) {
     throw new Error('The photograph could not be saved on this device');
   }
-  return { uri: destination.uri, sizeBytes: destination.size ?? 0 };
+  const extension = extensionFor(sourceUri);
+  let collision = 0;
+  let destination = new File(
+    directory,
+    destinationFilename(now, extension, collision),
+  );
+  while (destination.exists && collision < MAX_FILENAME_COLLISIONS) {
+    collision += 1;
+    destination = new File(
+      directory,
+      destinationFilename(now, extension, collision),
+    );
+  }
+  if (destination.exists) {
+    throw new Error('The photograph could not be saved on this device');
+  }
+
+  try {
+    source.copy(destination);
+    const sizeBytes = destination.size;
+    if (!destination.exists || sizeBytes === null || sizeBytes <= 0) {
+      throw new Error('The photograph could not be saved on this device');
+    }
+    if (sizeBytes > MAX_OWN_PHOTO_BYTES) {
+      throw new Error('That photograph is too large to keep for offline play');
+    }
+    // Register before resolving to the caller. Any older asynchronous global
+    // reconciliation must see this staging owner before it can inspect files.
+    activeCandidateUris.add(destination.uri);
+    return { uri: destination.uri, sizeBytes };
+  } catch (caught) {
+    // The destination was proven absent above, so cleanup can only remove the
+    // candidate created by this attempt, never the currently owned photograph.
+    if (destination.exists) {
+      try {
+        destination.delete();
+      } catch {
+        // Preserve the actionable copy/validation error. Reconciliation after
+        // the next session transaction will retry this managed orphan.
+      }
+    }
+    throw caught;
+  }
 }
 
 /**
- * Deletes every imported photograph except the ones still spoken for — the one
- * just chosen and whatever the saved session is using.
+ * Reconciles physical files only after the caller has committed its durable
+ * session transaction. Pass every saved slot's image URI; pass an empty array
+ * after clear. Provider URLs are ignored, so replacing an own photo with a
+ * provider photo releases the old file.
  */
+export async function reconcileOwnPhotoOwnership(
+  ownedUris: readonly (string | undefined)[],
+): Promise<void> {
+  const reconcile = async () => {
+    const { Directory, Paths } = await fileSystem();
+    const directory = new Directory(Paths.document, DIRECTORY_NAME);
+    if (!directory.exists) {
+      return;
+    }
+
+    const filesByUri = new Map(
+      directory
+        .list()
+        .filter((entry) => 'size' in entry)
+        .map((entry) => [entry.uri, entry] as const),
+    );
+    const prunePlan = resolveOwnPhotoPrunePlan(
+      [...filesByUri.keys()],
+      [...ownedUris, ...activeCandidateUris],
+    );
+    for (const uri of prunePlan) {
+      filesByUri.get(uri)?.delete();
+    }
+  };
+
+  const result = ownershipReconciliationQueue.then(reconcile, reconcile);
+  ownershipReconciliationQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/** Releases the staging lease only after the exact candidate is durably owned. */
+export function commitManagedOwnPhotoCandidate(
+  uri: string | undefined,
+): boolean {
+  return isManagedOwnPhotoUri(uri) && activeCandidateUris.delete(uri);
+}
+
+/** Removes one known staging candidate without making assumptions about any
+ * other active, optimistic, or durable owner. */
+export async function discardManagedOwnPhotoCandidate(
+  uri: string | undefined,
+): Promise<boolean> {
+  if (!isManagedOwnPhotoUri(uri)) {
+    return false;
+  }
+  activeCandidateUris.delete(uri);
+  try {
+    const { File } = await fileSystem();
+    const candidate = new File(uri);
+    if (candidate.exists) {
+      candidate.delete();
+    }
+    return true;
+  } catch {
+    // Candidate cleanup is retryable during later global reconciliation and
+    // must never damage the prior saved puzzle or block navigation.
+    return false;
+  }
+}
+
+/** @deprecated Prefer the transaction-named API at new call sites. */
 export async function pruneOwnPhotos(
   keepUris: readonly (string | undefined)[],
 ): Promise<void> {
-  const { Directory, Paths } = await fileSystem();
-  const directory = new Directory(Paths.document, DIRECTORY_NAME);
-  if (!directory.exists) {
-    return;
-  }
-  const kept = new Set(keepUris.filter((uri): uri is string => !!uri));
-  for (const entry of directory.list()) {
-    if ('size' in entry && !kept.has(entry.uri)) {
-      entry.delete();
-    }
-  }
+  return reconcileOwnPhotoOwnership(keepUris);
 }

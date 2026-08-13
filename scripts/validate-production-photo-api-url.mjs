@@ -35,6 +35,12 @@ if (url.search || url.hash) {
   reject('must not include a query string or fragment.');
 }
 
+if (url.pathname !== '/') {
+  reject(
+    'must be the Worker origin only, without a path; the client adds /photo and /track.',
+  );
+}
+
 const hostname = url.hostname
   .replace(/^\[|\]$/g, '')
   .replace(/\.+$/, '')

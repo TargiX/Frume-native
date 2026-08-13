@@ -24,11 +24,18 @@ vi.mock('react-native-purchases', () => ({
 import { PuzzleEngine } from '../engine';
 import type { PuzzleCutter, PuzzleEngineSnapshot, PuzzleLayout } from '../types';
 import {
+  beginCompletedSnapshotClearRetention,
   PREMIUM_CUTS_REQUIRED_ERROR,
   finalizePuzzleSessionStart,
+  finishCompletedSnapshotClearRetention,
   isPuzzleSessionReplacementCurrent,
   loadPuzzleSessionForRestore,
+  mustPreserveCompletedSessionSnapshot,
+  removeCompletionDurably,
+  retainFailedPromotedCompletionClear,
+  persistLiveCompletion,
   preparePuzzleSession,
+  promoteRestoredCompletion,
   recoverAndFlushPuzzleSession,
   syncPuzzleSessionActivity,
   type PuzzleSession,
@@ -44,6 +51,7 @@ const params = {
   difficulty: '3x3' as const,
   boardMaxWidth: 320,
   boardMaxHeight: 240,
+  traySurfaceExtent: 480,
 };
 
 describe('preparePuzzleSession', () => {
@@ -125,6 +133,7 @@ describe('preparePuzzleSession', () => {
       difficulty: params.difficulty,
       boardMaxWidth: params.boardMaxWidth,
       boardMaxHeight: params.boardMaxHeight,
+      traySurfaceExtent: params.traySurfaceExtent,
       trayPlacement: 'bottom',
     });
   });
@@ -210,6 +219,120 @@ describe('finalizePuzzleSessionStart', () => {
   });
 });
 
+describe('promoteRestoredCompletion', () => {
+  const receipt = {
+    completedAt: 2_000,
+    recordedAt: 2_000,
+    elapsedMs: 1_000,
+    moveCount: 1,
+    pieceCount: 1,
+    cutterId: 'classic' as const,
+    difficulty: '3x3' as const,
+    image: params.image,
+  };
+
+  it('keeps the completed active snapshot when receipt persistence fails', async () => {
+    const clear = vi.fn(async () => true);
+    const clearAfter = vi.fn(async () => true);
+
+    await expect(
+      promoteRestoredCompletion(
+        receipt,
+        { save: async () => false },
+        { clear },
+        { clearAfter },
+      ),
+    ).resolves.toEqual({ completionSaved: false, activeCleared: false });
+    expect(clear).not.toHaveBeenCalled();
+    expect(clearAfter).not.toHaveBeenCalled();
+  });
+
+  it('clears active progress only after the receipt commits', async () => {
+    const calls: string[] = [];
+    const clearPromise = Promise.resolve(true);
+
+    await expect(
+      promoteRestoredCompletion(
+        receipt,
+        {
+          save: async () => {
+            calls.push('receipt');
+            return true;
+          },
+        },
+        {
+          clear: () => {
+            calls.push('active');
+            return clearPromise;
+          },
+        },
+        {
+          clearAfter: async (shouldClear) => {
+            calls.push('image');
+            return shouldClear;
+          },
+        },
+      ),
+    ).resolves.toEqual({ completionSaved: true, activeCleared: true });
+    expect(calls).toEqual(['receipt', 'active', 'image']);
+  });
+});
+
+describe('persistLiveCompletion', () => {
+  const snapshot = {} as Parameters<typeof persistLiveCompletion>[0];
+  const receipt = {
+    completedAt: 2_000,
+    recordedAt: 2_000,
+    elapsedMs: 1_000,
+    moveCount: 1,
+    pieceCount: 1,
+    cutterId: 'classic' as const,
+    difficulty: '3x3' as const,
+    image: params.image,
+  };
+
+  it('flushes the completed snapshot before writing its receipt', async () => {
+    const order: string[] = [];
+    const schedule = vi.fn(() => order.push('schedule'));
+
+    await expect(
+      persistLiveCompletion(
+        snapshot,
+        receipt,
+        {
+          schedule,
+          flush: async () => {
+            order.push('progress');
+            return true;
+          },
+        },
+        {
+          save: async () => {
+            order.push('receipt');
+            return true;
+          },
+        },
+      ),
+    ).resolves.toEqual({ progressSaved: true, completionSaved: true });
+    expect(schedule).toHaveBeenCalledWith(snapshot);
+    expect(order).toEqual(['schedule', 'progress', 'receipt']);
+  });
+
+  it('does not publish a receipt over an older progress snapshot', async () => {
+    const save = vi.fn(async () => true);
+
+    await expect(
+      persistLiveCompletion(
+        snapshot,
+        receipt,
+        { schedule: vi.fn(), flush: async () => false },
+        { save },
+      ),
+    ).resolves.toEqual({ progressSaved: false, completionSaved: false });
+    expect(save).not.toHaveBeenCalled();
+  });
+});
+
 describe('puzzle session replacement identity guard', () => {
   it('permits rollback only for the exact installed engine and generation', () => {
     const layout: PuzzleLayout = {
@@ -248,21 +371,23 @@ describe('puzzle session replacement identity guard', () => {
       nextSession,
       requestId: 7,
       previousImageDurable: true,
+      nextImageDurable: true,
+      durableReplaced: false,
       settled: false,
     };
 
     expect(
-      isPuzzleSessionReplacementCurrent(replacement, nextSession, 7),
+      isPuzzleSessionReplacementCurrent(replacement, previousSession, 7),
     ).toBe(true);
     expect(
-      isPuzzleSessionReplacementCurrent(replacement, previousSession, 7),
+      isPuzzleSessionReplacementCurrent(replacement, nextSession, 7),
     ).toBe(false);
     expect(
-      isPuzzleSessionReplacementCurrent(replacement, nextSession, 8),
+      isPuzzleSessionReplacementCurrent(replacement, previousSession, 8),
     ).toBe(false);
     replacement.settled = true;
     expect(
-      isPuzzleSessionReplacementCurrent(replacement, nextSession, 7),
+      isPuzzleSessionReplacementCurrent(replacement, previousSession, 7),
     ).toBe(false);
   });
 });
@@ -376,5 +501,106 @@ describe('syncPuzzleSessionActivity', () => {
 
     syncPuzzleSessionActivity(session, true, 'active', 12_000);
     expect(engine.getElapsedMs(12_500)).toBe(2_000);
+  });
+});
+
+describe('completed session clear safety', () => {
+  it('keeps the completed snapshot until its visible receipt is durable', () => {
+    const session = {
+      engine: { isComplete: () => true },
+    } as PuzzleSession;
+    const visible = { image: params.image } as never;
+    const olderDurable = { image: params.image } as never;
+
+    expect(
+      mustPreserveCompletedSessionSnapshot(session, visible, olderDurable),
+    ).toBe(true);
+    expect(
+      mustPreserveCompletedSessionSnapshot(session, visible, visible),
+    ).toBe(false);
+  });
+
+  it('retains the completed image while snapshot clear is pending or fails', () => {
+    const session = {
+      layout: { image: params.image },
+      engine: { isComplete: () => true },
+    } as PuzzleSession;
+    const pending = beginCompletedSnapshotClearRetention(session, 17);
+
+    expect(pending).toEqual({ requestId: 17, imageUri: params.image.uri });
+    expect(
+      finishCompletedSnapshotClearRetention(pending, 17, false),
+    ).toEqual(pending);
+    expect(
+      finishCompletedSnapshotClearRetention(pending, 18, true),
+    ).toEqual(pending);
+    expect(
+      finishCompletedSnapshotClearRetention(pending, 17, true),
+    ).toBeNull();
+  });
+
+  it('coordinates receipt removal after restored completion clear failure', () => {
+    const receipt = { image: params.image } as never;
+
+    expect(
+      retainFailedPromotedCompletionClear(receipt, 31, {
+        completionSaved: true,
+        activeCleared: false,
+      }),
+    ).toEqual({ requestId: 31, imageUri: params.image.uri });
+    expect(
+      retainFailedPromotedCompletionClear(receipt, 31, {
+        completionSaved: true,
+        activeCleared: true,
+      }),
+    ).toBeNull();
+    expect(
+      retainFailedPromotedCompletionClear(receipt, 31, {
+        completionSaved: false,
+        activeCleared: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('never removes the receipt when completed snapshot clear fails', async () => {
+    let resolveSnapshotClear: ((cleared: boolean) => void) | undefined;
+    const snapshotClear = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSnapshotClear = resolve;
+        }),
+    );
+    const receiptClear = vi.fn(async () => true);
+    const removal = removeCompletionDurably(
+      snapshotClear,
+      receiptClear,
+      () => true,
+    );
+
+    await Promise.resolve();
+    expect(receiptClear).not.toHaveBeenCalled();
+    resolveSnapshotClear?.(false);
+
+    await expect(removal).resolves.toBe('snapshot_failed');
+    expect(receiptClear).not.toHaveBeenCalled();
+  });
+
+  it('removes the receipt only after completed snapshot clear succeeds', async () => {
+    const order: string[] = [];
+
+    await expect(
+      removeCompletionDurably(
+        async () => {
+          order.push('snapshot');
+          return true;
+        },
+        async () => {
+          order.push('receipt');
+          return true;
+        },
+        () => true,
+      ),
+    ).resolves.toBe('cleared');
+    expect(order).toEqual(['snapshot', 'receipt']);
   });
 });

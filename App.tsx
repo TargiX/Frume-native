@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { installGlobalErrorDiagnostics } from './src/diagnostics/globalErrorHandler';
 import { isPhaseFieldLabUrl, PhaseFieldLabScreen } from './src/features/lab';
 import { RootNavigator } from './src/navigation';
 import { PremiumAccessProvider } from './src/premium';
@@ -40,6 +41,8 @@ export default function App() {
       subscribe: (listener) => AppState.addEventListener('change', listener),
     });
   }, [isPhaseFieldLab]);
+
+  useEffect(() => installGlobalErrorDiagnostics(), []);
 
   if (isPhaseFieldLab) {
     return (

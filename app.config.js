@@ -1,4 +1,4 @@
-const DEFAULT_IOS_BUILD_NUMBER = '2';
+const DEFAULT_IOS_BUILD_NUMBER = '3';
 const configuredIosBuildNumber = process.env.FRUME_BUILD_NUMBER;
 const iosBuildNumber =
   configuredIosBuildNumber === undefined
@@ -90,6 +90,7 @@ module.exports = {
           },
         },
       ],
+      './plugins/withIosOwnPhotoBackupPolicy',
       './plugins/withIosPodDeploymentTarget',
     ],
   },

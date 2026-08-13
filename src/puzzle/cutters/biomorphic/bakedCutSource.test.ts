@@ -30,22 +30,25 @@ const library: BakedCutLibrary = {
 afterEach(() => clearBakedCutLibrary());
 
 describe("where a cutter gets its cut", () => {
-  it("solves when no library is installed", () => {
+  it("fails closed when no library is installed", () => {
     let solved = false;
-    const pieces = biomorphicPiecesFrom(
-      "living-fringe",
-      3,
-      3,
-      600,
-      600,
-      "seed",
-      () => {
-        solved = true;
-        return [];
-      },
+    expect(() =>
+      biomorphicPiecesFrom(
+        "living-fringe",
+        3,
+        3,
+        600,
+        600,
+        "seed",
+        () => {
+          solved = true;
+          return [];
+        },
+      ),
+    ).toThrow(
+      'Required baked living-fringe cut for a 3x3 board is unavailable',
     );
-    expect(solved).toBe(true);
-    expect(pieces).toEqual([]);
+    expect(solved).toBe(false);
   });
 
   it("uses the library instead of solving once one is installed", () => {
@@ -69,24 +72,28 @@ describe("where a cutter gets its cut", () => {
     expect(pieces).toHaveLength(9);
   });
 
-  it("falls back for a grid the library does not carry", () => {
+  it("fails closed for a grid the library does not carry", () => {
     installBakedCutLibrary(library);
     let solved = false;
-    biomorphicPiecesFrom("living-fringe", 5, 5, 600, 600, "seed", () => {
-      solved = true;
-      return [];
-    });
-    expect(solved).toBe(true);
+    expect(() =>
+      biomorphicPiecesFrom("living-fringe", 5, 5, 600, 600, "seed", () => {
+        solved = true;
+        return [];
+      }),
+    ).toThrow('Required baked living-fringe cut for a 5x5 board is unavailable');
+    expect(solved).toBe(false);
   });
 
-  it("falls back for a style the library does not carry", () => {
+  it("fails closed for a style the library does not carry", () => {
     installBakedCutLibrary(library);
     let solved = false;
-    biomorphicPiecesFrom("crystal-six", 3, 3, 600, 600, "seed", () => {
-      solved = true;
-      return [];
-    });
-    expect(solved).toBe(true);
+    expect(() =>
+      biomorphicPiecesFrom("crystal-six", 3, 3, 600, 600, "seed", () => {
+        solved = true;
+        return [];
+      }),
+    ).toThrow('Required baked crystal-six cut for a 3x3 board is unavailable');
+    expect(solved).toBe(false);
   });
 
   it("reports what it can serve without building anything", () => {

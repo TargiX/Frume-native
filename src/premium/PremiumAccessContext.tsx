@@ -19,6 +19,7 @@ import Purchases, {
 } from 'react-native-purchases';
 
 import { hasPremiumCuts } from './access';
+import { premiumStoreErrorMessage } from './errorPresentation';
 
 type PremiumAccessContextValue = {
   configured: boolean;
@@ -54,18 +55,6 @@ function reviewedProductIdentifierForPlatform(): string {
     );
   }
   return '';
-}
-
-function messageFrom(error: unknown, fallback: string): string {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'userCancelled' in error &&
-    error.userCancelled === true
-  ) {
-    return '';
-  }
-  return error instanceof Error ? error.message : fallback;
 }
 
 type PremiumVerificationAttempt =
@@ -235,26 +224,14 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
     }
 
     if (!reviewedProductIdentifier) {
-      setError(
-        'The reviewed permanent Premium Cuts product is not configured for this build.',
-      );
+      setError('Premium Cuts is unavailable in this build.');
     } else if (result.customerInfoError) {
-      setError(
-        messageFrom(
-          result.customerInfoError,
-          'Could not verify Premium Cuts access.',
-        ),
-      );
+      setError(premiumStoreErrorMessage(result.customerInfoError, 'verify'));
     } else if (result.offeringsError) {
-      setError(
-        messageFrom(
-          result.offeringsError,
-          'Could not load the permanent purchase from the store.',
-        ),
-      );
+      setError(premiumStoreErrorMessage(result.offeringsError, 'load'));
     } else if (result.permanentPackageMissing) {
       setError(
-        'The reviewed permanent Premium Cuts product is not available from the store right now.',
+        'Premium Cuts is not available from the store right now.',
       );
     }
 
@@ -307,9 +284,8 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
       }
       return active;
     } catch (caught) {
-      const message = messageFrom(caught, 'The purchase could not be completed.');
-      if (mounted.current && message) {
-        setError(message);
+      if (mounted.current) {
+        setError(premiumStoreErrorMessage(caught, 'purchase'));
       }
       return false;
     } finally {
@@ -342,12 +318,7 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
       );
       if (mounted.current) {
         setIsPremium(resolution.isPremium);
-        setError(
-          messageFrom(
-            resolution.error,
-            'Could not verify Premium Cuts access.',
-          ),
-        );
+        setError(premiumStoreErrorMessage(resolution.error, 'verify'));
       }
       return resolution.isPremium;
     }
@@ -372,7 +343,7 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
       return active;
     } catch (caught) {
       if (mounted.current) {
-        setError(messageFrom(caught, 'Purchases could not be restored.'));
+        setError(premiumStoreErrorMessage(caught, 'restore'));
       }
       return false;
     } finally {

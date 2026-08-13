@@ -1,8 +1,9 @@
-import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  findNodeHandle,
+  InteractionManager,
   Pressable,
   StyleSheet,
   Text,
@@ -21,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccessibilityAnnouncement } from '../../../accessibility';
 import { Button } from '../../../components/Button';
+import { playPuzzleCompletionHaptic } from '../../../haptics';
 import { colors, radius, spacing } from '../../../theme';
 import {
   CELEBRATION_MOTION,
@@ -31,9 +33,17 @@ type PuzzleCelebrationProps = {
   elapsedMs: number;
   nextLoading?: boolean;
   nextError?: string | null;
+  persistenceError?: string | null;
+  retryingSave?: boolean;
+  completionSaving?: boolean;
+  completionDurable?: boolean;
+  nextActionLabel?: string;
+  hapticsEnabled?: boolean;
+  hapticsPreferenceLoaded?: boolean;
   onNext: () => void;
   onPlayAgain: () => void;
   onHome: () => void;
+  onRetrySave?: () => void;
 };
 
 function formatElapsed(milliseconds: number): string {
@@ -52,21 +62,56 @@ export function PuzzleCelebration({
   elapsedMs,
   nextLoading = false,
   nextError,
+  persistenceError,
+  retryingSave = false,
+  completionSaving = false,
+  completionDurable = true,
+  nextActionLabel = 'Next puzzle',
+  hapticsEnabled = false,
+  hapticsPreferenceLoaded = false,
   onNext,
   onPlayAgain,
   onHome,
+  onRetrySave,
 }: PuzzleCelebrationProps) {
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const [panelVisible, setPanelVisible] = useState(true);
-  useAccessibilityAnnouncement(nextError ?? null);
+  const headingRef = useRef<React.ElementRef<typeof Text>>(null);
+  const hapticHandledRef = useRef(false);
+  useAccessibilityAnnouncement(nextError ?? persistenceError ?? null);
 
   useEffect(() => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     AccessibilityInfo.announceForAccessibility(
       `Puzzle complete in ${formatElapsed(elapsedMs)}`,
     );
-  }, [elapsedMs, reduceMotion]);
+    let cancelled = false;
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      void AccessibilityInfo.isScreenReaderEnabled()
+        .then((enabled) => {
+          if (!enabled || cancelled) {
+            return;
+          }
+          const heading = findNodeHandle(headingRef.current);
+          if (heading !== null) {
+            AccessibilityInfo.setAccessibilityFocus(heading);
+          }
+        })
+        .catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+      interaction.cancel();
+    };
+  }, [elapsedMs]);
+
+  useEffect(() => {
+    if (!hapticsPreferenceLoaded || hapticHandledRef.current) {
+      return;
+    }
+    hapticHandledRef.current = true;
+    void playPuzzleCompletionHaptic(hapticsEnabled);
+  }, [hapticsEnabled, hapticsPreferenceLoaded]);
 
   // Only the first appearance waits for the reveal; a panel the player asked
   // back should come straight away.
@@ -127,6 +172,7 @@ export function PuzzleCelebration({
       ),
     [],
   );
+  const completionActionBlocked = completionSaving || !completionDurable;
 
   return (
     <View
@@ -191,7 +237,12 @@ export function PuzzleCelebration({
             >
               <Ionicons name="sparkles" size={16} color={colors.onAccent} />
             </View>
-            <Text style={styles.title} accessibilityRole="header">
+            <Text
+              ref={headingRef}
+              style={styles.title}
+              accessible
+              accessibilityRole="header"
+            >
               Puzzle complete
             </Text>
             <Text style={styles.elapsed}>{formatElapsed(elapsedMs)}</Text>
@@ -203,12 +254,36 @@ export function PuzzleCelebration({
             </Text>
           ) : null}
 
+          {persistenceError ? (
+            <View style={styles.persistenceErrorGroup}>
+              <Text style={styles.error} accessibilityLiveRegion="assertive">
+                {persistenceError}. Your completed board stays recoverable until saving succeeds.
+              </Text>
+              {onRetrySave ? (
+                <Button
+                  label={retryingSave ? 'Saving…' : 'Retry saving'}
+                  variant="secondary"
+                  onPress={onRetrySave}
+                  disabled={retryingSave}
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          {completionSaving ? (
+            <Text style={styles.saving} accessibilityLiveRegion="polite">
+              Saving your completed puzzle…
+            </Text>
+          ) : null}
+
           <View style={styles.actions}>
             <View style={styles.primarySlot}>
               <Button
-                label={nextLoading ? 'Finding next puzzle…' : 'Next puzzle'}
+                label={
+                  nextLoading ? 'Finding next puzzle…' : nextActionLabel
+                }
                 onPress={onNext}
-                disabled={nextLoading}
+                disabled={nextLoading || completionActionBlocked}
                 block
               />
             </View>
@@ -217,11 +292,18 @@ export function PuzzleCelebration({
                 label="Play again"
                 variant="secondary"
                 onPress={onPlayAgain}
+                disabled={completionActionBlocked}
                 block
               />
             </View>
             <View style={styles.actionSlot}>
-              <Button label="Home" variant="secondary" onPress={onHome} block />
+              <Button
+                label="Home"
+                variant="secondary"
+                onPress={onHome}
+                disabled={completionActionBlocked}
+                block
+              />
             </View>
           </View>
         </Animated.View>
@@ -302,6 +384,17 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 13,
     lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  saving: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  persistenceErrorGroup: {
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
 });

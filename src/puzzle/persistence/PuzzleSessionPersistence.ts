@@ -10,6 +10,7 @@ import type {
   PuzzleCutDescriptor,
   PuzzleCutterId,
   PuzzleGuideMode,
+  PuzzleImageContentSource,
   PuzzleImageSource,
   PuzzleLayout,
   PuzzlePieceDefinition,
@@ -25,6 +26,8 @@ const LEGACY_PUZZLE_SESSION_SCHEMA_VERSION = 1;
 const PREVIOUS_PUZZLE_SESSION_SCHEMA_VERSION = 2;
 export const PUZZLE_SESSION_SCHEMA_VERSION = 3;
 export const PUZZLE_SESSION_STORAGE_KEY = '@frume/puzzle-session';
+export const PUZZLE_SESSION_CORRUPTION_STORAGE_KEY =
+  '@frume/puzzle-session-corruption';
 
 const MAX_PIECES = 1_000;
 const MAX_STRING_LENGTH = 100_000;
@@ -43,7 +46,21 @@ export type RestoredPuzzleSession = PuzzleSessionSnapshot & {
 export type PuzzleSessionLoadResult =
   | { status: 'loaded'; session: RestoredPuzzleSession }
   | { status: 'empty' }
+  | { status: 'corrupt'; diagnostic: PuzzleSessionCorruptionDiagnostic }
   | { status: 'error'; error: unknown };
+
+export type PuzzleSessionCorruptionDiagnostic = {
+  reason: 'invalid_session_envelope';
+  detectedAt: number;
+  serializedChars: number;
+  declaredVersion: number | null;
+};
+
+export type PuzzleSessionGuardedReplaceResult =
+  | 'committed'
+  | 'stale'
+  | 'failed'
+  | 'rollback_failed';
 
 type PersistedPuzzleSession = RestoredPuzzleSession & {
   version: number;
@@ -57,6 +74,7 @@ export type AsyncKeyValueStorage = {
 
 type PuzzleSessionPersistenceOptions = {
   key?: string;
+  corruptionKey?: string;
   debounceMs?: number;
   now?: () => number;
   onError?: (error: unknown) => void;
@@ -166,7 +184,7 @@ function parseClipRegion(value: unknown): ImageClipRegion | null {
     : null;
 }
 
-function parseImage(value: unknown): PuzzleImageSource | null {
+export function parsePuzzleImageSource(value: unknown): PuzzleImageSource | null {
   if (!isRecord(value) || !isBoundedString(value.uri)) {
     return null;
   }
@@ -193,12 +211,17 @@ function parseImage(value: unknown): PuzzleImageSource | null {
   if (remoteUri === null) {
     return null;
   }
+  const contentSource = parseImageContentSource(value.contentSource);
+  if (contentSource === null) {
+    return null;
+  }
   if (value.attribution === undefined) {
     return {
       uri: value.uri,
       ...size,
       ...(remoteUri ? { remoteUri } : {}),
       ...(accessibilityLabel ? { accessibilityLabel } : {}),
+      ...(contentSource ? { contentSource } : {}),
     };
   }
   if (
@@ -216,12 +239,51 @@ function parseImage(value: unknown): PuzzleImageSource | null {
     ...size,
     ...(remoteUri ? { remoteUri } : {}),
     ...(accessibilityLabel ? { accessibilityLabel } : {}),
+    ...(contentSource ? { contentSource } : {}),
     attribution: {
       photographerName: value.attribution.photographerName,
       photographerUrl: value.attribution.photographerUrl,
       sourceName: 'Unsplash',
       sourceUrl: value.attribution.sourceUrl,
     },
+  };
+}
+
+function parseImageContentSource(
+  value: unknown,
+): PuzzleImageContentSource | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.kind === 'own') {
+    return { kind: 'own' };
+  }
+  if (value.kind !== 'unsplash') {
+    return null;
+  }
+  const categoryId =
+    value.categoryId === undefined
+      ? undefined
+      : isBoundedString(value.categoryId) && value.categoryId.length <= 128
+        ? value.categoryId
+        : null;
+  const categoryLabel =
+    value.categoryLabel === undefined
+      ? undefined
+      : isBoundedString(value.categoryLabel) &&
+          value.categoryLabel.length <= 128
+        ? value.categoryLabel
+        : null;
+  if (categoryId === null || categoryLabel === null) {
+    return null;
+  }
+  return {
+    kind: 'unsplash',
+    ...(categoryId ? { categoryId } : {}),
+    ...(categoryId && categoryLabel ? { categoryLabel } : {}),
   };
 }
 
@@ -340,7 +402,7 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     return null;
   }
   const cutterId = parseCutterId(value.cutterId);
-  const image = parseImage(value.image);
+  const image = parsePuzzleImageSource(value.image);
   const boardSize = parseSize(value.boardSize);
   if (
     !cutterId ||
@@ -670,6 +732,7 @@ export function deserializePuzzleSession(
  */
 export class PuzzleSessionPersistence {
   private readonly key: string;
+  private readonly corruptionKey: string;
   private readonly debounceMs: number;
   private readonly now: () => number;
   private readonly onError?: (error: unknown) => void;
@@ -684,6 +747,8 @@ export class PuzzleSessionPersistence {
     options: PuzzleSessionPersistenceOptions = {},
   ) {
     this.key = options.key ?? PUZZLE_SESSION_STORAGE_KEY;
+    this.corruptionKey =
+      options.corruptionKey ?? PUZZLE_SESSION_CORRUPTION_STORAGE_KEY;
     this.debounceMs = options.debounceMs ?? 300;
     this.now = options.now ?? Date.now;
     this.onError = options.onError;
@@ -698,8 +763,35 @@ export class PuzzleSessionPersistence {
         }
         const restored = deserializePuzzleSession(serialized);
         if (!restored) {
+          let declaredVersion: number | null = null;
+          try {
+            const parsed: unknown = JSON.parse(serialized);
+            if (
+              isRecord(parsed) &&
+              Number.isSafeInteger(parsed.version) &&
+              (parsed.version as number) >= 0
+            ) {
+              declaredVersion = parsed.version as number;
+            }
+          } catch {
+            // The redacted diagnostic deliberately records no raw parse error.
+          }
+          const diagnostic: PuzzleSessionCorruptionDiagnostic = {
+            reason: 'invalid_session_envelope',
+            detectedAt: this.now(),
+            serializedChars: serialized.length,
+            declaredVersion,
+          };
+          try {
+            await this.storage.setItem(
+              this.corruptionKey,
+              JSON.stringify(diagnostic),
+            );
+          } catch (error) {
+            this.onError?.(error);
+          }
           await this.storage.removeItem(this.key);
-          return { status: 'empty' };
+          return { status: 'corrupt', diagnostic };
         }
         return { status: 'loaded', session: restored };
       } catch (error) {
@@ -779,6 +871,78 @@ export class PuzzleSessionPersistence {
     });
   }
 
+  /**
+   * Makes a newly prepared session the only pending durable state and writes it
+   * immediately. Session-start transactions use this before exposing their
+   * engine to React, so an abrupt exit can restore either the prior puzzle or
+   * the complete replacement snapshot, never a half-installed in-memory board.
+   */
+  async replace(snapshot: PuzzleSessionSnapshot): Promise<boolean> {
+    this.pending = null;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    return this.save(snapshot);
+  }
+
+  /**
+   * Writes a session only while its transaction owns the caller generation.
+   * If ownership changes during the native write, the previous snapshot is
+   * restored in this same storage-queue operation before newer work can run.
+   */
+  async replaceGuarded(
+    snapshot: PuzzleSessionSnapshot,
+    previous: PuzzleSessionSnapshot | null,
+    isCurrent: () => boolean,
+  ): Promise<PuzzleSessionGuardedReplaceResult> {
+    this.pending = null;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+
+    let serialized: string;
+    let previousSerialized: string | null;
+    try {
+      const savedAt = this.now();
+      serialized = serializePuzzleSession(snapshot, savedAt);
+      previousSerialized = previous
+        ? serializePuzzleSession(previous, savedAt)
+        : null;
+    } catch (error) {
+      this.onError?.(error);
+      return 'failed';
+    }
+
+    return this.enqueue(async () => {
+      if (!isCurrent()) {
+        return 'stale';
+      }
+      try {
+        await this.storage.setItem(this.key, serialized);
+      } catch (error) {
+        this.onError?.(error);
+        return 'failed';
+      }
+      if (isCurrent()) {
+        return 'committed';
+      }
+
+      try {
+        if (previousSerialized === null) {
+          await this.storage.removeItem(this.key);
+        } else {
+          await this.storage.setItem(this.key, previousSerialized);
+        }
+        return 'stale';
+      } catch (error) {
+        this.onError?.(error);
+        return 'rollback_failed';
+      }
+    });
+  }
+
   async clear(): Promise<boolean> {
     this.clearEpoch += 1;
     this.pending = null;
@@ -788,6 +952,36 @@ export class PuzzleSessionPersistence {
     }
 
     return this.enqueue(async () => {
+      try {
+        await this.storage.removeItem(this.key);
+        return true;
+      } catch (error) {
+        this.onError?.(error);
+        return false;
+      }
+    });
+  }
+
+  /**
+   * Clears only if the caller still owns the session generation when the
+   * serialized storage operation begins. A newer replacement queues behind an
+   * already-started clear and therefore cannot be removed by it.
+   */
+  async clearIf(isCurrent: () => boolean): Promise<boolean> {
+    return this.enqueue(async () => {
+      if (!isCurrent()) {
+        return false;
+      }
+
+      // The generation check and every destructive in-memory mutation belong
+      // to the same serialized operation. A clear that became stale while it
+      // waited in the queue must not discard a newer debounced snapshot.
+      this.clearEpoch += 1;
+      this.pending = null;
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
       try {
         await this.storage.removeItem(this.key);
         return true;

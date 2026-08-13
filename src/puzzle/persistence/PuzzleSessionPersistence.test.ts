@@ -4,6 +4,7 @@ import { PuzzleEngine } from '../engine/PuzzleEngine';
 import type { PuzzleEngineSnapshot, PuzzleLayout } from '../types';
 import {
   PUZZLE_SESSION_SCHEMA_VERSION,
+  PUZZLE_SESSION_CORRUPTION_STORAGE_KEY,
   PuzzleSessionPersistence,
   deserializePuzzleSession,
   serializePuzzleSession,
@@ -47,21 +48,32 @@ function sessionSnapshot(): PuzzleSessionSnapshot {
 
 class MemoryStorage implements AsyncKeyValueStorage {
   value: string | null = null;
+  corruptionDiagnostic: string | null = null;
   setCalls = 0;
   removeCalls = 0;
 
-  async getItem(): Promise<string | null> {
-    return this.value;
+  async getItem(key: string): Promise<string | null> {
+    return key === PUZZLE_SESSION_CORRUPTION_STORAGE_KEY
+      ? this.corruptionDiagnostic
+      : this.value;
   }
 
-  async setItem(_key: string, value: string): Promise<void> {
+  async setItem(key: string, value: string): Promise<void> {
     this.setCalls += 1;
-    this.value = value;
+    if (key === PUZZLE_SESSION_CORRUPTION_STORAGE_KEY) {
+      this.corruptionDiagnostic = value;
+    } else {
+      this.value = value;
+    }
   }
 
-  async removeItem(): Promise<void> {
+  async removeItem(key: string): Promise<void> {
     this.removeCalls += 1;
-    this.value = null;
+    if (key === PUZZLE_SESSION_CORRUPTION_STORAGE_KEY) {
+      this.corruptionDiagnostic = null;
+    } else {
+      this.value = null;
+    }
   }
 }
 
@@ -158,6 +170,11 @@ describe('puzzle session persistence codec', () => {
             remoteUri:
               'https://images.unsplash.com/photo-test?auto=format&w=1080',
             accessibilityLabel: 'A mountain lake beneath a cloudy sky',
+            contentSource: {
+              kind: 'unsplash',
+              categoryId: 'nature',
+              categoryLabel: 'Nature',
+            },
             attribution: {
               photographerName: 'A Photographer',
               photographerUrl:
@@ -175,6 +192,30 @@ describe('puzzle session persistence codec', () => {
       deserializePuzzleSession(serializePuzzleSession(withAttribution))?.engine
         .layout.image,
     ).toEqual(withAttribution.engine.layout.image);
+  });
+
+  it('preserves own-photo intent without inventing provider metadata', () => {
+    const source = sessionSnapshot();
+    source.engine.layout.image = {
+      ...source.engine.layout.image,
+      uri: 'file:///documents/frume-own-photos/own-1.jpg',
+      contentSource: { kind: 'own' },
+    };
+
+    expect(
+      deserializePuzzleSession(serializePuzzleSession(source))?.engine.layout
+        .image.contentSource,
+    ).toEqual({ kind: 'own' });
+  });
+
+  it('rejects malformed persisted photo source intent', () => {
+    const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
+    persisted.engine.layout.image.contentSource = {
+      kind: 'unsplash',
+      categoryId: 'x'.repeat(129),
+    };
+
+    expect(deserializePuzzleSession(JSON.stringify(persisted))).toBeNull();
   });
 
   it('migrates a v1 wall-clock timer to paused active time at its last save', () => {
@@ -256,13 +297,110 @@ describe('PuzzleSessionPersistence', () => {
     vi.useRealTimers();
   });
 
-  it('removes malformed persisted data instead of restoring it', async () => {
+  it('does not clear storage after the caller loses its generation', async () => {
+    const storage = new MemoryStorage();
+    const persistence = new PuzzleSessionPersistence(storage);
+    await persistence.save(sessionSnapshot());
+
+    await expect(persistence.clearIf(() => false)).resolves.toBe(false);
+    expect(storage.value).not.toBeNull();
+    expect(storage.removeCalls).toBe(0);
+
+    await expect(persistence.clearIf(() => true)).resolves.toBe(true);
+    expect(storage.value).toBeNull();
+    expect(storage.removeCalls).toBe(1);
+  });
+
+  it('does not discard pending progress when a guarded clear is stale', async () => {
+    vi.useFakeTimers();
+    const storage = new MemoryStorage();
+    const persistence = new PuzzleSessionPersistence(storage, {
+      debounceMs: 100,
+    });
+    const pending = {
+      ...sessionSnapshot(),
+      engine: { ...sessionSnapshot().engine, moveCount: 23 },
+    };
+
+    persistence.schedule(pending);
+    await expect(persistence.clearIf(() => false)).resolves.toBe(false);
+    await expect(persistence.flush()).resolves.toBe(true);
+
+    expect(storage.value).not.toBeNull();
+    expect(JSON.parse(storage.value ?? '{}').engine.moveCount).toBe(23);
+    expect(storage.removeCalls).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it('replaces pending progress with one durable transaction snapshot', async () => {
+    vi.useFakeTimers();
+    const storage = new MemoryStorage();
+    const persistence = new PuzzleSessionPersistence(storage, {
+      debounceMs: 100,
+    });
+    const previous = sessionSnapshot();
+    const replacement = {
+      ...previous,
+      engine: { ...previous.engine, moveCount: 11 },
+    };
+
+    persistence.schedule(previous);
+    await expect(persistence.replace(replacement)).resolves.toBe(true);
+    await vi.advanceTimersByTimeAsync(200);
+    await persistence.flush();
+
+    expect(storage.setCalls).toBe(1);
+    expect(deserializePuzzleSession(storage.value ?? '')?.engine.moveCount).toBe(
+      11,
+    );
+    vi.useRealTimers();
+  });
+
+  it('restores the prior snapshot inside the write queue when a commit becomes stale', async () => {
+    const storage = new MemoryStorage();
+    const persistence = new PuzzleSessionPersistence(storage);
+    const previous = sessionSnapshot();
+    const replacement = {
+      ...previous,
+      engine: { ...previous.engine, moveCount: 11 },
+    };
+    let current = true;
+    const originalSetItem = storage.setItem.bind(storage);
+    storage.setItem = async (key, value) => {
+      await originalSetItem(key, value);
+      if (deserializePuzzleSession(value)?.engine.moveCount === 11) {
+        current = false;
+      }
+    };
+
+    await expect(
+      persistence.replaceGuarded(replacement, previous, () => current),
+    ).resolves.toBe('stale');
+
+    expect(storage.setCalls).toBe(2);
+    expect(deserializePuzzleSession(storage.value ?? '')?.engine.moveCount).toBe(
+      previous.engine.moveCount,
+    );
+  });
+
+  it('quarantines a redacted diagnostic before removing malformed progress', async () => {
     const storage = new MemoryStorage();
     storage.value = '{"version":1,"engine":"broken"}';
     const persistence = new PuzzleSessionPersistence(storage);
 
-    await expect(persistence.load()).resolves.toEqual({ status: 'empty' });
+    await expect(persistence.load()).resolves.toMatchObject({
+      status: 'corrupt',
+      diagnostic: {
+        reason: 'invalid_session_envelope',
+        declaredVersion: 1,
+      },
+    });
     expect(storage.value).toBeNull();
+    expect(storage.corruptionDiagnostic).not.toContain('engine');
+    expect(JSON.parse(storage.corruptionDiagnostic ?? '{}')).toMatchObject({
+      reason: 'invalid_session_envelope',
+      declaredVersion: 1,
+    });
     expect(storage.removeCalls).toBe(1);
   });
 

@@ -94,19 +94,25 @@
 
             <div class="policy-cards">
               <div class="policy-card">
-                <h3>One saved puzzle on your device</h3>
+                <h3>Your current puzzle and last result</h3>
                 <p>
                   Frume stores one current puzzle in local app storage so you
-                  can continue later. The save includes the selected photo and
-                  its attribution, cut style, difficulty, piece positions,
-                  progress, moves, and elapsed play time.
+                  can continue later. The save includes a photo reference and
+                  attribution, cut style, difficulty, piece positions,
+                  progress, moves, and elapsed play time. Frume also keeps one
+                  compact last-completion receipt with the photo reference,
+                  completion time, cut, difficulty, piece count, moves, and
+                  elapsed play time until you remove or replace it.
                 </p>
                 <p>
-                  The puzzle image is cached in the app’s private document
-                  storage. While replacing a puzzle, Frume may briefly keep the
-                  old and new image so an interrupted save does not destroy
-                  existing progress; the older file is removed after the new
-                  save succeeds.
+                  Curated Unsplash images are hotlinked from the provider and
+                  are not copied into Frume’s persistent storage, so they may
+                  need the network again after relaunch. A photograph you chose
+                  yourself is stored as a bounded local derivative. While
+                  replacing a puzzle, Frume may briefly keep old and candidate
+                  own-photo files so an interrupted save does not destroy
+                  existing progress; unused files are removed after ownership
+                  changes successfully.
                 </p>
               </div>
 
@@ -120,11 +126,14 @@
                 </p>
                 <p>
                   That photograph is copied into Frume’s private storage so a
-                  saved puzzle still has its picture later, and it is deleted
-                  when it is no longer used by a saved puzzle or when you delete
-                  the app. It is never uploaded: it is not sent to Frume’s photo
-                  service, to Unsplash, or anywhere else, and no photo-use
-                  receipt is created for it.
+                  saved puzzle or last result still has its picture later. A
+                  valid large image is downsampled on device to a derivative of
+                  at most about 16 megapixels, and Frume marks its photo folders
+                  as excluded from iCloud Backup. The derivative is deleted when
+                  neither the current puzzle nor last result uses it, or when
+                  you delete the app. It is never uploaded: it is not sent to
+                  Frume’s photo service, to Unsplash, or anywhere else, and no
+                  photo-use receipt is created for it.
                 </p>
               </div>
 
@@ -179,6 +188,25 @@
                   attachments you choose to send are used to investigate and
                   reply to your request. Do not send passwords or full payment
                   details.
+                </p>
+              </div>
+
+              <div class="policy-card">
+                <h3>Redacted diagnostics on your device</h3>
+                <p>
+                  Frume can keep up to ten recent JavaScript, rendering, or
+                  haptic error records locally. A record contains the time,
+                  broad error type, whether it was fatal, a safe error class,
+                  and up to eight component names. It does not contain photo
+                  content, photo or service URLs, file paths, exception
+                  messages, stack traces, tracking tokens, user names, or a
+                  device identifier.
+                </p>
+                <p>
+                  Frume does not upload this log automatically. You may inspect
+                  and share the redacted report through About &amp; Support, or
+                  clear it at any time. A report leaves the device only when
+                  you choose a destination in the system share sheet.
                 </p>
               </div>
             </div>
@@ -263,15 +291,19 @@
             <h2 id="retention-title">Retention and deletion</h2>
             <ul class="plain-list">
               <li>
-                <strong>Saved puzzle and image:</strong> kept on your device
-                until you start another puzzle, clear its app data, or delete
-                Frume.
+                <strong>Current puzzle:</strong> kept on your device until a
+                confirmed replacement, app-data removal, or deletion of Frume.
               </li>
               <li>
                 <strong>A photograph you chose yourself:</strong> kept in
-                Frume’s private storage while a saved puzzle uses it, replaced
-                when you import another, and gone when you delete Frume. It is
-                never uploaded.
+                Frume’s private storage while the current puzzle or last result
+                uses it, and removed after both release it or when you delete
+                Frume. It is never uploaded or included in iCloud Backup.
+              </li>
+              <li>
+                <strong>Last-completion receipt:</strong> kept locally until a
+                later completion replaces it, you remove it from Home, clear
+                app data, or delete Frume.
               </li>
               <li>
                 <strong>Pending photo-use receipts:</strong> kept locally
@@ -279,8 +311,8 @@
                 Frume clears the local queue.
               </li>
               <li>
-                <strong>Server photo-use grant:</strong> expires after seven
-                days and is scheduled for removal about one day after expiry.
+                <strong>Server photo-use grant:</strong> expires after 24 hours
+                and is scheduled for removal about one hour after expiry.
                 Public curated photo metadata remains in the rotating service
                 pool until it is refreshed or removed for operational reasons.
               </li>
@@ -295,6 +327,12 @@
                 needed to answer the request and meet applicable legal or
                 operational obligations.
               </li>
+              <li>
+                <strong>Redacted diagnostics:</strong> limited to the ten most
+                recent records and kept locally until you clear app data,
+                delete Frume, or use the in-app clear action. Sharing creates a
+                copy only at the destination you choose.
+              </li>
             </ul>
           </section>
 
@@ -302,10 +340,12 @@
             <p class="section-number" aria-hidden="true">06</p>
             <h2 id="choices-title">Your choices</h2>
             <p>
-              You can remove local Frume data by deleting the app. You can play
-              an already saved puzzle without requesting a new photo, but an
-              internet connection is required to load another curated photo
-              and to purchase or restore Premium Cuts.
+              You can remove the last result and clear redacted diagnostics in
+              the app, or remove all local Frume data by deleting the app. An
+              own-photo puzzle remains available offline. A curated-photo
+              puzzle may need to reload its hotlinked image, and an internet
+              connection is required to load another curated photo and to
+              purchase or restore Premium Cuts.
             </p>
             <p>
               Privacy rights vary by location. You may contact Frume to ask

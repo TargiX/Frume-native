@@ -1,6 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import * as Haptics from 'expo-haptics';
 import React, {
   useCallback,
   useEffect,
@@ -25,7 +24,13 @@ import {
 } from '../../../accessibility';
 import { Button } from '../../../components/Button';
 import { usePuzzleMusic } from '../../../audio';
+import {
+  playPuzzlePlacementHaptic,
+  shouldPlayHapticFeedback,
+  useHapticsPreference,
+} from '../../../haptics';
 import { GameHud } from '../components/GameHud';
+import { HowToPlaySheet } from '../components/HowToPlaySheet';
 import { PuzzleMenuSheet } from '../components/PuzzleMenuSheet';
 import { PuzzleCelebration } from '../components/PuzzleCelebration';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
@@ -56,6 +61,14 @@ import {
   saveTableAppearance,
 } from '../utils/tableAppearancePreference';
 import {
+  loadHowToPlaySeen,
+  saveHowToPlaySeen,
+} from '../utils/howToPlayPreference';
+import {
+  completionPrimaryAction,
+  shouldRunGameTimer,
+} from './gameLifecycle';
+import {
   beginNextPuzzleRequest,
   buildNextPuzzleSessionParams,
   cancelNextPuzzleRequest,
@@ -75,18 +88,27 @@ export function GameScreen({ navigation }: Props) {
     DEFAULT_PUZZLE_GUIDE_MODE,
   );
   const [menuVisible, setMenuVisible] = useState(false);
+  const [howToPlayVisible, setHowToPlayVisible] = useState(false);
+  const [howToPlaySeen, setHowToPlaySeen] = useState(false);
+  const [howToPlayPreferenceLoaded, setHowToPlayPreferenceLoaded] =
+    useState(false);
   const [tableAppearance, setTableAppearance] =
     useState<PuzzleTableAppearance>(DEFAULT_PUZZLE_TABLE_APPEARANCE);
   const [assistFeedback, setAssistFeedback] = useState<string | null>(null);
   const [nextPuzzleLoading, setNextPuzzleLoading] = useState(false);
   const [nextPuzzleError, setNextPuzzleError] = useState<string | null>(null);
   const [retryingSave, setRetryingSave] = useState(false);
+  const [roundResetSignal, setRoundResetSignal] = useState(0);
   const nextPuzzleRequestStateRef = useRef(createNextPuzzleRequestState());
+  const gameTimerRunningRef = useRef<boolean | null>(null);
+  const howToPlayReturnsToMenuRef = useRef(false);
   const {
     session,
     restoring,
     error,
     persistenceError,
+    completionSaving,
+    completionDurable,
     resizeSession,
     beginSessionReplacement,
     commitSessionReplacement,
@@ -104,6 +126,17 @@ export function GameScreen({ navigation }: Props) {
     setMusicEnabled,
     retryMusic,
   } = usePuzzleMusic(isFocused && Boolean(session));
+  const {
+    hapticsEnabled,
+    hapticsPreferenceLoaded,
+    hapticsFeedback,
+    setHapticsEnabled,
+    retryHapticsPreference,
+  } = useHapticsPreference();
+  const hapticFeedbackAllowed = shouldPlayHapticFeedback(
+    hapticsPreferenceLoaded,
+    hapticsEnabled,
+  );
   const isCompleted = state?.status === 'completed';
   const recoveryError =
     !restoring && (!session || !engine || !state)
@@ -112,6 +145,9 @@ export function GameScreen({ navigation }: Props) {
   useAccessibilityAnnouncement(isFocused ? recoveryError : null);
   const image = state?.layout.image ?? session?.layout.image;
   const attribution = image?.attribution;
+  const completionAction = image
+    ? completionPrimaryAction(image)
+    : ({ kind: 'choose_photo', label: 'Choose another photo' } as const);
   const currentBoardWidth = state?.layout.boardSize.width;
   const currentBoardHeight = state?.layout.boardSize.height;
   const imageAspect =
@@ -140,13 +176,41 @@ export function GameScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      setGameFocused(true);
       return () => {
         cancelNextPuzzleRequest(nextPuzzleRequestStateRef.current);
         setNextPuzzleLoading(false);
-        setGameFocused(false);
       };
-    }, [setGameFocused]),
+    }, []),
+  );
+
+  useEffect(() => {
+    const shouldRun = shouldRunGameTimer(
+      isFocused,
+      menuVisible,
+      !howToPlayPreferenceLoaded || howToPlayVisible || !howToPlaySeen,
+    );
+    if (gameTimerRunningRef.current === shouldRun) {
+      return;
+    }
+    gameTimerRunningRef.current = shouldRun;
+    setGameFocused(shouldRun);
+  }, [
+    howToPlayPreferenceLoaded,
+    howToPlaySeen,
+    howToPlayVisible,
+    isFocused,
+    menuVisible,
+    setGameFocused,
+  ]);
+
+  useEffect(
+    () => () => {
+      if (gameTimerRunningRef.current !== false) {
+        gameTimerRunningRef.current = false;
+        setGameFocused(false);
+      }
+    },
+    [setGameFocused],
   );
 
   useEffect(
@@ -171,6 +235,40 @@ export function GameScreen({ navigation }: Props) {
       current = false;
     };
   }, []);
+
+  useEffect(() => {
+    let current = true;
+    void loadHowToPlaySeen().then((seen) => {
+      if (!current) {
+        return;
+      }
+      setHowToPlaySeen(seen);
+      setHowToPlayPreferenceLoaded(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      howToPlayPreferenceLoaded &&
+      !howToPlaySeen &&
+      !howToPlayVisible &&
+      isFocused &&
+      session &&
+      !isCompleted
+    ) {
+      setHowToPlayVisible(true);
+    }
+  }, [
+    howToPlayPreferenceLoaded,
+    howToPlaySeen,
+    howToPlayVisible,
+    isCompleted,
+    isFocused,
+    session,
+  ]);
 
   useEffect(() => {
     if (!assistFeedback) {
@@ -212,8 +310,11 @@ export function GameScreen({ navigation }: Props) {
     playLayout.boardHeight,
     playLayout.boardWidth,
     playLayout.trayPlacement,
+    playLayout.trayRunExtent,
     resizeSession,
     session?.engine,
+    session?.layout.trayPlacement,
+    session?.layout.traySurfaceExtent,
   ]);
 
   useEffect(
@@ -233,12 +334,46 @@ export function GameScreen({ navigation }: Props) {
     cancelNextPuzzleRequest(nextPuzzleRequestStateRef.current);
     setNextPuzzleLoading(false);
     setNextPuzzleError(null);
+    setMenuVisible(false);
     engine?.reset();
+    setRoundResetSignal((signal) => signal + 1);
+  };
+
+  const onCloseHowToPlay = () => {
+    setHowToPlayVisible(false);
+    if (howToPlayReturnsToMenuRef.current) {
+      howToPlayReturnsToMenuRef.current = false;
+      setMenuVisible(true);
+    }
+    if (!howToPlaySeen) {
+      // Resume immediately. A failed write simply teaches again next launch.
+      setHowToPlaySeen(true);
+      void saveHowToPlaySeen().then((saved) => {
+        if (!saved) {
+          const message =
+            'How to Play will appear again because this preference could not be saved.';
+          setAssistFeedback(message);
+          AccessibilityInfo.announceForAccessibilityWithOptions(message, {
+            queue: true,
+          });
+        }
+      });
+    }
+  };
+
+  const onOpenHowToPlay = () => {
+    howToPlayReturnsToMenuRef.current = true;
+    setMenuVisible(false);
+    setHowToPlayVisible(true);
   };
 
   const onNextPuzzle = async () => {
     const requestState = nextPuzzleRequestStateRef.current;
-    if (requestState.current || !session) {
+    if (
+      requestState.current ||
+      !session ||
+      completionAction.kind !== 'next_remote'
+    ) {
       return;
     }
     const request = beginNextPuzzleRequest(requestState);
@@ -248,7 +383,7 @@ export function GameScreen({ navigation }: Props) {
     setNextPuzzleError(null);
     try {
       const result = await fetchPuzzlePhoto(
-        undefined,
+        completionAction.categoryId,
         request.controller.signal,
         height >= width ? 'portrait' : 'landscape',
       );
@@ -304,6 +439,15 @@ export function GameScreen({ navigation }: Props) {
         setNextPuzzleError(
           'This photo could not be prepared for play. Check your connection or device storage, then try again.',
         );
+      } else if (
+        startResult === 'commit_failed' ||
+        startResult === 'rollback_failed'
+      ) {
+        setNextPuzzleError(
+          startResult === 'rollback_failed'
+            ? 'The previous puzzle could not be restored safely. Keep Frume open and retry after freeing device storage.'
+            : 'The next puzzle could not be saved. Free some device storage, then try again.',
+        );
       }
     } catch {
       if (isRequestCurrent()) {
@@ -319,8 +463,17 @@ export function GameScreen({ navigation }: Props) {
   const onHome = () => {
     cancelNextPuzzleRequest(nextPuzzleRequestStateRef.current);
     setNextPuzzleLoading(false);
-    clearSession();
+    // beforeRemove owns completed-session cleanup for every navigation path.
     navigation.popToTop();
+  };
+
+  const onChooseAnotherPhoto = () => {
+    cancelNextPuzzleRequest(nextPuzzleRequestStateRef.current);
+    setNextPuzzleLoading(false);
+    setNextPuzzleError(null);
+    // beforeRemove owns completed-session cleanup for every navigation path.
+    navigation.popToTop();
+    navigation.navigate('Gallery');
   };
 
   const onExit = () => {
@@ -409,10 +562,9 @@ export function GameScreen({ navigation }: Props) {
       return;
     }
 
-    void Haptics.impactAsync(
-      result.connectedWithNeighbor
-        ? Haptics.ImpactFeedbackStyle.Medium
-        : Haptics.ImpactFeedbackStyle.Light,
+    void playPuzzlePlacementHaptic(
+      hapticFeedbackAllowed,
+      result.connectedWithNeighbor,
     );
     const assistedDefinition = state.layout.pieces.find(
       (piece) => piece.id === result.pieceId,
@@ -482,6 +634,8 @@ export function GameScreen({ navigation }: Props) {
           completed={isCompleted}
           guideMode={guideMode}
           tableAppearance={tableAppearance}
+          roundResetSignal={roundResetSignal}
+          hapticsEnabled={hapticFeedbackAllowed}
         />
       </View>
       {isCompleted ? (
@@ -489,9 +643,23 @@ export function GameScreen({ navigation }: Props) {
           elapsedMs={elapsedMs}
           nextLoading={nextPuzzleLoading}
           nextError={nextPuzzleError}
-          onNext={() => void onNextPuzzle()}
+          persistenceError={persistenceError}
+          retryingSave={retryingSave}
+          completionSaving={completionSaving}
+          completionDurable={completionDurable}
+          nextActionLabel={completionAction.label}
+          hapticsEnabled={hapticsEnabled}
+          hapticsPreferenceLoaded={hapticsPreferenceLoaded}
+          onNext={() => {
+            if (completionAction.kind === 'next_remote') {
+              void onNextPuzzle();
+            } else {
+              onChooseAnotherPhoto();
+            }
+          }}
           onPlayAgain={onPlayAgain}
           onHome={onHome}
+          onRetrySave={() => void onRetryProgressSave()}
         />
       ) : null}
       {!isCompleted ? (
@@ -505,6 +673,9 @@ export function GameScreen({ navigation }: Props) {
           musicEnabled={musicEnabled}
           musicPreferenceLoaded={musicPreferenceLoaded}
           musicFeedback={musicFeedback}
+          hapticsEnabled={hapticsEnabled}
+          hapticsPreferenceLoaded={hapticsPreferenceLoaded}
+          hapticsFeedback={hapticsFeedback}
           persistenceError={persistenceError}
           retryingSave={retryingSave}
           attribution={attribution}
@@ -520,7 +691,11 @@ export function GameScreen({ navigation }: Props) {
           }}
           onSetMusicEnabled={setMusicEnabled}
           onRetryMusic={retryMusic}
+          onSetHapticsEnabled={setHapticsEnabled}
+          onRetryHaptics={retryHapticsPreference}
           onRetrySave={() => void onRetryProgressSave()}
+          onOpenHowToPlay={onOpenHowToPlay}
+          onRestartPuzzle={onPlayAgain}
           onAssistPiece={() => {
             setMenuVisible(false);
             requestAnimationFrame(onAssistPiece);
@@ -544,6 +719,10 @@ export function GameScreen({ navigation }: Props) {
           <Text style={styles.feedbackText}>{assistFeedback}</Text>
         </View>
       ) : null}
+      <HowToPlaySheet
+        visible={howToPlayVisible}
+        onClose={onCloseHowToPlay}
+      />
     </View>
   );
 }

@@ -11,7 +11,7 @@ import {
 const downloadLocation = (id: string) =>
   `https://api.unsplash.com/photos/${id}/download?ixid=${id}-tracking`;
 const trackingToken = (id: number) =>
-  `00000000-0000-4000-8000-${id.toString(16).padStart(12, '0')}`;
+  `00000000-0000-4000-8000-${id.toString(16).padStart(12, '0')}.${'A'.repeat(43)}`;
 const photoUseEvent = (id: string, tokenId: number): PhotoUseEvent => ({
   downloadLocation: downloadLocation(id),
   trackingToken: trackingToken(tokenId),

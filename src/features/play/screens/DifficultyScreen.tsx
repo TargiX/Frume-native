@@ -3,6 +3,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
+  type AppStateStatus,
   Image,
   Linking,
   Pressable,
@@ -14,13 +16,26 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAccessibilityAnnouncement } from '../../../accessibility';
+import {
+  androidAccessibilityLiveRegion,
+  useAccessibilityAnnouncement,
+} from '../../../accessibility';
 import { Button } from '../../../components/Button';
 import { MAX_CONTENT_WIDTH, Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
-import { isPremiumCutter, usePremiumAccess } from '../../../premium';
+import {
+  createPremiumUnlockContinuation,
+  isPremiumCutter,
+  PREMIUM_CUT_CATALOG,
+  type PremiumCutCatalogId,
+  usePremiumAccess,
+} from '../../../premium';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
-import { PREMIUM_CUTS_REQUIRED_ERROR } from '../../../puzzle/hooks/usePuzzleSession';
+import {
+  PREMIUM_CUTS_REQUIRED_ERROR,
+  type PuzzleSession,
+  type StartPuzzleSessionParams,
+} from '../../../puzzle/hooks/usePuzzleSession';
 import {
   DIFFICULTY_GRID,
   pieceCount,
@@ -48,9 +63,25 @@ import {
   resolveDifficultyScreenLayout,
 } from '../utils/difficultyLayout';
 import {
+  beginNextPuzzleRequest,
+  cancelNextPuzzleRequest,
+  createUnsplashContentSource,
+  createNextPuzzleRequestState,
+  finishNextPuzzleRequest,
+  isNextPuzzleRequestCurrent,
+  startTrackedNextPuzzle,
+} from '../utils/nextPuzzle';
+import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
 } from '../utils/photoRequest';
+import {
+  cancelPuzzlePreparationWhenAppLeavesActive,
+} from '../utils/preparationLifecycle';
+import {
+  commitManagedOwnPhotoCandidate,
+  discardManagedOwnPhotoCandidate,
+} from '../utils/ownPhotoLibrary';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Difficulty'>;
 
@@ -87,6 +118,16 @@ const ATTRIBUTION_HIT_SLOP = {
 
 type PlayableCutterId = Exclude<PuzzleCutterId, 'fractal'>;
 
+const PREMIUM_CUT_DETAILS: Record<PremiumCutCatalogId, string> = {
+  organic: 'Flowing, irregular seams',
+  biomorphic: 'An even fringe of fine teeth',
+  'living-spectrum': 'Teeth on five scales, seams varied',
+  crystal: 'Six-fold tips, each piece its own way',
+  'crystal-quartered': 'Four headings, blockier and mineral',
+  amoeba: 'Blobby, pseudopod interlocks',
+  'amoeba-columnar': 'Tall banded lobes over stretched sites',
+};
+
 const CUT_STYLES: {
   id: PlayableCutterId;
   label: string;
@@ -97,42 +138,21 @@ const CUT_STYLES: {
     label: 'Classic',
     detail: 'Familiar interlocking tabs',
   },
-  {
-    id: 'organic',
-    label: 'Organic',
-    detail: 'Flowing, irregular seams',
-  },
-  {
-    id: 'biomorphic',
-    label: 'Living',
-    detail: 'An even fringe of fine teeth',
-  },
-  {
-    id: 'living-spectrum',
-    label: 'Living spectrum',
-    detail: 'Teeth on five scales, seams varied',
-  },
-  {
-    id: 'crystal',
-    label: 'Crystal',
-    detail: 'Six-fold tips, each piece its own way',
-  },
-  {
-    id: 'crystal-quartered',
-    label: 'Crystal quartered',
-    detail: 'Four headings, blockier and mineral',
-  },
-  {
-    id: 'amoeba',
-    label: 'Amoeba',
-    detail: 'Blobby, pseudopod interlocks',
-  },
-  {
-    id: 'amoeba-columnar',
-    label: 'Amoeba columnar',
-    detail: 'Tall banded lobes over stretched sites',
-  },
+  ...PREMIUM_CUT_CATALOG.map((option) => ({
+    ...option,
+    detail: PREMIUM_CUT_DETAILS[option.id],
+  })),
 ];
+
+type PuzzleStartIntent = {
+  sessionParams: StartPuzzleSessionParams;
+  expectedSession: PuzzleSession | null;
+  difficulty: PuzzleDifficulty;
+  providerUse: {
+    downloadLocation: string;
+    trackingToken: string;
+  } | null;
+};
 
 function GridPreview({
   difficulty,
@@ -173,9 +193,16 @@ export function DifficultyScreen({ navigation, route }: Props) {
     categoryLabel,
     downloadLocation,
     trackingToken,
+    ownPhotoCandidateUri,
   } = route.params;
-  const { startSession, clearSession, loading, error } =
-    usePuzzleSessionContext();
+  const {
+    session,
+    beginSessionReplacement,
+    commitSessionReplacement,
+    rollbackSessionReplacement,
+    loading,
+    error,
+  } = usePuzzleSessionContext();
   const { isPremium } = usePremiumAccess();
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<PuzzleDifficulty>('4x4');
@@ -202,13 +229,32 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [sizeAdjustmentMessage, setSizeAdjustmentMessage] = useState<
+    string | null
+  >(null);
   const visibleError = imageError
     ? PHOTO_LOAD_ERROR
     : photoError ?? trackingError ?? error;
   useAccessibilityAnnouncement(visibleError);
+  useAccessibilityAnnouncement(sizeAdjustmentMessage);
   const startingRef = useRef(false);
-  const premiumStartPendingRef = useRef(false);
+  const startRequestStateRef = useRef(createNextPuzzleRequestState());
+  const premiumStartContinuationRef = useRef(
+    createPremiumUnlockContinuation<PuzzleStartIntent>(),
+  );
+  const cutOptionRefs = useRef<
+    Partial<
+      Record<PlayableCutterId, React.ElementRef<typeof Pressable>>
+    >
+  >({});
+  const premiumReturnFocusRef = useRef<
+    React.ElementRef<typeof Pressable> | null
+  >(null);
   const mountedRef = useRef(true);
+  const ownPhotoCandidateCommittedRef = useRef(false);
+  const premiumUnlockedPendingRef = useRef(false);
+  const resumePremiumIntentRef = useRef<() => void>(() => undefined);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const photoRequestRef = useRef<{
     id: number;
     controller: AbortController;
@@ -253,6 +299,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
     isPremiumCutter(selectedCutter) && !isPremium;
 
   const openPremiumCuts = () => {
+    const pending = premiumStartContinuationRef.current.peek();
+    const cutterId = pending?.sessionParams.cutterId ?? selectedCutter;
+    if (cutterId !== 'fractal') {
+      premiumReturnFocusRef.current = cutOptionRefs.current[cutterId] ?? null;
+    }
     setShowPremium(true);
   };
 
@@ -260,18 +311,67 @@ export function DifficultyScreen({ navigation, route }: Props) {
     setShowPremium(false);
   };
 
+  const cancelPremiumCuts = () => {
+    premiumUnlockedPendingRef.current = false;
+    premiumStartContinuationRef.current.discard();
+  };
+
   const onCutStylePress = (cutterId: PlayableCutterId) => {
+    premiumUnlockedPendingRef.current = false;
+    premiumStartContinuationRef.current.discard();
+    setSizeAdjustmentMessage(null);
     setSelectedCutter(cutterId);
-    premiumStartPendingRef.current = false;
   };
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      premiumUnlockedPendingRef.current = false;
+      premiumStartContinuationRef.current.discard();
+      cancelNextPuzzleRequest(startRequestStateRef.current);
       photoRequestRef.current?.controller.abort();
       photoRequestRef.current = null;
+      if (ownPhotoCandidateUri && !ownPhotoCandidateCommittedRef.current) {
+        void discardManagedOwnPhotoCandidate(ownPhotoCandidateUri);
+      }
     };
+    // Current ownership is read through refs so a successful session context
+    // update cannot trigger mount cleanup during the commit transaction.
+  }, [ownPhotoCandidateUri]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextState;
+      if (nextState === 'active' && premiumUnlockedPendingRef.current) {
+        queueMicrotask(() => resumePremiumIntentRef.current());
+      }
+      cancelPuzzlePreparationWhenAppLeavesActive(
+        previousState,
+        nextState,
+        {
+          cancelStart: () => {
+            cancelNextPuzzleRequest(startRequestStateRef.current);
+            startingRef.current = false;
+            if (mountedRef.current) {
+              setStarting(false);
+            }
+          },
+          cancelPhotoSwap: () => {
+            const photoRequest = photoRequestRef.current;
+            photoRequestRef.current = null;
+            photoRequest?.controller.abort(
+              new Error('App left the active state'),
+            );
+            if (mountedRef.current) {
+              setSwapping(false);
+            }
+          },
+        },
+      );
+    });
+    return () => subscription.remove();
   }, []);
 
   /**
@@ -280,6 +380,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
    * the use is only enqueued once a session actually starts.
    */
   const onAnotherPhoto = async () => {
+    if (appStateRef.current !== 'active') {
+      return;
+    }
+    if (ownPhotoCandidateUri) {
+      navigation.goBack();
+      return;
+    }
     photoRequestRef.current?.controller.abort(
       new Error('Replaced by a newer photo selection'),
     );
@@ -298,6 +405,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       );
       if (
         !mountedRef.current ||
+        appStateRef.current !== 'active' ||
         photoRequestRef.current?.id !== requestId ||
         controller.signal.aborted
       ) {
@@ -309,6 +417,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     } catch (requestError) {
       if (
         mountedRef.current &&
+        appStateRef.current === 'active' &&
         photoRequestRef.current?.id === requestId &&
         !controller.signal.aborted
       ) {
@@ -325,17 +434,19 @@ export function DifficultyScreen({ navigation, route }: Props) {
   };
 
   useEffect(() => {
-    if (!premiumStartPendingRef.current || !error) {
+    const pending = premiumStartContinuationRef.current.peek();
+    if (!pending || !error) {
       return;
     }
-    premiumStartPendingRef.current = false;
     if (
       error === PREMIUM_CUTS_REQUIRED_ERROR &&
-      isPremiumCutter(selectedCutter)
+      isPremiumCutter(pending.sessionParams.cutterId ?? 'classic')
     ) {
       openPremiumCuts();
+      return;
     }
-  }, [error, selectedCutter]);
+    premiumStartContinuationRef.current.discard();
+  }, [error]);
 
   useEffect(() => {
     // A simulated cut may not exist at the size already chosen; move the choice
@@ -345,84 +456,197 @@ export function DifficultyScreen({ navigation, route }: Props) {
     }
     const fallback = nearestAvailableSize(selectedCutter, selectedDifficulty);
     if (fallback) {
+      const previousPieces = pieceCount(selectedDifficulty);
+      const fallbackPieces = pieceCount(fallback);
       setSelectedDifficulty(fallback);
+      setSizeAdjustmentMessage(
+        `Size changed from ${previousPieces} to ${fallbackPieces} pieces because ${selectedCut.label} is available at that size.`,
+      );
     }
-  }, [selectedCutter, selectedDifficulty, sizesForCut]);
+  }, [selectedCut.label, selectedCutter, selectedDifficulty, sizesForCut]);
 
-  const onPlay = async () => {
-    if (selectedCutLocked) {
-      openPremiumCuts();
+  const createStartIntent = (): PuzzleStartIntent => ({
+    sessionParams: {
+      image: {
+        uri: imageUri,
+        width: imageWidth,
+        height: imageHeight,
+        accessibilityLabel:
+          photoDescription ??
+          (categoryLabel
+            ? `${categoryLabel} puzzle photograph`
+            : 'Puzzle photograph'),
+        attribution:
+          photographerName && photographerUrl
+            ? {
+                photographerName,
+                photographerUrl,
+                sourceName: 'Unsplash',
+                sourceUrl:
+                  'https://unsplash.com/?utm_source=frume&utm_medium=referral',
+              }
+            : undefined,
+        contentSource:
+          downloadLocation && trackingToken
+            ? createUnsplashContentSource(categoryId, categoryLabel)
+            : { kind: 'own' as const },
+      },
+      cutterId: selectedCutter,
+      difficulty: selectedDifficulty,
+      guideMode: selectedGuideMode,
+      boardMaxWidth: playLayout.boardWidth,
+      boardMaxHeight: playLayout.boardHeight,
+      traySurfaceExtent: playLayout.trayRunExtent,
+      trayPlacement: playLayout.trayPlacement,
+    },
+    expectedSession: session,
+    difficulty: selectedDifficulty,
+    providerUse:
+      downloadLocation && trackingToken
+        ? { downloadLocation, trackingToken }
+        : null,
+  });
+
+  const startPuzzleIntent = async (intent: PuzzleStartIntent) => {
+    if (startingRef.current || appStateRef.current !== 'active') {
       return;
     }
-    if (startingRef.current) {
-      return;
+    if (isPremiumCutter(intent.sessionParams.cutterId ?? 'classic')) {
+      premiumStartContinuationRef.current.stage(intent);
+    } else {
+      premiumStartContinuationRef.current.discard();
     }
     startingRef.current = true;
+    const startRequest = beginNextPuzzleRequest(startRequestStateRef.current);
+    const isStartCurrent = () =>
+      mountedRef.current &&
+      appStateRef.current === 'active' &&
+      isNextPuzzleRequestCurrent(startRequestStateRef.current, startRequest);
     setStarting(true);
     setTrackingError(null);
-    premiumStartPendingRef.current = isPremiumCutter(selectedCutter);
     try {
-      const started = await startSession({
-        image: {
-          uri: imageUri,
-          width: imageWidth,
-          height: imageHeight,
-          accessibilityLabel:
-            photoDescription ??
-            (categoryLabel
-              ? `${categoryLabel} puzzle photograph`
-              : 'Puzzle photograph'),
-          attribution:
-            photographerName && photographerUrl
-              ? {
-                  photographerName,
-                  photographerUrl,
-                  sourceName: 'Unsplash',
-                  sourceUrl:
-                    'https://unsplash.com/?utm_source=frume&utm_medium=referral',
-                }
-              : undefined,
+      const providerUse = intent.providerUse;
+      const startResult = await startTrackedNextPuzzle(
+        intent.sessionParams,
+        {
+          beginSessionReplacement: (params, transactionIsCurrent) =>
+            beginSessionReplacement(
+              params,
+              intent.expectedSession,
+              transactionIsCurrent,
+            ),
+          enqueuePhotoUse: providerUse
+            ? () =>
+                enqueuePhotoUse(
+                  {
+                    links: {
+                      download_location: providerUse.downloadLocation,
+                    },
+                  },
+                  providerUse.trackingToken,
+                )
+            : async () => undefined,
+          commitSessionReplacement: async (
+            replacement,
+            transactionIsCurrent,
+          ) => {
+            // Protect the staging file for the entire durable-write/rollback
+            // boundary. The hook installs context before its post-commit
+            // cleanup finishes, so a screen unmount in that window must not
+            // delete the newly owned image.
+            if (ownPhotoCandidateUri) {
+              ownPhotoCandidateCommittedRef.current = true;
+            }
+            const committed = await commitSessionReplacement(
+              replacement,
+              transactionIsCurrent,
+            );
+            if (committed && ownPhotoCandidateUri) {
+              ownPhotoCandidateCommittedRef.current = true;
+              commitManagedOwnPhotoCandidate(ownPhotoCandidateUri);
+            }
+            return committed;
+          },
+          rollbackSessionReplacement,
         },
-        cutterId: selectedCutter,
-        difficulty: selectedDifficulty,
-        guideMode: selectedGuideMode,
-        boardMaxWidth: playLayout.boardWidth,
-        boardMaxHeight: playLayout.boardHeight,
-        traySurfaceExtent: playLayout.trayRunExtent,
-        trayPlacement: playLayout.trayPlacement,
-      });
-      if (!started) {
-        return;
+        isStartCurrent,
+      );
+      const started = startResult === 'started';
+      if (
+        ownPhotoCandidateUri &&
+        startResult !== 'started' &&
+        startResult !== 'rollback_failed'
+      ) {
+        ownPhotoCandidateCommittedRef.current = false;
       }
-      premiumStartPendingRef.current = false;
-
-      // Persist required provider tracking before leaving setup. The network
-      // drain runs in the background and is retried on the next launch. A
-      // photograph the player brought themselves has no provider to report to.
-      if (!downloadLocation || !trackingToken) {
-        navigation.navigate('Game', { difficulty: selectedDifficulty });
-        return;
-      }
-      try {
-        await enqueuePhotoUse(
-          { links: { download_location: downloadLocation } },
-          trackingToken,
-        );
-      } catch {
-        // Do not leave a resumable session behind when its required photo-use
-        // event could not be persisted.
-        clearSession();
+      if (startResult === 'tracking_failed' && isStartCurrent()) {
+        premiumUnlockedPendingRef.current = false;
+        premiumStartContinuationRef.current.discard();
         setTrackingError(
           'This photo could not be prepared for play. Check your connection or device storage, then try again.',
         );
+      } else if (
+        (startResult === 'commit_failed' ||
+          startResult === 'rollback_failed') &&
+        isStartCurrent()
+      ) {
+        premiumUnlockedPendingRef.current = false;
+        premiumStartContinuationRef.current.discard();
+        setTrackingError(
+          startResult === 'rollback_failed'
+            ? 'The prior puzzle could not be restored safely. Keep Frume open and retry after freeing device storage.'
+            : 'The puzzle could not be saved on this device. Free some storage, then try again.',
+        );
+      }
+      if (!started) {
+        if (startResult === 'cancelled') {
+          // StoreKit may temporarily make the app inactive. The exact unlocked
+          // intent remains staged and resumes when AppState returns active.
+          premiumUnlockedPendingRef.current = true;
+        }
         return;
       }
-      navigation.navigate('Game', { difficulty: selectedDifficulty });
+      if (!isStartCurrent()) {
+        return;
+      }
+      premiumStartContinuationRef.current.discard();
+      premiumUnlockedPendingRef.current = false;
+      ownPhotoCandidateCommittedRef.current = true;
+      navigation.navigate('Game', { difficulty: intent.difficulty });
+    } catch {
+      premiumUnlockedPendingRef.current = false;
+      premiumStartContinuationRef.current.discard();
+      if (isStartCurrent()) {
+        setTrackingError(
+          'This photo could not be prepared for play. Check your connection or device storage, then try again.',
+        );
+      }
     } finally {
-      startingRef.current = false;
-      setStarting(false);
+      if (finishNextPuzzleRequest(startRequestStateRef.current, startRequest)) {
+        startingRef.current = false;
+        setStarting(false);
+      }
     }
   };
+
+  const onPlay = () => {
+    const intent = createStartIntent();
+    if (selectedCutLocked) {
+      premiumStartContinuationRef.current.stage(intent);
+      openPremiumCuts();
+      return;
+    }
+    void startPuzzleIntent(intent);
+  };
+
+  const continueAfterPremiumUnlock = () => {
+    premiumUnlockedPendingRef.current = true;
+    const intent = premiumStartContinuationRef.current.peek();
+    if (intent && appStateRef.current === 'active') {
+      void startPuzzleIntent(intent);
+    }
+  };
+  resumePremiumIntentRef.current = continueAfterPremiumUnlock;
 
   const openPhotographer = () => {
     if (photographerUrl) {
@@ -480,7 +704,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Another photo"
           accessibilityHint={
-            categoryLabel
+            ownPhotoCandidateUri
+              ? 'Returns to the photo picker to choose a different photograph'
+              : categoryLabel
               ? `Replaces this photograph with another ${categoryLabel} one`
               : 'Replaces this photograph with another one'
           }
@@ -570,6 +796,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
           return (
             <Pressable
               key={option.id}
+              ref={(node) => {
+                if (node) {
+                  cutOptionRefs.current[option.id] = node;
+                } else {
+                  delete cutOptionRefs.current[option.id];
+                }
+              }}
               accessibilityRole="radio"
               accessibilityState={{ selected: active, disabled: loading }}
               accessibilityLabel={`${option.label}. ${option.detail}. ${status}`}
@@ -599,7 +832,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
                       !singleColumnCuts && styles.cutTileLabel,
                       active && styles.optionLabelActive,
                     ]}
-                    numberOfLines={singleColumnCuts ? undefined : 1}
+                    numberOfLines={singleColumnCuts ? undefined : 2}
                   >
                     {option.label}
                   </Text>
@@ -608,6 +841,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
                       name="lock-closed"
                       size={16}
                       color={colors.accent}
+                      style={styles.cutStatusIcon}
                       accessible={false}
                       importantForAccessibility="no"
                     />
@@ -616,6 +850,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
                       name="checkmark-circle"
                       size={18}
                       color={colors.accent}
+                      style={styles.cutStatusIcon}
                       accessible={false}
                       importantForAccessibility="no"
                     />
@@ -661,6 +896,14 @@ export function DifficultyScreen({ navigation, route }: Props) {
           ? `Every size is free. ${selectedCut.label} is cut by simulation, so it comes in the sizes that were prepared.`
           : 'Every size is free. Pick what feels comfortable.'}
       </Text>
+      {sizeAdjustmentMessage ? (
+        <Text
+          style={styles.sizeAdjustmentNotice}
+          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+        >
+          {sizeAdjustmentMessage}
+        </Text>
+      ) : null}
 
       <View style={styles.difficultyOptions} accessibilityRole="radiogroup">
         {SIZE_OPTIONS.filter((option) => sizesForCut.includes(option.id)).map((option) => {
@@ -679,7 +922,10 @@ export function DifficultyScreen({ navigation, route }: Props) {
                 active && styles.optionSelected,
                 pressed && styles.optionPressed,
               ]}
-              onPress={() => setSelectedDifficulty(option.id)}
+              onPress={() => {
+                setSizeAdjustmentMessage(null);
+                setSelectedDifficulty(option.id);
+              }}
             >
               <GridPreview difficulty={option.id} active={active} />
               <View style={styles.optionTitleRow}>
@@ -847,7 +1093,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
       <PremiumCutsSheet
         visible={showPremium}
         onClose={closePremiumCuts}
-        onUnlocked={closePremiumCuts}
+        onCancelled={cancelPremiumCuts}
+        onUnlocked={continueAfterPremiumUnlock}
+        returnFocusRef={premiumReturnFocusRef}
       />
     </>
   );
@@ -998,6 +1246,13 @@ const styles = StyleSheet.create({
     marginTop: -spacing.xs,
     marginBottom: spacing.lg,
   },
+  sizeAdjustmentNotice: {
+    color: colors.accent,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: -spacing.md,
+    marginBottom: spacing.lg,
+  },
   cutOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1038,19 +1293,27 @@ const styles = StyleSheet.create({
    * around it would be a box inside a box.
    */
   cutTile: {
+    minWidth: 0,
     gap: spacing.xs,
   },
   cutTileCopy: {
+    minWidth: 0,
     width: '100%',
   },
   cutTileLabel: {
     fontSize: 14,
+    lineHeight: 18,
   },
   cutTitleRow: {
+    minWidth: 0,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  cutStatusIcon: {
+    flexShrink: 0,
+    marginTop: 1,
   },
   cutDetail: {
     color: colors.textSecondary,
@@ -1162,6 +1425,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   optionLabel: {
+    minWidth: 0,
+    flexShrink: 1,
     color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',

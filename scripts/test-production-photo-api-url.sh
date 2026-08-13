@@ -34,7 +34,7 @@ expect_reject() {
 }
 
 expect_accept "public HTTPS hostname" "https://photos.example.com"
-expect_accept "public HTTPS hostname with base path" "https://photos.example.com/api/"
+expect_accept "public HTTPS hostname with trailing slash" "https://photos.example.com/"
 expect_accept "public IPv4 literal" "https://8.8.8.8"
 expect_accept "public IPv6 literal" "https://[2606:4700:4700::1111]"
 
@@ -45,6 +45,8 @@ expect_reject "embedded username" "https://user@photos.example.com"
 expect_reject "embedded password" "https://user:secret@photos.example.com"
 expect_reject "query string" "https://photos.example.com?environment=dev"
 expect_reject "fragment" "https://photos.example.com#dev"
+expect_reject "path prefix" "https://photos.example.com/api/"
+expect_reject "endpoint path" "https://photos.example.com/photo"
 expect_reject "localhost" "https://localhost"
 expect_reject "localhost trailing dot" "https://localhost."
 expect_reject "localhost subdomain" "https://photos.localhost"

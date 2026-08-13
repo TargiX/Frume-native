@@ -9,7 +9,6 @@ import {
   type Transforms3d,
   useImage,
 } from '@shopify/react-native-skia';
-import * as Haptics from 'expo-haptics';
 import React, {
   useCallback,
   useEffect,
@@ -36,6 +35,8 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../accessibility';
+import { Button } from '../../components/Button';
+import { playPuzzlePlacementHaptic } from '../../haptics';
 import { MIN_TOUCH_TARGET } from '../../theme';
 import type { PuzzleEngine } from '../engine';
 import { getTrayMetrics } from '../engine/tray';
@@ -55,6 +56,13 @@ import type {
   SnapFeedback,
 } from '../types';
 import { BoardSurface } from './BoardSurface';
+import {
+  isPieceEntranceVisible,
+  PIECE_ENTRANCE_BATCH_COUNT,
+  PIECE_ENTRANCE_DURATION_MS,
+  pieceEntranceBatchDelayMs,
+  pieceEntranceDelayMs,
+} from './boardLifecycle';
 import { DrawBoardImage } from './DrawBoardImage';
 import { PieceEmbossOverlay } from './PieceEmbossOverlay';
 import {
@@ -62,6 +70,10 @@ import {
   shouldRenderPieceEmboss,
 } from './pieceEmbossPolicy';
 import { resolvePieceRenderTranslation } from './pieceRenderPosition';
+import {
+  acceptManualImageLoadRetry,
+  imageLoadRetryPresentation,
+} from './imageLoadRetry';
 import { PUZZLE_SEAM_DISSOLVE_MS } from './revealMotion';
 import { getPieceOverflowMargin } from './pieceOverflowMargin';
 import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
@@ -235,6 +247,7 @@ type PieceGestureOverlayProps = {
   totalPieces: number;
   surfaceInset: number;
   surfaceInsetY: number;
+  hapticsEnabled: boolean;
 };
 
 function PieceGestureOverlay({
@@ -254,6 +267,7 @@ function PieceGestureOverlay({
   totalPieces,
   surfaceInset,
   surfaceInsetY,
+  hapticsEnabled,
 }: PieceGestureOverlayProps) {
   const inTray = runtime.inTray;
   const hitWidth = Math.max(
@@ -285,6 +299,7 @@ function PieceGestureOverlay({
     cameraScale,
     positionX: visual.x,
     positionY: visual.y,
+    hapticsEnabled,
   });
   const animatedStyle = useAnimatedStyle(() => ({
     left:
@@ -310,10 +325,9 @@ function PieceGestureOverlay({
     if (!result) {
       return;
     }
-    void Haptics.impactAsync(
-      result.connectedWithNeighbor
-        ? Haptics.ImpactFeedbackStyle.Medium
-        : Haptics.ImpactFeedbackStyle.Light,
+    void playPuzzlePlacementHaptic(
+      hapticsEnabled,
+      result.connectedWithNeighbor,
     );
     const placedCount = Object.values(engine.getState().pieces).filter(
       (piece) => piece.locked,
@@ -324,7 +338,14 @@ function PieceGestureOverlay({
       }. ${placedCount} of ${totalPieces} pieces placed.`,
       { queue: true },
     );
-  }, [definition.id, definition.index, engine, interactive, totalPieces]);
+  }, [
+    definition.id,
+    definition.index,
+    engine,
+    hapticsEnabled,
+    interactive,
+    totalPieces,
+  ]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -375,6 +396,9 @@ type PuzzleBoardProps = {
   completed?: boolean;
   guideMode?: PuzzleGuideMode;
   tableAppearance?: PuzzleTableAppearance;
+  /** Changes whenever the same engine starts a fresh round, such as Replay. */
+  roundResetSignal?: number;
+  hapticsEnabled?: boolean;
 };
 
 export function PuzzleBoard({
@@ -387,21 +411,31 @@ export function PuzzleBoard({
   completed = false,
   guideMode = 'cuts',
   tableAppearance = 'felt',
+  roundResetSignal = 0,
+  hapticsEnabled = false,
 }: PuzzleBoardProps) {
   const { boardSize, image } = layout;
   const [imageError, setImageError] = useState<string | null>(null);
-  const [displayImageUri, setDisplayImageUri] = useState(image.uri);
-  const handleImageError = useCallback((caught: Error) => {
-    if (image.remoteUri && displayImageUri !== image.remoteUri) {
-      setImageError(null);
-      setDisplayImageUri(image.remoteUri);
-      return;
-    }
-    setImageError(caught.message || 'The photograph could not be loaded.');
-  }, [displayImageUri, image.remoteUri]);
+  const [displayImageUri, setDisplayImageUri] = useState<string | null>(null);
+  const [manualImageLoadRetries, setManualImageLoadRetries] = useState(0);
+  const [imageReloadSignal, setImageReloadSignal] = useState(0);
+  const imageRetryPresentation = imageLoadRetryPresentation(
+    manualImageLoadRetries,
+  );
+  const handleImageError = useCallback(
+    (_caught: Error) => {
+      if (image.remoteUri && displayImageUri !== image.remoteUri) {
+        setImageError(null);
+        setDisplayImageUri(image.remoteUri);
+        return;
+      }
+      setImageError('The photograph could not be loaded.');
+    },
+    [displayImageUri, image.remoteUri],
+  );
   const skiaImage = useImage(displayImageUri, handleImageError);
   const imageStatusMessage = imageError
-    ? `Photograph unavailable. ${imageError}`
+    ? `Photograph unavailable. ${imageRetryPresentation.guidance}`
     : skiaImage
       ? null
       : 'Loading photograph.';
@@ -419,7 +453,20 @@ export function PuzzleBoard({
   const cameraX = useMemo(() => makeMutable(0), []);
   const cameraY = useMemo(() => makeMutable(0), []);
   const pinchStartScale = useMemo(() => makeMutable(1), []);
-  const entranceEngineRef = useRef<PuzzleEngine | null>(null);
+  const entranceRoundRef = useRef<{
+    engine: PuzzleEngine;
+    signal: number;
+  } | null>(null);
+  const [entranceGate, setEntranceGate] = useState<{
+    engine: PuzzleEngine | null;
+    signal: number;
+    visibleBatch: number;
+  }>({ engine: null, signal: -1, visibleBatch: -1 });
+  const visibleEntranceBatch =
+    entranceGate.engine === engine &&
+    entranceGate.signal === roundResetSignal
+      ? entranceGate.visibleBatch
+      : -1;
   /**
    * The shelf runs the width of the table and is centred on the board, so it
    * starts to the left of the board's own origin. Everything is drawn from this
@@ -496,16 +543,50 @@ export function PuzzleBoard({
 
   useEffect(() => {
     setImageError(null);
-    setDisplayImageUri(image.uri);
-  }, [image.uri]);
+    // Passing null for one frame gives Skia a new source dependency, so Replay
+    // is a real retry even when the failed URI itself has not changed.
+    setDisplayImageUri(null);
+    const frame = requestAnimationFrame(() => setDisplayImageUri(image.uri));
+    return () => cancelAnimationFrame(frame);
+  }, [image.uri, imageReloadSignal]);
 
   useEffect(() => {
-    // Each puzzle deals a fresh tray, and tray-content coordinates start at
-    // zero again. Carrying the previous puzzle's scroll over would draw the new
-    // row shifted off the visible strip.
+    setManualImageLoadRetries(0);
+  }, [image.uri, roundResetSignal]);
+
+  const retryImageLoad = useCallback(() => {
+    const nextRetryCount = acceptManualImageLoadRetry(
+      manualImageLoadRetries,
+    );
+    if (nextRetryCount === null) {
+      return;
+    }
+    setManualImageLoadRetries(nextRetryCount);
+    setImageError(null);
+    setImageReloadSignal((signal) => signal + 1);
+  }, [manualImageLoadRetries]);
+
+  useEffect(() => {
+    // Engine replacement and Replay both create a new board round. Keep all
+    // renderer-local state aligned even when Replay reuses the engine object.
     cancelAnimation(trayScroll);
+    cancelAnimation(cameraScale);
+    cancelAnimation(cameraX);
+    cancelAnimation(cameraY);
     trayScroll.value = 0;
-  }, [engine, trayScroll]);
+    cameraScale.value = 1;
+    cameraX.value = 0;
+    cameraY.value = 0;
+    pinchStartScale.value = 1;
+  }, [
+    cameraScale,
+    cameraX,
+    cameraY,
+    engine,
+    pinchStartScale,
+    roundResetSignal,
+    trayScroll,
+  ]);
 
   /**
    * Extent of the pieces still waiting in the tray, in tray-content space.
@@ -603,6 +684,8 @@ export function PuzzleBoard({
   }, [
     cameraBounds.contentHeight,
     cameraBounds.contentWidth,
+    cameraBounds.viewportHeight,
+    cameraBounds.viewportWidth,
     cameraScale,
     cameraX,
     cameraY,
@@ -707,51 +790,139 @@ export function PuzzleBoard({
   ]);
 
   useEffect(() => {
-    const shouldAnimateEntrance = entranceEngineRef.current !== engine;
-    entranceEngineRef.current = engine;
+    const previousRound = entranceRoundRef.current;
+    const startsNewRound =
+      previousRound?.engine !== engine ||
+      previousRound.signal !== roundResetSignal;
+    entranceRoundRef.current = { engine, signal: roundResetSignal };
 
     // The entrance belongs to this engine's own pieces: on a replacement the
     // props still describe the outgoing puzzle for one render.
     const entranceState = engine.getState();
+    const entranceTrayScale = getTrayMetrics(entranceState.layout).scale;
+    const lastBatch = PIECE_ENTRANCE_BATCH_COUNT - 1;
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
 
-    entranceState.layout.pieces.forEach((definition, index) => {
-      const visual = visuals.get(definition.id);
-      if (!visual) {
-        return;
+    if (!startsNewRound) {
+      // A Reduce Motion change cancels the old worklet animations during effect
+      // cleanup. Settle the existing round instead of replaying its entrance.
+      entranceState.layout.pieces.forEach((definition) => {
+        const runtime = entranceState.pieces[definition.id];
+        const visual = visuals.get(definition.id);
+        const synced = engineSync.get(definition.id);
+        if (runtime && visual && synced) {
+          visual.x.value = runtime.position.x;
+          visual.y.value = runtime.position.y;
+          visual.rotation.value = runtime.rotation;
+          visual.opacity.value = 1;
+          visual.scale.value = 1;
+          visual.trayAttached.value = runtime.inTray;
+          visual.trayFactor.value = runtime.inTray ? entranceTrayScale : 1;
+          synced.x = runtime.position.x;
+          synced.y = runtime.position.y;
+          synced.rotation = runtime.rotation;
+          synced.inTray = runtime.inTray;
+          synced.trayFactor = runtime.inTray ? entranceTrayScale : 1;
+        }
+      });
+      setEntranceGate({
+        engine,
+        signal: roundResetSignal,
+        visibleBatch: lastBatch,
+      });
+    } else {
+      setEntranceGate({
+        engine,
+        signal: roundResetSignal,
+        visibleBatch: reduceMotion ? lastBatch : -1,
+      });
+
+      entranceState.layout.pieces.forEach((definition) => {
+        const runtime = entranceState.pieces[definition.id];
+        const visual = visuals.get(definition.id);
+        const synced = engineSync.get(definition.id);
+        if (!runtime || !visual || !synced) {
+          return;
+        }
+
+        cancelAnimation(visual.x);
+        cancelAnimation(visual.y);
+        cancelAnimation(visual.rotation);
+        cancelAnimation(visual.scale);
+        cancelAnimation(visual.opacity);
+        cancelAnimation(visual.trayFactor);
+        visual.x.value = runtime.position.x;
+        visual.y.value = runtime.position.y;
+        visual.rotation.value = runtime.rotation;
+        visual.trayAttached.value = runtime.inTray;
+        visual.trayFactor.value = runtime.inTray ? entranceTrayScale : 1;
+        synced.x = runtime.position.x;
+        synced.y = runtime.position.y;
+        synced.rotation = runtime.rotation;
+        synced.inTray = runtime.inTray;
+        synced.trayFactor = runtime.inTray ? entranceTrayScale : 1;
+
+        if (runtime.locked || reduceMotion) {
+          visual.opacity.value = 1;
+          visual.scale.value = 1;
+          return;
+        }
+        const delay = pieceEntranceDelayMs(
+          definition.index,
+          entranceState.layout.pieces.length,
+        );
+        visual.opacity.value = 0;
+        visual.scale.value = 0.88;
+        visual.opacity.value = withDelay(
+          delay,
+          withTiming(1, { duration: PIECE_ENTRANCE_DURATION_MS }),
+        );
+        visual.scale.value = withDelay(
+          delay,
+          withTiming(1, { duration: PIECE_ENTRANCE_DURATION_MS }),
+        );
+      });
+
+      if (!reduceMotion) {
+        Array.from({ length: PIECE_ENTRANCE_BATCH_COUNT }, (_, batch) => {
+          const delay =
+            pieceEntranceBatchDelayMs(batch) + PIECE_ENTRANCE_DURATION_MS;
+          timers.push(
+            setTimeout(() => {
+              setEntranceGate((current) =>
+                current.engine === engine &&
+                current.signal === roundResetSignal
+                  ? {
+                      ...current,
+                      visibleBatch: Math.max(current.visibleBatch, batch),
+                    }
+                  : current,
+              );
+            }, delay),
+          );
+        });
       }
-      if (entranceState.pieces[definition.id]?.locked) {
-        visual.opacity.value = 1;
-        visual.scale.value = 1;
-        return;
-      }
-      if (reduceMotion || !shouldAnimateEntrance) {
-        visual.opacity.value = 1;
-        visual.scale.value = 1;
-        return;
-      }
-      visual.opacity.value = withDelay(
-        index * 34,
-        withTiming(1, { duration: 240 }),
-      );
-      visual.scale.value = withDelay(
-        index * 34,
-        withSpring(1, { damping: 15, stiffness: 210 }),
-      );
-    });
+    }
 
     return () => {
+      timers.forEach(clearTimeout);
       visuals.forEach((visual) => {
         cancelAnimation(visual.x);
         cancelAnimation(visual.y);
         cancelAnimation(visual.rotation);
         cancelAnimation(visual.scale);
         cancelAnimation(visual.opacity);
+        cancelAnimation(visual.trayFactor);
       });
     };
-    // Entry runs once per engine. Relayout keeps the same engine and therefore
-    // cannot replay the loose-piece deal animation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, reduceMotion, visuals]);
+    // Relayout keeps the same engine and signal, so it cannot replay the deal.
+  }, [
+    engine,
+    engineSync,
+    reduceMotion,
+    roundResetSignal,
+    visuals,
+  ]);
 
   useEffect(() => {
     layout.pieces.forEach((definition) => {
@@ -760,6 +931,13 @@ export function PuzzleBoard({
       const synced = engineSync.get(definition.id);
       if (!runtime || !visual || !synced) {
         return;
+      }
+
+      // Assist can place a piece while the short deal animation is still
+      // finishing. A locked result must become visible immediately.
+      if (runtime.locked) {
+        cancelAnimation(visual.opacity);
+        visual.opacity.value = 1;
       }
 
       const trayTransition = runtime.inTray !== synced.inTray;
@@ -881,18 +1059,30 @@ export function PuzzleBoard({
   ]);
 
   useEffect(() => {
-    if (reduceMotion) {
-      piecesOpacity.value = completed ? 0 : 1;
-      fullOpacity.value = completed ? 1 : 0;
+    if (!completed) {
+      // Replay is a new round, not a reverse completion animation.
+      piecesOpacity.value = 1;
+      fullOpacity.value = 0;
       return;
     }
-    piecesOpacity.value = withTiming(completed ? 0 : 1, {
+    if (reduceMotion) {
+      piecesOpacity.value = 0;
+      fullOpacity.value = 1;
+      return;
+    }
+    piecesOpacity.value = withTiming(0, {
       duration: PUZZLE_SEAM_DISSOLVE_MS,
     });
-    fullOpacity.value = withTiming(completed ? 1 : 0, {
+    fullOpacity.value = withTiming(1, {
       duration: PUZZLE_SEAM_DISSOLVE_MS,
     });
-  }, [completed, fullOpacity, piecesOpacity, reduceMotion]);
+  }, [
+    completed,
+    fullOpacity,
+    piecesOpacity,
+    reduceMotion,
+    roundResetSignal,
+  ]);
 
   useEffect(() => {
     if (!snapFeedback) {
@@ -960,6 +1150,20 @@ export function PuzzleBoard({
       >
         <Text style={styles.imageStatusTitle}>Photograph unavailable</Text>
         <Text style={styles.imageStatusBody}>{imageError}</Text>
+        <Text style={styles.imageStatusBody}>
+          {imageRetryPresentation.guidance}
+        </Text>
+        {imageRetryPresentation.canRetry &&
+        imageRetryPresentation.retryLabel ? (
+          <View style={styles.imageRetryAction}>
+            <Button
+              label={imageRetryPresentation.retryLabel}
+              variant="secondary"
+              onPress={retryImageLoad}
+              accessibilityHint="Attempts to reload the puzzle photograph"
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -1103,7 +1307,14 @@ export function PuzzleBoard({
                   runtime={runtime}
                   visual={visual}
                   engine={engine}
-                  interactive={!completed}
+                  interactive={
+                    !completed &&
+                    isPieceEntranceVisible(
+                      definition.index,
+                      layout.pieces.length,
+                      visibleEntranceBatch,
+                    )
+                  }
                   trayScroll={trayScroll}
                   trayTop={trayMetrics.top}
                   trayLeft={trayMetrics.left}
@@ -1115,6 +1326,7 @@ export function PuzzleBoard({
                   totalPieces={layout.pieces.length}
                   surfaceInset={originX}
                   surfaceInsetY={originY}
+                  hapticsEnabled={hapticsEnabled}
                 />
               );
             })}
@@ -1196,6 +1408,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
     marginTop: 6,
+  },
+  imageRetryAction: {
+    marginTop: 16,
+    alignItems: 'center',
   },
   boardSurface: {
     position: 'absolute',

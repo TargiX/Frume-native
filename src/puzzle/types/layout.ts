@@ -47,6 +47,22 @@ export type PuzzleImageAttribution = {
   sourceUrl: string;
 };
 
+/**
+ * The player's content intent, persisted with the image so follow-up actions
+ * never silently switch from a chosen theme (or a private photo) to an
+ * unrelated network photograph.
+ */
+export type PuzzleImageContentSource =
+  | {
+      kind: 'own';
+    }
+  | {
+      kind: 'unsplash';
+      /** Absent means the player explicitly chose “Surprise me”. */
+      categoryId?: string;
+      categoryLabel?: string;
+    };
+
 export type PuzzleImageSource = {
   /** Local durable URI when offline resume is available, otherwise the source URI. */
   uri: string;
@@ -55,6 +71,8 @@ export type PuzzleImageSource = {
   width: number;
   height: number;
   accessibilityLabel?: string;
+  /** Source/category intent used by retry and next-puzzle flows. */
+  contentSource?: PuzzleImageContentSource;
   /** Credit shown wherever a third-party photograph remains visible. */
   attribution?: PuzzleImageAttribution;
 };

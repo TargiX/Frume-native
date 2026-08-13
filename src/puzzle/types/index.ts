@@ -6,6 +6,7 @@ export type {
   PuzzleCutterId,
   PuzzleGuideMode,
   PuzzleImageAttribution,
+  PuzzleImageContentSource,
   PuzzleImageSource,
   PuzzleLayout,
   PuzzlePieceDefinition,

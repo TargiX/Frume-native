@@ -12,28 +12,60 @@
       {
         "name": "TRACKING_GRANTS",
         "class_name": "TrackingGrant"
+      },
+      {
+        "name": "PROVIDER_BUDGET",
+        "class_name": "ProviderBudget"
       }
     ]
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["CategoryPhotoPool", "TrackingGrant"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["ProviderBudget"]
     }
   ],
+  "vars": {
+    // Provisional ceiling: at most 900 outbound provider requests in a
+    // conservative rolling 60-minute window, preserving a 100-request reserve
+    // below a 1000/hour plan. The API
+    // remains disabled until live Production allowance and alert ownership are
+    // verified; explicitly change this reviewed value to 0 only then.
+    "PROVIDER_REQUESTS_PER_HOUR": "1000",
+    "PROVIDER_RESERVE_PER_HOUR": "100",
+    // Signed grants are all stored in one global broker so caller-controlled
+    // source addresses cannot multiply either issuance or SQLite storage.
+    // Five global grants/minute bounds grant traffic independently of source
+    // addresses. The complete pool + grant write envelope still requires the
+    // Workers Paid attestation below; review capacity before raising this value.
+    "MAX_RETAINED_TRACKING_GRANTS": "10000",
+    "TRACKING_GRANT_ISSUES_PER_MINUTE": "5",
+    // The full category-pool + grant write envelope can exceed the Workers
+    // Free daily SQLite allowance. Keep both this attestation and the API off
+    // until the intended account is verified on Workers Paid.
+    "WORKERS_PAID_PLAN_CONFIRMED": "0",
+    "PHOTO_API_DISABLED": "1"
+  },
   "ratelimits": [
     {
       "name": "PHOTO_ISSUE_RATE_LIMITER",
       // This namespace ID must remain unique within the Cloudflare account.
       "namespace_id": "2026073101",
       "simple": {
-        "limit": 60,
+        "limit": 1,
         "period": 60
       }
     },
     {
       "name": "TRACKING_RATE_LIMITER",
-      // Tracking attempts are keyed by the server-issued UUID grant.
+      // Valid signed grants are limited by both source and grant ID.
       "namespace_id": "2026073102",
       "simple": {
         "limit": 5,
@@ -49,9 +81,11 @@
 
   // Deployment setup:
   //
-  // 1. On the first deploy, upload the rotated API credential atomically with
+  // 1. On the first deploy, upload both the rotated API credential and an
+  //    independent TRACKING_TOKEN_SECRET atomically with
   //    `wrangler deploy --secrets-file`; `secret put` is for an existing Worker.
-  // 2. Confirm both rate-limit namespace IDs are unique in the account.
+  // 2. Confirm Workers Paid is active and both rate-limit namespace IDs are
+  //    unique in the account before changing either fail-closed flag.
   // 3. For a web build, set ALLOWED_ORIGINS to a comma-separated origin list.
   //    Native clients do not send an Origin header.
 }

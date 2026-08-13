@@ -34,7 +34,14 @@ import {
   describePhotoRequestError,
 } from '../utils/photoRequest';
 import { pickOwnPhoto } from '../utils/pickOwnPhoto';
+import { discardManagedOwnPhotoCandidate } from '../utils/ownPhotoLibrary';
 import { CATEGORY_COVERS } from './categoryCovers';
+import {
+  galleryRetryAccessibilityHint,
+  galleryRetryAccessibilityLabel,
+  retryGalleryPhoto,
+  type GalleryPhotoAttempt,
+} from './galleryRetry';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'Gallery'>;
 
@@ -52,7 +59,7 @@ export function GalleryScreen({ navigation }: Props) {
     id: number;
     controller: AbortController;
   } | null>(null);
-  const lastCategoryRef = useRef<string | undefined>(undefined);
+  const lastAttemptRef = useRef<GalleryPhotoAttempt | null>(null);
   const nextRequestIdRef = useRef(0);
   const loading = pending !== null;
   const pendingCategory = PUZZLE_CATEGORIES.find(
@@ -97,7 +104,7 @@ export function GalleryScreen({ navigation }: Props) {
     const requestId = ++nextRequestIdRef.current;
     const controller = new AbortController();
     requestRef.current = { id: requestId, controller };
-    lastCategoryRef.current = categoryId;
+    lastAttemptRef.current = { source: 'remote', categoryId };
     setPending(categoryId ?? 'surprise');
     setError(null);
     try {
@@ -146,10 +153,15 @@ export function GalleryScreen({ navigation }: Props) {
     );
     requestRef.current = null;
     nextRequestIdRef.current += 1;
+    lastAttemptRef.current = { source: 'own' };
+    setPending(null);
     setError(null);
 
     const result = await pickOwnPhoto([sessionImageUri]);
     if (!mountedRef.current) {
+      if (result.status === 'picked') {
+        await discardManagedOwnPhotoCandidate(result.photo.uri);
+      }
       return;
     }
     if (result.status === 'cancelled') {
@@ -165,6 +177,14 @@ export function GalleryScreen({ navigation }: Props) {
       imageWidth: result.photo.width,
       imageHeight: result.photo.height,
       photoDescription: 'Your own photograph',
+      ownPhotoCandidateUri: result.photo.uri,
+    });
+  };
+
+  const retryLastPhoto = () => {
+    retryGalleryPhoto(lastAttemptRef.current, {
+      searchPhoto: (categoryId) => void pickPhoto(categoryId),
+      pickOwnPhoto: () => void useOwnPhoto(),
     });
   };
 
@@ -176,7 +196,7 @@ export function GalleryScreen({ navigation }: Props) {
       <View style={compactLandscape ? styles.landscapeHeader : undefined}>
         <View style={styles.titleGroup}>
           <Text style={styles.title} accessibilityRole="header">
-            Choose a theme
+            Choose a photo theme
           </Text>
           {compactLandscape && error ? (
             <View style={styles.landscapeErrorRow}>
@@ -189,9 +209,11 @@ export function GalleryScreen({ navigation }: Props) {
                 {error}
               </Text>
               <Pressable
-                onPress={() => pickPhoto(lastCategoryRef.current)}
+                onPress={retryLastPhoto}
                 accessibilityRole="button"
-                accessibilityLabel="Try photo search again"
+                accessibilityLabel={galleryRetryAccessibilityLabel(
+                  lastAttemptRef.current,
+                )}
                 hitSlop={12}
               >
                 <Text style={styles.landscapeRetry}>Try again</Text>
@@ -204,7 +226,8 @@ export function GalleryScreen({ navigation }: Props) {
                 compactLandscape && styles.subtitleLandscape,
               ]}
             >
-              Landscapes, cities, animals — no abstract patterns
+              Each theme finds one curated photograph. Use Surprise for a
+              random theme or choose a photo from your library.
             </Text>
           )}
         </View>
@@ -312,8 +335,10 @@ export function GalleryScreen({ navigation }: Props) {
           <Button
             label="Try again"
             variant="secondary"
-            onPress={() => pickPhoto(lastCategoryRef.current)}
-            accessibilityHint="Retries your last photo selection"
+            onPress={retryLastPhoto}
+            accessibilityHint={galleryRetryAccessibilityHint(
+              lastAttemptRef.current,
+            )}
           />
         </View>
       ) : null}
