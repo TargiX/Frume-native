@@ -56,6 +56,7 @@ import type {
   SnapFeedback,
 } from '../types';
 import { BoardSurface } from './BoardSurface';
+import { resolveCameraViewStyle } from './cameraViewStyle';
 import {
   isPieceEntranceVisible,
   PIECE_ENTRANCE_BATCH_COUNT,
@@ -78,6 +79,7 @@ import { PUZZLE_SEAM_DISSOLVE_MS } from './revealMotion';
 import { getPieceOverflowMargin } from './pieceOverflowMargin';
 import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
 import { TrayEdgeHint } from './TrayEdgeHint';
+import { resolveTrayAutoRevealScroll } from './trayAutoReveal';
 import { TraySurface } from './TraySurface';
 import { resolveTraySurfaceFrame } from './traySurfaceFrame';
 import { PUZZLE_SURFACE_COLORS } from './surfacePalette';
@@ -714,13 +716,13 @@ export function PuzzleBoard({
     cameraY,
   ]);
 
-  const cameraStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: cameraX.value },
-      { translateY: cameraY.value },
-      { scale: cameraScale.value },
-    ],
-  }));
+  const cameraStyle = useAnimatedStyle(() =>
+    resolveCameraViewStyle({
+      scale: cameraScale.value,
+      x: cameraX.value,
+      y: cameraY.value,
+    }),
+  );
 
   /**
    * The same view, handed to Skia instead of applied to its output. Scaling the
@@ -755,25 +757,14 @@ export function PuzzleBoard({
   // Keep at least one waiting piece on screen. Without this the last pieces can
   // sit entirely beyond the edge with nothing to say they are there.
   useEffect(() => {
-    if (!trayExtent) {
-      return;
-    }
     const scroll = trayScroll.value;
-    const windowLeading = -scroll;
-    const windowTrailing = windowLeading + trayViewportExtent;
-    const anyVisible =
-      trayExtent.max > windowLeading + 8 &&
-      trayExtent.min < windowTrailing - 8;
-
-    let target = Math.min(maxScroll, Math.max(minScroll, scroll));
-    if (!anyVisible) {
-      // Centre the nearest end of what is left.
-      target =
-        trayExtent.min >= windowTrailing
-          ? -trayExtent.min + 24
-          : trayViewportExtent - trayExtent.max - 24;
-      target = Math.min(maxScroll, Math.max(minScroll, target));
-    }
+    const target = resolveTrayAutoRevealScroll({
+      scroll,
+      extent: trayExtent,
+      viewportExtent: trayViewportExtent,
+      minScroll,
+      maxScroll,
+    });
 
     if (Math.abs(target - scroll) > 0.5) {
       trayScroll.value = reduceMotion
