@@ -63,7 +63,11 @@ expect_reject "IPv6 link-local" "https://[fe80::1]"
 expect_reject "IPv4-mapped IPv6 loopback" "https://[::ffff:127.0.0.1]"
 
 if archive_output=$(
-  FRUME_DEVELOPMENT_TEAM="TESTTEAM" \
+  env \
+    -u FRUME_RELEASE_SOURCE_STAGE \
+    -u FRUME_RELEASE_SOURCE_DIR \
+    -u FRUME_RELEASE_HANDOFF_PATH \
+    FRUME_DEVELOPMENT_TEAM="TESTTEAM" \
     FRUME_BUILD_NUMBER="1" \
     EXPO_PUBLIC_PHOTO_API_URL="http://127.0.0.1:8787" \
     EXPO_PUBLIC_REVENUECAT_IOS_API_KEY="test_public_key" \
