@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 
-type ButtonProps = {
+export type ButtonProps = {
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -20,18 +20,25 @@ type ButtonProps = {
  * every screen look like a settings sheet; `block` is available for the rare
  * case that genuinely wants it.
  */
-export function Button({
-  label,
-  onPress,
-  variant = 'primary',
-  disabled = false,
-  accessibilityHint,
-  block = false,
-  style,
-}: ButtonProps) {
+export const Button = React.forwardRef<
+  React.ElementRef<typeof Pressable>,
+  ButtonProps
+>(function Button(
+  {
+    label,
+    onPress,
+    variant = 'primary',
+    disabled = false,
+    accessibilityHint,
+    block = false,
+    style,
+  },
+  ref,
+) {
   return (
     <View style={block ? styles.blockWrap : styles.inlineWrap}>
       <Pressable
+        ref={ref}
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
@@ -50,7 +57,7 @@ export function Button({
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   inlineWrap: {

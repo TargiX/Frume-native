@@ -54,7 +54,8 @@ const PHOTO_RESPONSE = {
     },
   },
   category: { id: 'nature', label: 'Nature' },
-  tracking_token: '123e4567-e89b-42d3-a456-426614174000',
+  tracking_token:
+    `123e4567-e89b-42d3-a456-426614174000.${'A'.repeat(43)}`,
 };
 
 afterEach(() => {
@@ -222,11 +223,8 @@ describe('fetchPuzzlePhoto', () => {
     expect(networkFetch).not.toHaveBeenCalled();
   });
 
-  it('uses the configured proxy, including a base path and category', async () => {
-    vi.stubEnv(
-      'EXPO_PUBLIC_PHOTO_API_URL',
-      'https://photos.example.test/mobile-api',
-    );
+  it('uses the configured Worker origin with the category route', async () => {
+    vi.stubEnv('EXPO_PUBLIC_PHOTO_API_URL', 'https://photos.example.test');
     const networkFetch = vi.fn().mockResolvedValue(Response.json(PHOTO_RESPONSE));
     vi.stubGlobal('fetch', networkFetch);
     const controller = new AbortController();
@@ -236,9 +234,7 @@ describe('fetchPuzzlePhoto', () => {
     expect(result).toEqual(PHOTO_RESPONSE);
     expect(networkFetch).toHaveBeenCalledTimes(1);
     const [url, init] = networkFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      'https://photos.example.test/mobile-api/photo?category=nature',
-    );
+    expect(url).toBe('https://photos.example.test/photo?category=nature');
     expect(init).toMatchObject({
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -469,6 +465,17 @@ describe('fetchPuzzlePhoto', () => {
       code: 'invalid_configuration',
     });
   });
+
+  it('rejects a proxy path prefix that would miss the exact Worker routes', async () => {
+    vi.stubEnv(
+      'EXPO_PUBLIC_PHOTO_API_URL',
+      'https://photos.example.test/api/',
+    );
+
+    await expect(fetchPuzzlePhoto('nature')).rejects.toMatchObject({
+      code: 'invalid_configuration',
+    });
+  });
 });
 
 describe('trackPhotoUse', () => {
@@ -579,7 +586,7 @@ describe('trackPhotoUse', () => {
     expect(networkFetch).not.toHaveBeenCalled();
   });
 
-  it('can await only the local enqueue while the network send continues', async () => {
+  it('does not report a play-start enqueue as complete until tracking is delivered', async () => {
     vi.stubEnv('EXPO_PUBLIC_PHOTO_API_URL', 'https://photos.example.test');
     let finishRequest!: (response: Response) => void;
     const pendingRequest = new Promise<Response>((resolve) => {
@@ -588,15 +595,23 @@ describe('trackPhotoUse', () => {
     const networkFetch = vi.fn().mockReturnValue(pendingRequest);
     vi.stubGlobal('fetch', networkFetch);
 
-    await expect(
-      enqueuePhotoUse(PHOTO_RESPONSE.photo, PHOTO_RESPONSE.tracking_token),
-    ).resolves.toBeUndefined();
+    let settled = false;
+    const enqueue = enqueuePhotoUse(
+      PHOTO_RESPONSE.photo,
+      PHOTO_RESPONSE.tracking_token,
+    ).finally(() => {
+      settled = true;
+    });
+
+    await vi.waitFor(() => {
+      expect(networkFetch).toHaveBeenCalledTimes(1);
+    });
 
     expect(asyncStorageState.values.size).toBe(1);
-    expect(networkFetch).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
 
     finishRequest(new Response(null, { status: 204 }));
-    await retryPendingPhotoUses();
+    await expect(enqueue).resolves.toBeUndefined();
 
     expect(asyncStorageState.values.size).toBe(0);
     expect(networkFetch).toHaveBeenCalledTimes(1);

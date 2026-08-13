@@ -1,28 +1,22 @@
 import type { PuzzleImageSource } from '../types';
 
-export const MAX_CACHED_PUZZLE_IMAGE_BYTES = 20 * 1024 * 1024;
-
 export type PuzzleImageCacheSlot = 'a' | 'b';
 
-export type CachedPuzzleImageFile = {
-  uri: string;
-  sizeBytes: number;
-};
-
+/**
+ * The adapter now exists only to remove local provider-image copies created by
+ * older Frume builds. New API photographs are always rendered from the exact
+ * `images.unsplash.com` URL returned by Unsplash.
+ */
 export type PuzzleImageFileStore = {
   slotForUri(uri: string): Promise<PuzzleImageCacheSlot | null>;
   exists(uri: string): Promise<boolean>;
-  replaceFromRemote(
-    slot: PuzzleImageCacheSlot,
-    remoteUri: string,
-    maximumBytes: number,
-  ): Promise<CachedPuzzleImageFile>;
   remove(slot: PuzzleImageCacheSlot): Promise<void>;
   clear(): Promise<void>;
 };
 
 export type PuzzleImageCacheResult = {
   image: PuzzleImageSource;
+  /** The source can be resolved after relaunch; provider images need network. */
   durable: boolean;
 };
 
@@ -42,7 +36,7 @@ function isProviderImageUri(uri: string): boolean {
   }
 }
 
-function sourceUri(image: PuzzleImageSource): string | null {
+function providerUri(image: PuzzleImageSource): string | null {
   if (image.remoteUri && isProviderImageUri(image.remoteUri)) {
     return image.remoteUri;
   }
@@ -58,16 +52,16 @@ function isNetworkUri(uri: string): boolean {
   }
 }
 
-function oppositeSlot(
-  current: PuzzleImageCacheSlot | null,
-): PuzzleImageCacheSlot {
-  return current === 'a' ? 'b' : 'a';
+function hotlinkedImage(
+  image: PuzzleImageSource,
+  remoteUri: string,
+): PuzzleImageSource {
+  return { ...image, uri: remoteUri, remoteUri };
 }
 
 /**
- * Keeps at most two fixed image files: the currently persisted puzzle and one
- * replacement candidate. The old file is retained until the new session has
- * reached AsyncStorage, closing the crash window between download and save.
+ * Serializes legacy-cache cleanup with session persistence. There is no
+ * provider-image download path: hotlinking is the storage and display policy.
  */
 export class PuzzleImageCache {
   private operationQueue: Promise<void> = Promise.resolve();
@@ -76,53 +70,16 @@ export class PuzzleImageCache {
 
   cacheForReplacement(
     image: PuzzleImageSource,
-    currentImageUri?: string,
+    _currentImageUri?: string,
   ): Promise<PuzzleImageCacheResult> {
     return this.enqueue(async () => {
-      const existingSlot = await this.store.slotForUri(image.uri);
-      if (existingSlot && (await this.store.exists(image.uri))) {
-        return { image, durable: true };
+      const remoteUri = providerUri(image);
+      if (remoteUri) {
+        return { image: hotlinkedImage(image, remoteUri), durable: true };
       }
 
-      const remoteUri = sourceUri(image);
-      if (!remoteUri) {
-        // Bundled/local sources outside this cache already have their own
-        // lifecycle and do not need to be copied.
-        return { image, durable: !isNetworkUri(image.uri) };
-      }
-
-      const currentSlot = currentImageUri
-        ? await this.store.slotForUri(currentImageUri)
-        : null;
-      const targetSlot = oppositeSlot(currentSlot);
-
-      try {
-        const cached = await this.store.replaceFromRemote(
-          targetSlot,
-          remoteUri,
-          MAX_CACHED_PUZZLE_IMAGE_BYTES,
-        );
-        if (
-          cached.sizeBytes <= 0 ||
-          cached.sizeBytes > MAX_CACHED_PUZZLE_IMAGE_BYTES
-        ) {
-          await this.store.remove(targetSlot);
-          return { image, durable: false };
-        }
-        return {
-          image: {
-            ...image,
-            uri: cached.uri,
-            remoteUri,
-          },
-          durable: true,
-        };
-      } catch {
-        // The remote URI remains playable online; a failed candidate must not
-        // invalidate the previous session's still-durable file.
-        await this.store.remove(targetSlot).catch(() => undefined);
-        return { image, durable: false };
-      }
+      // Player-owned/bundled files have their own explicit ownership policy.
+      return { image, durable: !isNetworkUri(image.uri) };
     });
   }
 
@@ -130,69 +87,21 @@ export class PuzzleImageCache {
     image: PuzzleImageSource,
   ): Promise<PuzzleImageCacheResult> {
     return this.enqueue(async () => {
-      const existingSlot = await this.store.slotForUri(image.uri);
-      if (existingSlot && (await this.store.exists(image.uri))) {
-        return { image, durable: true };
+      const remoteUri = providerUri(image);
+      if (remoteUri) {
+        // A pre-hotlinking save may point at one of the old document slots.
+        // The persisted remoteUri is authoritative, so remove those copies.
+        await this.store.clear().catch(() => undefined);
+        return { image: hotlinkedImage(image, remoteUri), durable: true };
       }
 
-      const remoteUri = sourceUri(image);
-      if (!remoteUri) {
-        return {
-          image,
-          durable:
-            existingSlot === null && !isNetworkUri(image.uri),
-        };
-      }
-
-      const targetSlot = oppositeSlot(existingSlot);
-      try {
-        const cached = await this.store.replaceFromRemote(
-          targetSlot,
-          remoteUri,
-          MAX_CACHED_PUZZLE_IMAGE_BYTES,
-        );
-        if (
-          cached.sizeBytes <= 0 ||
-          cached.sizeBytes > MAX_CACHED_PUZZLE_IMAGE_BYTES
-        ) {
-          await this.store.remove(targetSlot);
-          return {
-            image: { ...image, uri: remoteUri, remoteUri },
-            durable: false,
-          };
-        }
-        return {
-          image: {
-            ...image,
-            uri: cached.uri,
-            remoteUri,
-          },
-          durable: true,
-        };
-      } catch {
-        await this.store.remove(targetSlot).catch(() => undefined);
-        return {
-          image: { ...image, uri: remoteUri, remoteUri },
-          durable: false,
-        };
-      }
+      return { image, durable: !isNetworkUri(image.uri) };
     });
   }
 
-  /**
-   * Called only after the matching session snapshot is durable. This ordering
-   * prevents a failed replacement from deleting the prior puzzle's image.
-   */
-  retainOnly(imageUri: string): Promise<void> {
-    return this.enqueue(async () => {
-      const retainedSlot = await this.store.slotForUri(imageUri);
-      const slots: PuzzleImageCacheSlot[] = ['a', 'b'];
-      await Promise.all(
-        slots
-          .filter((slot) => slot !== retainedSlot)
-          .map((slot) => this.store.remove(slot).catch(() => undefined)),
-      );
-    });
+  /** Removes every legacy provider copy after the matching snapshot commits. */
+  retainOnly(_imageUri: string): Promise<void> {
+    return this.enqueue(() => this.store.clear());
   }
 
   clear(): Promise<void> {
@@ -200,8 +109,8 @@ export class PuzzleImageCache {
   }
 
   /**
-   * Reserves cleanup's place in the cache queue immediately, then waits for
-   * the related durable-state clear. Later replacements cannot overtake it.
+   * Reserves cleanup's place immediately, then waits for durable-state clear.
+   * A later session start cannot overtake it.
    */
   clearAfter(shouldClear: Promise<boolean>): Promise<boolean> {
     return this.enqueue(async () => {

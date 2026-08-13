@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
   AccessibilityInfo,
+  Alert,
   findNodeHandle,
   InteractionManager,
   Linking,
@@ -32,6 +33,7 @@ import type {
   PuzzleCutterId,
 } from '../../../puzzle/types';
 import type { MusicSettingFeedback } from '../../../audio/musicPreference';
+import type { HapticsSettingFeedback } from '../../../haptics';
 import {
   PUZZLE_GUIDE_OPTIONS,
   puzzleGuideLabel,
@@ -39,6 +41,7 @@ import {
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
 import { PUZZLE_MENU_RHYTHM } from './puzzleMenuRhythm';
 import { PUZZLE_MENU_MOTION } from './puzzleMenuPresentation';
+import { puzzleRestartConfirmation } from './puzzleRestartConfirmation';
 
 const CREDIT_LINK_HIT_SLOP = {
   top: 4,
@@ -57,6 +60,9 @@ type PuzzleMenuSheetProps = {
   musicEnabled: boolean;
   musicPreferenceLoaded: boolean;
   musicFeedback: MusicSettingFeedback;
+  hapticsEnabled: boolean;
+  hapticsPreferenceLoaded: boolean;
+  hapticsFeedback: HapticsSettingFeedback;
   persistenceError?: string | null;
   retryingSave?: boolean;
   attribution?: PuzzleImageAttribution;
@@ -65,7 +71,11 @@ type PuzzleMenuSheetProps = {
   onSelectTableAppearance: (appearance: PuzzleTableAppearance) => void;
   onSetMusicEnabled: (enabled: boolean) => void;
   onRetryMusic: () => void;
+  onSetHapticsEnabled: (enabled: boolean) => void;
+  onRetryHaptics: () => void;
   onRetrySave: () => void;
+  onOpenHowToPlay: () => void;
+  onRestartPuzzle: () => void;
   onAssistPiece: () => void;
   onReturnLoosePieces: () => void;
   onExit: () => void;
@@ -164,6 +174,9 @@ export function PuzzleMenuSheet({
   musicEnabled,
   musicPreferenceLoaded,
   musicFeedback,
+  hapticsEnabled,
+  hapticsPreferenceLoaded,
+  hapticsFeedback,
   persistenceError,
   retryingSave = false,
   attribution,
@@ -172,7 +185,11 @@ export function PuzzleMenuSheet({
   onSelectTableAppearance,
   onSetMusicEnabled,
   onRetryMusic,
+  onSetHapticsEnabled,
+  onRetryHaptics,
   onRetrySave,
+  onOpenHowToPlay,
+  onRestartPuzzle,
   onAssistPiece,
   onReturnLoosePieces,
   onExit,
@@ -217,6 +234,18 @@ export function PuzzleMenuSheet({
 
   const openUrl = (url: string) => {
     void Linking.openURL(url).catch(() => undefined);
+  };
+
+  const confirmRestartPuzzle = () => {
+    const copy = puzzleRestartConfirmation(placedCount, totalCount);
+    Alert.alert(copy.title, copy.message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: copy.confirmLabel,
+        style: 'destructive',
+        onPress: onRestartPuzzle,
+      },
+    ]);
   };
 
   React.useEffect(() => {
@@ -496,7 +525,7 @@ export function PuzzleMenuSheet({
             </View>
 
             <View style={styles.menuSection}>
-              <Text style={styles.sectionLabel}>Sound</Text>
+              <Text style={styles.sectionLabel}>Sound &amp; touch</Text>
               <View
                 style={[
                   styles.settingRow,
@@ -584,9 +613,100 @@ export function PuzzleMenuSheet({
                   style={stacksControls ? styles.settingSwitchStacked : undefined}
                 />
               </View>
+
+              <View style={styles.settingDivider} />
+              <View
+                style={[
+                  styles.settingRow,
+                  stacksControls && styles.settingRowStacked,
+                ]}
+              >
+                <View style={styles.settingInfo}>
+                  <View style={styles.actionIcon}>
+                    <Ionicons
+                      name={
+                        hapticsFeedback.kind === 'error'
+                          ? 'alert-circle-outline'
+                          : hapticsEnabled
+                            ? 'pulse-outline'
+                            : 'remove-circle-outline'
+                      }
+                      size={20}
+                      color={
+                        hapticsFeedback.kind === 'error'
+                          ? colors.danger
+                          : colors.textPrimary
+                      }
+                      accessible={false}
+                      importantForAccessibility="no"
+                    />
+                  </View>
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionTitle}>Haptics</Text>
+                    <Text
+                      style={[
+                        styles.actionDetail,
+                        hapticsFeedback.kind === 'error' && styles.settingError,
+                      ]}
+                      accessibilityLiveRegion="polite"
+                    >
+                      {hapticsFeedback.message}
+                    </Text>
+                    {hapticsFeedback.retryAvailable ? (
+                      <Pressable
+                        onPress={onRetryHaptics}
+                        accessibilityRole="button"
+                        accessibilityLabel={hapticsFeedback.retryLabel}
+                        accessibilityHint={
+                          hapticsFeedback.retryLabel === 'Retry loading'
+                            ? 'Attempts to load the saved haptics setting again'
+                            : 'Attempts to save the current haptics setting again'
+                        }
+                        style={({ pressed }) => [
+                          styles.retryMusicButton,
+                          pressed && styles.linkPressed,
+                        ]}
+                      >
+                        <Ionicons
+                          name="refresh-outline"
+                          size={16}
+                          color={colors.textPrimary}
+                          accessible={false}
+                          importantForAccessibility="no"
+                        />
+                        <Text style={styles.retryMusicLabel}>
+                          {hapticsFeedback.retryLabel}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+                <Switch
+                  value={hapticsEnabled}
+                  disabled={!hapticsPreferenceLoaded}
+                  onValueChange={onSetHapticsEnabled}
+                  accessibilityLabel="Haptic feedback"
+                  accessibilityHint={hapticsFeedback.message}
+                  accessibilityValue={{
+                    text: hapticsPreferenceLoaded
+                      ? `${hapticsEnabled ? 'On' : 'Off'}. ${hapticsFeedback.message}`
+                      : hapticsFeedback.message,
+                  }}
+                  trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                  thumbColor={colors.textPrimary}
+                  ios_backgroundColor={colors.surfaceRaised}
+                  style={stacksControls ? styles.settingSwitchStacked : undefined}
+                />
+              </View>
             </View>
 
             <View style={styles.sectionDivider} />
+            <ActionRow
+              icon="help-circle-outline"
+              title="How to Play"
+              detail="Review piece, tray, zoom, and Assist controls"
+              onPress={onOpenHowToPlay}
+            />
             <ActionRow
               icon="sparkles-outline"
               title="Place one piece"
@@ -598,6 +718,13 @@ export function PuzzleMenuSheet({
               title="Return loose pieces"
               detail="Moves every unsolved piece back to the tray"
               onPress={onReturnLoosePieces}
+            />
+            <ActionRow
+              icon="refresh-outline"
+              title="Restart puzzle"
+              detail="Clears this round's placements and elapsed time"
+              onPress={confirmRestartPuzzle}
+              danger
             />
 
             {attribution ? (
@@ -851,6 +978,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     marginTop: PUZZLE_MENU_RHYTHM.detailToControls,
+  },
+  settingDivider: {
+    height: 1,
+    marginTop: spacing.md,
+    marginLeft: 36 + spacing.md,
+    backgroundColor: colors.border,
   },
   settingRowStacked: {
     flexDirection: 'column',

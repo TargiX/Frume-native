@@ -99,8 +99,10 @@ export async function trackPhotoUse(
 }
 
 /**
- * Persists a real use, starts a best-effort background send, and resolves as
- * soon as the local enqueue finishes. This is the play-start integration.
+ * Persists a real use and does not let the transactional play-start boundary
+ * commit until the provider receipt has actually been delivered. A retryable
+ * failure leaves the event durable, but rejects so no resumable curated puzzle
+ * can outlive an unconsumed 24-hour server grant.
  */
 export async function enqueuePhotoUse(
   photo: TrackablePhoto,
@@ -112,7 +114,7 @@ export async function enqueuePhotoUse(
   }
 
   await persistPhotoUse(event);
-  void photoUseQueue.flush().catch(() => undefined);
+  await photoUseQueue.flush();
 }
 
 /** Retry all durable pending uses, normally once during app startup. */

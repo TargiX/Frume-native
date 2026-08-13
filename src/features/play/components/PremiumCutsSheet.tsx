@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  findNodeHandle,
+  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -18,20 +21,30 @@ import {
 import { Button } from '../../../components/Button';
 import {
   completePremiumUnlockOnce,
+  PREMIUM_CUT_CATALOG_COUNT,
+  PREMIUM_CUT_CATALOG_LIST,
   usePremiumAccess,
 } from '../../../premium';
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
 
+type PremiumFocusTargetRef =
+  | React.RefObject<React.ElementRef<typeof Text> | null>
+  | React.RefObject<React.ElementRef<typeof Pressable> | null>;
+
 type PremiumCutsSheetProps = {
   visible: boolean;
   onClose: () => void;
+  onCancelled?: () => void;
   onUnlocked: () => void;
+  returnFocusRef?: React.RefObject<React.ElementRef<typeof Pressable> | null>;
 };
 
 export function PremiumCutsSheet({
   visible,
   onClose,
+  onCancelled,
   onUnlocked,
+  returnFocusRef,
 }: PremiumCutsSheetProps) {
   const insets = useSafeAreaInsets();
   const {
@@ -47,6 +60,13 @@ export function PremiumCutsSheet({
     refresh,
   } = usePremiumAccess();
   const unlockHandled = React.useRef(false);
+  const headingRef = React.useRef<React.ElementRef<typeof Text>>(null);
+  const focusRequestRef = React.useRef(0);
+  const focusInteractionRef = React.useRef<ReturnType<
+    typeof InteractionManager.runAfterInteractions
+  > | null>(null);
+  const presentationVisibleRef = React.useRef(false);
+  const dismissalRef = React.useRef<'cancelled' | 'unlocked'>('cancelled');
   const storeStatus = loading
     ? 'Loading Premium Cuts purchase options…'
     : purchasing
@@ -54,23 +74,96 @@ export function PremiumCutsSheet({
       : error;
   useAccessibilityAnnouncement(visible ? storeStatus : null);
 
+  const focusForScreenReader = React.useCallback(
+    (target: PremiumFocusTargetRef) => {
+      const requestId = ++focusRequestRef.current;
+      focusInteractionRef.current?.cancel();
+      focusInteractionRef.current = InteractionManager.runAfterInteractions(
+        () => {
+          void AccessibilityInfo.isScreenReaderEnabled()
+            .then((screenReaderEnabled) => {
+              if (
+                !screenReaderEnabled ||
+                requestId !== focusRequestRef.current
+              ) {
+                return;
+              }
+              const node = findNodeHandle(target.current);
+              if (node !== null) {
+                AccessibilityInfo.setAccessibilityFocus(node);
+              }
+            })
+            .catch(() => undefined);
+        },
+      );
+    },
+    [],
+  );
+
+  const cancelFocusRequest = React.useCallback(() => {
+    focusRequestRef.current += 1;
+    focusInteractionRef.current?.cancel();
+    focusInteractionRef.current = null;
+  }, []);
+
+  const closeAfterUnlock = React.useCallback(() => {
+    cancelFocusRequest();
+    dismissalRef.current = 'unlocked';
+    onClose();
+  }, [cancelFocusRequest, onClose]);
+
+  const closeWithoutUnlock = React.useCallback(() => {
+    cancelFocusRequest();
+    dismissalRef.current = 'cancelled';
+    onCancelled?.();
+    onClose();
+  }, [cancelFocusRequest, onCancelled, onClose]);
+
   React.useEffect(() => {
     if (!visible) {
+      presentationVisibleRef.current = false;
       unlockHandled.current = false;
+      cancelFocusRequest();
       return;
     }
-    completePremiumUnlockOnce(isPremium, unlockHandled, onUnlocked, onClose);
-  }, [isPremium, onClose, onUnlocked, visible]);
+    if (!presentationVisibleRef.current) {
+      presentationVisibleRef.current = true;
+      dismissalRef.current = 'cancelled';
+    }
+    completePremiumUnlockOnce(
+      isPremium,
+      unlockHandled,
+      onUnlocked,
+      closeAfterUnlock,
+    );
+  }, [cancelFocusRequest, closeAfterUnlock, isPremium, onUnlocked, visible]);
+
+  React.useEffect(
+    () => () => {
+      cancelFocusRequest();
+    },
+    [cancelFocusRequest],
+  );
 
   const purchase = async () => {
     if (await purchasePremiumCuts()) {
-      completePremiumUnlockOnce(true, unlockHandled, onUnlocked, onClose);
+      completePremiumUnlockOnce(
+        true,
+        unlockHandled,
+        onUnlocked,
+        closeAfterUnlock,
+      );
     }
   };
 
   const restore = async () => {
     if (await restorePurchases()) {
-      completePremiumUnlockOnce(true, unlockHandled, onUnlocked, onClose);
+      completePremiumUnlockOnce(
+        true,
+        unlockHandled,
+        onUnlocked,
+        closeAfterUnlock,
+      );
     }
   };
 
@@ -87,14 +180,22 @@ export function PremiumCutsSheet({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={closeWithoutUnlock}
+      onShow={() => focusForScreenReader(headingRef)}
+      onDismiss={() => {
+        const restoreFocus = dismissalRef.current === 'cancelled';
+        dismissalRef.current = 'cancelled';
+        if (restoreFocus && returnFocusRef) {
+          focusForScreenReader(returnFocusRef);
+        }
+      }}
       presentationStyle="overFullScreen"
       statusBarTranslucent
     >
       <View style={styles.overlay}>
         <Pressable
           style={StyleSheet.absoluteFill}
-          onPress={onClose}
+          onPress={closeWithoutUnlock}
           accessible={false}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
@@ -102,7 +203,7 @@ export function PremiumCutsSheet({
         <View
           style={styles.sheet}
           accessibilityViewIsModal
-          onAccessibilityEscape={onClose}
+          onAccessibilityEscape={closeWithoutUnlock}
         >
           <ScrollView
             style={styles.scroll}
@@ -126,7 +227,7 @@ export function PremiumCutsSheet({
                 importantForAccessibility="no-hide-descendants"
               />
               <Pressable
-                onPress={onClose}
+                onPress={closeWithoutUnlock}
                 accessibilityRole="button"
                 accessibilityLabel="Close Premium Cuts"
                 accessibilityHint="Dismisses the Premium Cuts sheet"
@@ -159,13 +260,18 @@ export function PremiumCutsSheet({
               />
             </View>
             <Text style={styles.eyebrow}>Premium Cuts</Text>
-            <Text style={styles.title} accessibilityRole="header">
+            <Text
+              ref={headingRef}
+              style={styles.title}
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel="Premium Cuts. Cuts that feel alive"
+            >
               Cuts that feel alive
             </Text>
             <Text style={styles.body}>
-              Unlock Organic and Living pieces: flowing seams plus branching
-              cells grown by a crystal-like simulation. Every difficulty stays
-              free.
+              Unlock all {PREMIUM_CUT_CATALOG_COUNT} premium cuts:{' '}
+              {PREMIUM_CUT_CATALOG_LIST}. Every puzzle size stays free.
             </Text>
 
             <View style={styles.feature}>
@@ -177,7 +283,7 @@ export function PremiumCutsSheet({
                 importantForAccessibility="no"
               />
               <Text style={styles.featureText}>
-                Both premium cut styles included
+                All {PREMIUM_CUT_CATALOG_COUNT} premium cut styles included
               </Text>
             </View>
             <View style={styles.feature}>
@@ -235,7 +341,7 @@ export function PremiumCutsSheet({
                 <Button
                   label="Not now"
                   variant="ghost"
-                  onPress={onClose}
+                  onPress={closeWithoutUnlock}
                   block
                 />
               </View>
@@ -257,7 +363,7 @@ export function PremiumCutsSheet({
               </Text>
             ) : !purchaseConfigured ? (
               <Text style={styles.notice}>
-                The reviewed permanent purchase is unavailable in this build.
+                Premium Cuts is unavailable in this build.
               </Text>
             ) : null}
             {error ? (
@@ -375,6 +481,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   featureText: {
+    flex: 1,
+    flexShrink: 1,
     color: colors.textPrimary,
     fontSize: 15,
   },

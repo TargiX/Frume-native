@@ -6,6 +6,7 @@ import {
   beginNextPuzzleRequest,
   buildNextPuzzleSessionParams,
   cancelNextPuzzleRequest,
+  createUnsplashContentSource,
   createNextPuzzleRequestState,
   isNextPuzzleRequestCurrent,
   startTrackedNextPuzzle,
@@ -17,6 +18,15 @@ describe('next puzzle session', () => {
       cutterId: 'organic',
       difficulty: '5x5',
       guideMode: 'grid',
+      layout: {
+        image: {
+          contentSource: {
+            kind: 'unsplash',
+            categoryId: 'nature',
+            categoryLabel: 'Nature',
+          },
+        },
+      },
     } as PuzzleSession;
     const result = {
       photo: {
@@ -50,10 +60,58 @@ describe('next puzzle session', () => {
     expect(params.difficulty).toBe('5x5');
     expect(params.guideMode).toBe('grid');
     expect(params.image.uri).toBe(result.photo.urls.regular);
+    expect(params.image.contentSource).toEqual({
+      kind: 'unsplash',
+      categoryId: 'nature',
+      categoryLabel: 'Nature',
+    });
     expect(params.image.attribution?.photographerName).toBe('Ada');
   });
 
-  it('persists required photo use only after the replacement session starts', async () => {
+  it('keeps Surprise as a random intent instead of inventing a fixed category', () => {
+    expect(createUnsplashContentSource(undefined, 'Nature')).toEqual({
+      kind: 'unsplash',
+    });
+
+    const current = {
+      cutterId: 'classic',
+      difficulty: '3x3',
+      layout: {
+        image: {
+          contentSource: { kind: 'unsplash', categoryLabel: 'Nature' },
+        },
+      },
+    } as PuzzleSession;
+    const result = {
+      photo: {
+        id: 'surprise-photo',
+        width: 1600,
+        height: 900,
+        alt_description: null,
+        urls: { regular: 'https://images.unsplash.com/surprise-photo' },
+        user: {
+          name: 'Ada',
+          links: { html: 'https://unsplash.com/@ada' },
+        },
+        links: {
+          download_location:
+            'https://api.unsplash.com/photos/surprise-photo/download',
+        },
+      },
+      category: { id: 'nature', label: 'Nature' },
+      tracking_token: '11111111-1111-4111-8111-111111111111',
+    } as PuzzlePhotoResult;
+
+    expect(
+      buildNextPuzzleSessionParams(current, result, {
+        boardMaxWidth: 700,
+        boardMaxHeight: 420,
+        trayPlacement: 'right',
+      }).image.contentSource,
+    ).toEqual({ kind: 'unsplash' });
+  });
+
+  it('persists required photo use after preparation and before durable commit', async () => {
     const order: string[] = [];
     const replacement = { id: 'replacement' } as never;
     const params = {} as Parameters<typeof startTrackedNextPuzzle>[0];

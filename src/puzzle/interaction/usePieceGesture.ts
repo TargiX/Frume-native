@@ -1,13 +1,14 @@
-import * as Haptics from 'expo-haptics';
 import { useCallback, useMemo } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import {
   runOnJS,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { playPuzzlePlacementHaptic } from '../../haptics';
 import type { PuzzleEngine } from '../engine';
 import { beginPieceDrag, completePieceDrag } from './dragLifecycle';
 import { BOARD_PIECE_ACTIVATION_DISTANCE } from './pieceDragIntent';
@@ -42,6 +43,7 @@ type UsePieceGestureParams = {
   cameraScale: SharedValue<number>;
   positionX: SharedValue<number>;
   positionY: SharedValue<number>;
+  hapticsEnabled: boolean;
 };
 
 export function usePieceGesture({
@@ -63,7 +65,9 @@ export function usePieceGesture({
   cameraScale,
   positionX,
   positionY,
+  hapticsEnabled,
 }: UsePieceGestureParams) {
+  const reduceMotion = useReducedMotion();
   const originX = useSharedValue(0);
   const originY = useSharedValue(0);
   const dragActive = useSharedValue(false);
@@ -86,15 +90,15 @@ export function usePieceGesture({
         },
       );
       if (result?.snapped) {
-        void Haptics.impactAsync(
-          result.connectedWithNeighbor
-            ? Haptics.ImpactFeedbackStyle.Medium
-            : Haptics.ImpactFeedbackStyle.Light,
+        void playPuzzlePlacementHaptic(
+          hapticsEnabled,
+          result.connectedWithNeighbor,
         );
       }
     },
     [
       engine,
+      hapticsEnabled,
       pieceHeight,
       pieceId,
       pieceWidth,
@@ -119,10 +123,12 @@ export function usePieceGesture({
             positionY.value += trayScroll.value;
           }
           trayAttached.value = false;
-          trayFactor.value = withSpring(1, {
-            damping: 40,
-            stiffness: 380,
-          });
+          trayFactor.value = reduceMotion
+            ? 1
+            : withSpring(1, {
+                damping: 40,
+                stiffness: 380,
+              });
         }
         originX.value = positionX.value;
         originY.value = positionY.value;
@@ -146,29 +152,35 @@ export function usePieceGesture({
             axisPosition + pieceExtent / 2 >= trayStart;
           if (inTray && droppedInTray) {
             if (trayPlacement === 'bottom') {
-              positionX.value = withSpring(
-                originX.value - trayScroll.value,
-                { damping: 40, stiffness: 380 },
-              );
-              positionY.value = withSpring(originY.value, {
-                damping: 40,
-                stiffness: 380,
-              });
+              const targetX = originX.value - trayScroll.value;
+              positionX.value = reduceMotion
+                ? targetX
+                : withSpring(targetX, { damping: 40, stiffness: 380 });
+              positionY.value = reduceMotion
+                ? originY.value
+                : withSpring(originY.value, {
+                    damping: 40,
+                    stiffness: 380,
+                  });
             } else {
-              positionX.value = withSpring(originX.value, {
-                damping: 40,
-                stiffness: 380,
-              });
-              positionY.value = withSpring(
-                originY.value - trayScroll.value,
-                { damping: 40, stiffness: 380 },
-              );
+              const targetY = originY.value - trayScroll.value;
+              positionX.value = reduceMotion
+                ? originX.value
+                : withSpring(originX.value, {
+                    damping: 40,
+                    stiffness: 380,
+                  });
+              positionY.value = reduceMotion
+                ? targetY
+                : withSpring(targetY, { damping: 40, stiffness: 380 });
             }
             trayAttached.value = true;
-            trayFactor.value = withSpring(trayScale, {
-              damping: 40,
-              stiffness: 380,
-            });
+            trayFactor.value = reduceMotion
+              ? trayScale
+              : withSpring(trayScale, {
+                  damping: 40,
+                  stiffness: 380,
+                });
           }
           runOnJS(endDrag)(positionX.value, positionY.value);
         }
@@ -240,6 +252,7 @@ export function usePieceGesture({
       originY,
       positionX,
       positionY,
+      reduceMotion,
       trayAttached,
       trayFactor,
       trayLeft,

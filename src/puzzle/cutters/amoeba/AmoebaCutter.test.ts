@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { getCutter } from '../registry';
 import { BiomorphicCutter } from '../biomorphic';
+import { BAKED_CUT_LIBRARY } from '../biomorphic/bakedLibrary.generated';
+import {
+  clearBakedCutLibrary,
+  installBakedCutLibrary,
+} from '../biomorphic/bakedCutSource';
 import { AmoebaCutter } from './AmoebaCutter';
 
 const image = {
@@ -9,6 +14,9 @@ const image = {
   width: 1600,
   height: 1200,
 };
+
+beforeAll(() => installBakedCutLibrary(BAKED_CUT_LIBRARY));
+afterAll(() => clearBakedCutLibrary());
 
 describe('AmoebaCutter', () => {
   it('is registered as its own premium cut style', () => {

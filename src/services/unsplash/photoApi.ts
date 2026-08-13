@@ -116,10 +116,11 @@ export function buildPhotoApiUrl(endpoint: 'photo' | 'track'): string {
     baseUrl.username ||
     baseUrl.password ||
     baseUrl.search ||
-    baseUrl.hash
+    baseUrl.hash ||
+    baseUrl.pathname !== '/'
   ) {
     throw new PhotoApiError(
-      'EXPO_PUBLIC_PHOTO_API_URL must be HTTPS (or local HTTP) without credentials, query, or hash',
+      'EXPO_PUBLIC_PHOTO_API_URL must be an HTTPS Worker origin (or local HTTP origin) without credentials, path, query, or hash',
       'invalid_configuration',
     );
   }

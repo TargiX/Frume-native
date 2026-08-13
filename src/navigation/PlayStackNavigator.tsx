@@ -36,7 +36,11 @@ export function PlayStackNavigator() {
         component={AboutSupportScreen}
         options={{ title: 'About & Support' }}
       />
-      <Stack.Screen name="Gallery" component={GalleryScreen} options={{ title: 'Choose a photo' }} />
+      <Stack.Screen
+        name="Gallery"
+        component={GalleryScreen}
+        options={{ title: 'Choose a photo' }}
+      />
       <Stack.Screen
         name="Difficulty"
         component={DifficultyScreen}

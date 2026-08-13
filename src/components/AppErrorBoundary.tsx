@@ -1,6 +1,7 @@
 import React from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 
+import { clientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { colors, spacing } from '../theme';
 import { Button } from './Button';
 
@@ -28,7 +29,12 @@ export class AppErrorBoundary extends React.Component<
     return { failed: true };
   }
 
-  componentDidCatch(): void {
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    void clientDiagnostics.record({
+      kind: 'render_error',
+      error,
+      componentStack: info.componentStack,
+    });
     AccessibilityInfo.announceForAccessibility(
       'Something went wrong. Your saved puzzle is still safe.',
     );

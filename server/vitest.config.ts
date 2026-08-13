@@ -35,7 +35,11 @@ export default defineConfig({
         // date by one day. Keep production on 2026-07-31 and test its supported
         // predecessor until the package catches up.
         compatibilityDate: '2026-07-30',
-        bindings: { UNSPLASH_ACCESS_KEY: 'server-only-test-key' },
+        bindings: {
+          UNSPLASH_ACCESS_KEY: 'server-only-test-key',
+          TRACKING_TOKEN_SECRET:
+            'server-only-tracking-token-secret-for-tests',
+        },
         async outboundService(request) {
           const url = new URL(request.url);
           if (url.origin !== 'https://api.unsplash.com') {

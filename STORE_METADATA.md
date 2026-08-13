@@ -20,7 +20,9 @@ Use the existing [Frume App Store Connect record](https://appstoreconnect.apple.
   is already used and must not be reused
 - Existing TestFlight build trains: `1.0.0`, `1.0.1`, `1.0.3`, and `1.0.4`;
   build `1` appears under `1.0.0` and `1.0.4`
-- Current source candidate: marketing version `1.0.0`, build `2`; build `2`
+- Invalid uploaded build: `1.0.0 (2)`; its source archive contains a RevenueCat
+  test key and it must never be attached or submitted
+- Current source default: marketing version `1.0.0`, build `3`; build `3`
   still requires an availability check immediately before archive
 
 The live listing still represents the superseded photo-frame product: obsolete
@@ -108,7 +110,7 @@ provided through Unsplash.
 
 **Keywords draft**
 
-jigsaw,puzzle,photo,my photos,relaxing,calm,offline,brain,organic,generative
+jigsaw,puzzle,photo,my photos,relaxing,calm,focus,brain,organic,generative
 
 **Primary category**
 
@@ -128,7 +130,7 @@ production services and the real localized lifetime price. Produce and review
 the required iPhone and iPad device-family sets; do not stretch one family into
 the other.
 
-1. Home — “A quiet place to solve photographs.”
+1. Home — “Photographs, cut differently.”
 2. Theme gallery — the six curated categories.
 3. Setup — photo preview, photographer credit, cut choice, and free difficulty.
 4. Classic game — a partly completed board and organized tray.
@@ -154,23 +156,25 @@ controls.
 
 ## App Store review notes draft
 
-Frume does not require an account. Classic cuts and all three difficulty
-choices are free.
+Frume does not require an account. Classic cuts and every size from 9 to 196
+pieces are free.
 
 To reach the in-app purchase:
 
-1. Open **Choose a puzzle**.
+1. Open **Choose a photograph**.
 2. Select any theme.
-3. On the setup screen, select **Organic** or **Living**.
+3. On the setup screen, select any cut marked **Premium**.
 4. The **Premium Cuts** sheet opens.
 
 The product is a non-consumable lifetime unlock, not a subscription. Its
 RevenueCat entitlement identifier is `premium_cut_styles`. A restore action is
 available on the paywall and in **About & Support**.
 
-Loading a new puzzle photo requires network access. An unfinished puzzle is
-stored locally and can be resumed. Photo attribution links open outside the
-app.
+Loading a curated puzzle photo requires network access. Progress is stored
+locally; a curated Unsplash photograph remains hotlinked and therefore needs a
+connection when it is displayed again. A photograph selected through the
+system picker stays on the device and can resume offline. Photo attribution
+links open outside the app.
 
 Before submitting these notes, add only verified App Review contact information
 and any StoreKit sandbox instructions Apple requires.
@@ -181,8 +185,9 @@ These are pending edits, not saved dashboard state:
 
 - Keep the existing Apple ID, bundle ID, and SKU, but change the editable
   platform version from `1.0` to the exact three-component binary version
-  `1.0.0`. Select the planned `1.0.0 (2)` archive only after confirming build
-  `2` remains unused in that train; never reuse the old build number `1`.
+  `1.0.0`. Never select invalid build `2`; select the planned `1.0.0 (3)`
+  archive only after confirming build `3` remains unused in that train. Never
+  reuse the old build number `1`.
 - Replace the old photo-frame subtitle, description, promotional text,
   keywords, and screenshots with the puzzle copy and sequence above, reviewed
   against the exact TestFlight candidate.
@@ -241,7 +246,7 @@ These are pending edits, not saved dashboard state:
 The unsigned simulator build recorded in
 `release-evidence/2026-07-31-ios-simulator.md` was inspected, installed, and
 launched on the target iPhone and iPad simulators. End-to-end QA covered the
-iPhone Classic flow through completion. Current force-termination QA restored
+iPhone Classic flow through completion. That historical run's force-termination QA restored
 one of nine pieces from its local saved-photo file, closed the active timer, and
 kept the Home timer unchanged after five seconds; maximum Dynamic Type and iPad
 layout were also exercised. The draft workspace currently contains five opaque
@@ -293,10 +298,9 @@ What you can do:
 - Continue your current puzzle after leaving the app
 - Restore a previous Premium Cuts purchase
 
-Organic cuts add irregular, flowing seams. Living cuts replace the regular
-grid with free-form generative cells and variable neighbor patterns. Both are
-available through one optional lifetime purchase — never a subscription.
-Difficulty remains free.
+Premium Cuts adds Organic, Living, Living spectrum, Crystal, Crystal quartered,
+Amoeba, and Amoeba columnar geometry. All seven are available through one
+optional lifetime purchase — never a subscription. Difficulty remains free.
 
 No Frume account is required. Photo attribution is shown in the app for
 photographs provided through Unsplash.

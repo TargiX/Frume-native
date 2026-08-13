@@ -4,17 +4,38 @@ import { DurableObject } from 'cloudflare:workers';
  * Frume photo proxy.
  *
  * Each category is coordinated by its own SQLite-backed Durable Object. Photo
- * download tracking is authorized by a short-lived, server-issued grant in a
- * separate Durable Object so the client can never turn this Worker into an
- * arbitrary Unsplash API relay.
+ * download tracking is authorized by a short-lived, HMAC-authenticated grant
+ * in one globally bounded broker Durable Object so the client can never turn
+ * this Worker into an arbitrary Unsplash API relay or fan out storage by ID.
  */
 
 export type Env = {
   CATEGORY_POOLS: DurableObjectNamespace<CategoryPhotoPool>;
   TRACKING_GRANTS: DurableObjectNamespace<TrackingGrant>;
+  PROVIDER_BUDGET: DurableObjectNamespace<ProviderBudget>;
   PHOTO_ISSUE_RATE_LIMITER: RateLimit;
   TRACKING_RATE_LIMITER: RateLimit;
   UNSPLASH_ACCESS_KEY?: string;
+  /** Independent high-entropy secret used only to authenticate grant tokens. */
+  TRACKING_TOKEN_SECRET?: string;
+  /** Exact integer ceiling shared by every Worker isolate. */
+  PROVIDER_REQUESTS_PER_HOUR?: string;
+  /** Requests held back for manual recovery and provider housekeeping. */
+  PROVIDER_RESERVE_PER_HOUR?: string;
+  /** Invariant ceiling for retained rows in the single global grant DO. */
+  MAX_RETAINED_TRACKING_GRANTS?: string;
+  /** Global issuance ceiling independent of caller-controlled source IPs. */
+  TRACKING_GRANT_ISSUES_PER_MINUTE?: string;
+  /** Explicit production capacity gate; current write envelope requires Paid. */
+  WORKERS_PAID_PLAN_CONFIRMED?: string;
+  /** Emergency fail-closed switch. The only enabled value is exactly `1`. */
+  PHOTO_API_DISABLED?: string;
+  /** Cloudflare-generated identity for the exact code/configuration version. */
+  CF_VERSION_METADATA?: {
+    id: string;
+    tag: string;
+    timestamp: string;
+  };
   /** Comma-separated browser origins. Native clients send no Origin header. */
   ALLOWED_ORIGINS?: string;
 };
@@ -69,6 +90,7 @@ type ErrorBody = {
 
 type SerializedFailure =
   | { kind: 'configuration'; message: string }
+  | { kind: 'provider_capacity'; retryAfterSeconds: number }
   | { kind: 'upstream'; message: string; status?: number };
 
 export type CategoryPhotoResult =
@@ -89,6 +111,14 @@ export type TrackingGrantResult =
   | { kind: 'location_mismatch' }
   | { kind: 'permanent'; upstreamStatus: number }
   | { kind: 'error'; failure: SerializedFailure };
+
+export type ProviderBudgetResult =
+  | { kind: 'reserved'; remaining: number; resetAt: number }
+  | { kind: 'exhausted'; remaining: 0; resetAt: number };
+
+export type TrackingGrantIssueResult =
+  | { kind: 'issued'; retained: number }
+  | { kind: 'exhausted'; retryAfterSeconds: number };
 
 const CATEGORIES = [
   { id: 'nature', label: 'Nature', query: 'landscape mountains forest lake' },
@@ -128,13 +158,20 @@ const POOL_LIMIT = 90;
 const REFILL_LEASE_MS = 30_000;
 const TRACKING_ATTEMPT_LEASE_MS = 30_000;
 const UPSTREAM_TIMEOUT_MS = 15_000;
-const TRACKING_GRANT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const TRACKING_GRANT_RETENTION_MS = 24 * 60 * 60 * 1000;
+const TRACKING_GRANT_TTL_MS = 24 * 60 * 60 * 1000;
+const TRACKING_GRANT_RETENTION_MS = 60 * 60 * 1000;
 const RETRY_AFTER_SECONDS = 2;
 const MAX_TRACK_BODY_BYTES = 4 * 1024;
 const SAFE_PHOTO_ID = /^[A-Za-z0-9_-]{1,128}$/;
-export const TRACKING_TOKEN_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const TRACKING_TOKEN_ID_SOURCE =
+  '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+const TRACKING_TOKEN_ID_PATTERN = new RegExp(`^${TRACKING_TOKEN_ID_SOURCE}$`);
+export const TRACKING_TOKEN_PATTERN = new RegExp(
+  `^(${TRACKING_TOKEN_ID_SOURCE})\\.([A-Za-z0-9_-]{43})$`,
+);
+const TRACKING_TOKEN_CONTEXT = 'frume-tracking-grant-v1:';
+const MIN_TRACKING_TOKEN_SECRET_CHARS = 32;
+const MAX_TRACKING_TOKEN_SECRET_CHARS = 256;
 const IMAGE_HOSTS = new Set(['images.unsplash.com', 'plus.unsplash.com']);
 const DOWNLOAD_HOSTS = new Set(['api.unsplash.com']);
 const PHOTOGRAPHER_HOSTS = new Set(['unsplash.com', 'www.unsplash.com']);
@@ -142,6 +179,43 @@ const MIN_PUZZLE_ASPECT = 9 / 16;
 const MAX_PUZZLE_ASPECT = 16 / 9;
 const MAX_TARGET_ASPECT_FACTOR = 1.25;
 const TARGET_ASPECT_QUERY = /^(?:0|[1-9]\d?)(?:\.\d{1,4})?$/;
+const PROVIDER_BUDGET_OBJECT_NAME = 'global';
+const TRACKING_GRANT_OBJECT_NAME = 'global';
+const DEFAULT_PROVIDER_REQUESTS_PER_HOUR = 1_000;
+const DEFAULT_PROVIDER_RESERVE_PER_HOUR = 100;
+const MAX_PROVIDER_REQUESTS_PER_HOUR = 1_000_000;
+const DEFAULT_MAX_RETAINED_TRACKING_GRANTS = 10_000;
+const DEFAULT_TRACKING_GRANT_ISSUES_PER_MINUTE = 5;
+const MAX_TRACKING_GRANT_CONFIGURATION = 100_000;
+const PHOTO_API_DEPLOYMENT_ID_PATTERN =
+  /^[A-Za-z0-9][A-Za-z0-9._-]{11,127}$/;
+// Include two boundary buckets so a burst across minute boundaries cannot
+// reach the storage backstop before the oldest retained row becomes eligible
+// for cleanup.
+const TRACKING_GRANT_RETENTION_BUCKETS =
+  Math.ceil(
+    (TRACKING_GRANT_TTL_MS + TRACKING_GRANT_RETENTION_MS) / 60_000,
+  ) + 2;
+
+type OperationalEvent =
+  | 'photo_issued'
+  | 'photo_rejected'
+  | 'tracking_consumed'
+  | 'tracking_idempotent'
+  | 'provider_reserved'
+  | 'provider_exhausted'
+  | 'provider_success'
+  | 'provider_failure'
+  | 'api_disabled';
+
+function recordOperationalEvent(
+  event: OperationalEvent,
+  fields: Record<string, string | number | boolean> = {},
+): void {
+  // Fixed event names and scalar counters only: never log request URLs,
+  // tracking tokens, IP addresses, photo identifiers, or exception messages.
+  console.log('frume_worker_event', { event, ...fields });
+}
 
 class ConfigurationError extends Error {}
 
@@ -154,6 +228,12 @@ class UpstreamError extends Error {
   }
 }
 
+class ProviderCapacityError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super('Photo provider capacity is temporarily unavailable');
+  }
+}
+
 class PermanentTrackingError extends Error {
   constructor(readonly upstreamStatus: number) {
     super('Photo use can no longer be registered');
@@ -162,6 +242,93 @@ class PermanentTrackingError extends Error {
 
 class BodyTooLargeError extends Error {}
 class InvalidContentLengthError extends Error {}
+
+function validateTrackingTokenSecret(value: string | undefined): string {
+  if (
+    !value ||
+    value !== value.trim() ||
+    value.length < MIN_TRACKING_TOKEN_SECRET_CHARS ||
+    value.length > MAX_TRACKING_TOKEN_SECRET_CHARS
+  ) {
+    throw new ConfigurationError(
+      'TRACKING_TOKEN_SECRET is not configured securely',
+    );
+  }
+  return value;
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function base64UrlDecode(value: string): Uint8Array | null {
+  try {
+    const padding = '='.repeat((4 - (value.length % 4)) % 4);
+    const decoded = atob(
+      `${value.replace(/-/g, '+').replace(/_/g, '/')}${padding}`,
+    );
+    const bytes = Uint8Array.from(decoded, (character) =>
+      character.charCodeAt(0),
+    );
+    return bytes.length === 32 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+async function trackingTokenKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(validateTrackingTokenSecret(secret)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  );
+}
+
+export async function createTrackingToken(
+  tokenId: string,
+  secret: string,
+): Promise<string> {
+  if (!TRACKING_TOKEN_ID_PATTERN.test(tokenId)) {
+    throw new Error('Invalid tracking token ID');
+  }
+  const payload = new TextEncoder().encode(
+    `${TRACKING_TOKEN_CONTEXT}${tokenId}`,
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign('HMAC', await trackingTokenKey(secret), payload),
+  );
+  return `${tokenId}.${base64UrlEncode(signature)}`;
+}
+
+export async function verifyTrackingToken(
+  token: string,
+  secret: string,
+): Promise<string | null> {
+  const match = TRACKING_TOKEN_PATTERN.exec(token);
+  if (!match) {
+    return null;
+  }
+  const signature = base64UrlDecode(match[2]);
+  if (!signature) {
+    return null;
+  }
+  const payload = new TextEncoder().encode(
+    `${TRACKING_TOKEN_CONTEXT}${match[1]}`,
+  );
+  return (await crypto.subtle.verify(
+    'HMAC',
+    await trackingTokenKey(secret),
+    signature,
+    payload,
+  ))
+    ? match[1]
+    : null;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -377,11 +544,150 @@ function requireAccessKey(env: Env): string {
   return key;
 }
 
+function requireTrackingTokenSecret(env: Env): string {
+  return validateTrackingTokenSecret(env.TRACKING_TOKEN_SECRET);
+}
+
 function requireBinding<T>(binding: T | undefined, name: string): T {
   if (!binding) {
     throw new ConfigurationError(`${name} is not configured`);
   }
   return binding;
+}
+
+function parseBoundedInteger(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+  if (!/^[1-9]\d*$/.test(value.trim())) {
+    throw new ConfigurationError(`${name} must be a positive integer`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > MAX_PROVIDER_REQUESTS_PER_HOUR) {
+    throw new ConfigurationError(`${name} is outside the supported range`);
+  }
+  return parsed;
+}
+
+export function providerBudgetConfiguration(env: Env): {
+  limit: number;
+  reserve: number;
+} {
+  const limit = parseBoundedInteger(
+    env.PROVIDER_REQUESTS_PER_HOUR,
+    DEFAULT_PROVIDER_REQUESTS_PER_HOUR,
+    'PROVIDER_REQUESTS_PER_HOUR',
+  );
+  const reserve = parseBoundedInteger(
+    env.PROVIDER_RESERVE_PER_HOUR,
+    DEFAULT_PROVIDER_RESERVE_PER_HOUR,
+    'PROVIDER_RESERVE_PER_HOUR',
+  );
+  if (reserve >= limit) {
+    throw new ConfigurationError(
+      'PROVIDER_RESERVE_PER_HOUR must be lower than PROVIDER_REQUESTS_PER_HOUR',
+    );
+  }
+  return { limit, reserve };
+}
+
+export function trackingGrantConfiguration(env: Env): {
+  maxRetained: number;
+  maxIssuesPerMinute: number;
+} {
+  const maxRetained = parseBoundedInteger(
+    env.MAX_RETAINED_TRACKING_GRANTS,
+    DEFAULT_MAX_RETAINED_TRACKING_GRANTS,
+    'MAX_RETAINED_TRACKING_GRANTS',
+  );
+  const maxIssuesPerMinute = parseBoundedInteger(
+    env.TRACKING_GRANT_ISSUES_PER_MINUTE,
+    DEFAULT_TRACKING_GRANT_ISSUES_PER_MINUTE,
+    'TRACKING_GRANT_ISSUES_PER_MINUTE',
+  );
+  if (
+    maxRetained > MAX_TRACKING_GRANT_CONFIGURATION ||
+    maxIssuesPerMinute > MAX_TRACKING_GRANT_CONFIGURATION
+  ) {
+    throw new ConfigurationError(
+      'Tracking grant configuration is outside the supported range',
+    );
+  }
+  if (
+    maxRetained <
+    maxIssuesPerMinute * TRACKING_GRANT_RETENTION_BUCKETS
+  ) {
+    throw new ConfigurationError(
+      'MAX_RETAINED_TRACKING_GRANTS cannot safely retain the configured issuance rate',
+    );
+  }
+  return { maxRetained, maxIssuesPerMinute };
+}
+
+export function photoApiDisabled(env: Env): boolean {
+  const configured = env.PHOTO_API_DISABLED?.trim();
+  if (configured === undefined || configured === '' || configured === '1') {
+    return true;
+  }
+  if (configured === '0') {
+    return false;
+  }
+  throw new ConfigurationError('PHOTO_API_DISABLED must be 0 or 1');
+}
+
+function photoApiDeploymentId(env: Env): string {
+  const configured = env.CF_VERSION_METADATA?.id;
+  if (
+    !configured ||
+    configured !== configured.trim() ||
+    !PHOTO_API_DEPLOYMENT_ID_PATTERN.test(configured)
+  ) {
+    throw new ConfigurationError(
+      'CF_VERSION_METADATA is not configured as a valid Worker version identity',
+    );
+  }
+  return configured;
+}
+
+export function workersPaidPlanConfirmed(env: Env): boolean {
+  const configured = env.WORKERS_PAID_PLAN_CONFIRMED?.trim();
+  if (configured === '1') {
+    return true;
+  }
+  if (configured === undefined || configured === '' || configured === '0') {
+    return false;
+  }
+  throw new ConfigurationError(
+    'WORKERS_PAID_PLAN_CONFIRMED must be 0 or 1',
+  );
+}
+
+function photoServiceDisabled(env: Env): boolean {
+  return photoApiDisabled(env) || !workersPaidPlanConfirmed(env);
+}
+
+function providerBudgetStub(env: Env): DurableObjectStub<ProviderBudget> {
+  return requireBinding(env.PROVIDER_BUDGET, 'PROVIDER_BUDGET').getByName(
+    PROVIDER_BUDGET_OBJECT_NAME,
+  );
+}
+
+async function reserveProviderRequest(env: Env): Promise<void> {
+  const { limit, reserve } = providerBudgetConfiguration(env);
+  const result = await providerBudgetStub(env).reserve(limit, reserve);
+  if (result.kind === 'exhausted') {
+    recordOperationalEvent('provider_exhausted', {
+      remaining: result.remaining,
+    });
+    throw new ProviderCapacityError(
+      Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000)),
+    );
+  }
+  recordOperationalEvent('provider_reserved', { remaining: result.remaining });
 }
 
 function reportLowRateLimit(response: Response): void {
@@ -399,6 +705,7 @@ function reportLowRateLimit(response: Response): void {
 
 async function requestUnsplash(url: URL, env: Env): Promise<Response> {
   const accessKey = requireAccessKey(env);
+  await reserveProviderRequest(env);
   let response: Response;
   try {
     response = await fetch(url, {
@@ -412,21 +719,29 @@ async function requestUnsplash(url: URL, env: Env): Promise<Response> {
         'Accept-Version': 'v1',
       },
     });
-  } catch (error) {
-    console.warn('Unsplash request transport failed', { error: String(error) });
+  } catch {
+    recordOperationalEvent('provider_failure', { reason: 'transport' });
     throw new UpstreamError('Unsplash request failed');
   }
 
   reportLowRateLimit(response);
   if (!response.ok) {
+    recordOperationalEvent('provider_failure', { status: response.status });
     throw new UpstreamError('Unsplash returned an error', response.status);
   }
+  recordOperationalEvent('provider_success', { status: response.status });
   return response;
 }
 
 function serializeFailure(error: unknown): SerializedFailure {
   if (error instanceof ConfigurationError) {
     return { kind: 'configuration', message: error.message };
+  }
+  if (error instanceof ProviderCapacityError) {
+    return {
+      kind: 'provider_capacity',
+      retryAfterSeconds: error.retryAfterSeconds,
+    };
   }
   if (error instanceof UpstreamError) {
     return {
@@ -441,6 +756,9 @@ function serializeFailure(error: unknown): SerializedFailure {
 function throwFailure(failure: SerializedFailure): never {
   if (failure.kind === 'configuration') {
     throw new ConfigurationError(failure.message);
+  }
+  if (failure.kind === 'provider_capacity') {
+    throw new ProviderCapacityError(failure.retryAfterSeconds);
   }
   throw new UpstreamError(failure.message, failure.status);
 }
@@ -750,7 +1068,158 @@ export class CategoryPhotoPool extends DurableObject<Env> {
   }
 }
 
+type ProviderBudgetRow = {
+  window_started_at: number;
+  request_count: number;
+  configured_limit: number;
+  configured_reserve: number;
+};
+
+/**
+ * One globally named Durable Object is the final authority for every outbound
+ * provider request, including scheduled refills and download tracking. SQLite
+ * mutation happens before external I/O, so concurrent Worker isolates cannot
+ * overrun the reviewed allowance in any rolling 60-minute period.
+ */
+export class ProviderBudget extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => this.migrate());
+  }
+
+  private migrate(): void {
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS provider_budget_minutes (
+        minute_started_at INTEGER PRIMARY KEY,
+        request_count INTEGER NOT NULL CHECK (request_count > 0)
+      );
+    `);
+    const hasLegacyBudget =
+      this.ctx.storage.sql
+        .exec<{ count: number }>(
+          `SELECT COUNT(*) AS count FROM sqlite_master
+           WHERE type = 'table' AND name = 'provider_budget'`,
+        )
+        .one().count === 1;
+    if (hasLegacyBudget) {
+      const legacyCount = this.ctx.storage.sql
+        .exec<{ request_count: number }>(
+          `SELECT request_count FROM provider_budget WHERE singleton = 1`,
+        )
+        .toArray()[0]?.request_count;
+      if (legacyCount && legacyCount > 0) {
+        const currentMinute = Math.floor(Date.now() / 60_000) * 60_000;
+        // Carry legacy use into the new rolling window conservatively rather
+        // than granting fresh capacity at deployment.
+        this.ctx.storage.sql.exec(
+          `INSERT INTO provider_budget_minutes (
+             minute_started_at, request_count
+           ) VALUES (?, ?)
+           ON CONFLICT(minute_started_at) DO UPDATE SET
+             request_count = request_count + excluded.request_count`,
+          currentMinute,
+          legacyCount,
+        );
+      }
+      this.ctx.storage.sql.exec('DROP TABLE provider_budget');
+    }
+  }
+
+  private rollingUsage(now: number): {
+    minuteStartedAt: number;
+    requestCount: number;
+    resetAt: number;
+  } {
+    const minuteMs = 60_000;
+    const minuteStartedAt = Math.floor(now / minuteMs) * minuteMs;
+    // Keep the boundary minute too. This is conservative by less than one
+    // minute and guarantees a calendar-boundary burst can never exceed the
+    // provider's generic "per hour" contract.
+    const oldestIncludedMinute = minuteStartedAt - 60 * minuteMs;
+    this.ctx.storage.sql.exec(
+      `DELETE FROM provider_budget_minutes WHERE minute_started_at < ?`,
+      oldestIncludedMinute,
+    );
+    const usage = this.ctx.storage.sql
+      .exec<{ request_count: number; earliest_minute: number | null }>(
+        `SELECT COALESCE(SUM(request_count), 0) AS request_count,
+                MIN(minute_started_at) AS earliest_minute
+         FROM provider_budget_minutes`,
+      )
+      .one();
+    return {
+      minuteStartedAt,
+      requestCount: usage.request_count,
+      resetAt:
+        (usage.earliest_minute ?? minuteStartedAt) + 61 * minuteMs,
+    };
+  }
+
+  reserve(
+    limit: number,
+    reserve: number,
+    now = Date.now(),
+  ): ProviderBudgetResult {
+    if (
+      !Number.isSafeInteger(limit) ||
+      !Number.isSafeInteger(reserve) ||
+      !Number.isSafeInteger(now) ||
+      limit <= 0 ||
+      reserve <= 0 ||
+      reserve >= limit ||
+      now < 0
+    ) {
+      throw new Error('Invalid provider budget request');
+    }
+
+    const usage = this.rollingUsage(now);
+    const available = Math.max(0, limit - reserve);
+    if (usage.requestCount >= available) {
+      return {
+        kind: 'exhausted',
+        remaining: 0,
+        resetAt: usage.resetAt,
+      };
+    }
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO provider_budget_minutes (minute_started_at, request_count)
+       VALUES (?, 1)
+       ON CONFLICT(minute_started_at) DO UPDATE SET
+         request_count = request_count + 1`,
+      usage.minuteStartedAt,
+    );
+    return {
+      kind: 'reserved',
+      remaining: available - usage.requestCount - 1,
+      resetAt: usage.resetAt,
+    };
+  }
+
+  status(limit: number, reserve: number, now = Date.now()): ProviderBudgetRow {
+    if (
+      !Number.isSafeInteger(limit) ||
+      !Number.isSafeInteger(reserve) ||
+      !Number.isSafeInteger(now) ||
+      limit <= 0 ||
+      reserve <= 0 ||
+      reserve >= limit ||
+      now < 0
+    ) {
+      throw new Error('Invalid provider budget request');
+    }
+    const usage = this.rollingUsage(now);
+    return {
+      window_started_at: usage.minuteStartedAt - 60 * 60_000,
+      request_count: usage.requestCount,
+      configured_limit: limit,
+      configured_reserve: reserve,
+    };
+  }
+}
+
 type GrantRow = {
+  token_id: string;
   expected_download_location: string;
   expires_at: number;
   status: string;
@@ -771,6 +1240,12 @@ export class TrackingGrant extends DurableObject<Env> {
         applied_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    // Releases before the global broker used one named object per token. Keep
+    // their old schema untouched so their already-scheduled alarms can delete
+    // them; no request in the new protocol opens a caller-selected object.
+    if (this.ctx.id.name !== TRACKING_GRANT_OBJECT_NAME) {
+      return;
+    }
     const version =
       this.ctx.storage.sql
         .exec<{ version: number }>(
@@ -778,10 +1253,10 @@ export class TrackingGrant extends DurableObject<Env> {
         )
         .toArray()[0]?.version ?? 0;
 
-    if (version < 1) {
+    if (version < 2) {
       this.ctx.storage.sql.exec(`
-        CREATE TABLE tracking_grant (
-          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        CREATE TABLE IF NOT EXISTS tracking_grants (
+          token_id TEXT PRIMARY KEY,
           expected_download_location TEXT NOT NULL,
           expires_at INTEGER NOT NULL,
           status TEXT NOT NULL CHECK (status IN ('issued', 'tracking', 'consumed', 'permanent')),
@@ -790,68 +1265,161 @@ export class TrackingGrant extends DurableObject<Env> {
           consumed_at INTEGER,
           permanent_status INTEGER
         );
-        INSERT INTO _sql_schema_migrations (id) VALUES (1);
+        CREATE INDEX IF NOT EXISTS tracking_grants_expires_at
+          ON tracking_grants(expires_at);
+        CREATE TABLE IF NOT EXISTS tracking_grant_issue_window (
+          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+          window_started_at INTEGER NOT NULL,
+          issue_count INTEGER NOT NULL
+        );
+        INSERT OR IGNORE INTO _sql_schema_migrations (id) VALUES (2);
       `);
     }
   }
 
-  async issue(expectedDownloadLocation: string, expiresAt: number): Promise<void> {
+  private cleanup(now: number): void {
+    this.ctx.storage.sql.exec(
+      `DELETE FROM tracking_grants
+       WHERE expires_at <= ?`,
+      now - TRACKING_GRANT_RETENTION_MS,
+    );
+  }
+
+  private async scheduleCleanup(): Promise<void> {
+    const next = this.ctx.storage.sql
+      .exec<{ cleanup_at: number }>(
+        `SELECT MIN(expires_at) + ? AS cleanup_at FROM tracking_grants`,
+        TRACKING_GRANT_RETENTION_MS,
+      )
+      .toArray()[0]?.cleanup_at;
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (
+      Number.isSafeInteger(next) &&
+      (currentAlarm === null || next < currentAlarm)
+    ) {
+      await this.ctx.storage.setAlarm(next);
+    }
+  }
+
+  async issue(
+    tokenId: string,
+    expectedDownloadLocation: string,
+    expiresAt: number,
+    maxRetained: number,
+    maxIssuesPerMinute: number,
+    now = Date.now(),
+  ): Promise<TrackingGrantIssueResult> {
     const normalized = parseDownloadLocation(expectedDownloadLocation)?.toString();
     if (
+      !TRACKING_TOKEN_ID_PATTERN.test(tokenId) ||
       !normalized ||
       !Number.isSafeInteger(expiresAt) ||
-      expiresAt <= Date.now()
+      expiresAt <= now ||
+      !Number.isSafeInteger(now) ||
+      this.ctx.id.name !== TRACKING_GRANT_OBJECT_NAME ||
+      !Number.isSafeInteger(maxRetained) ||
+      !Number.isSafeInteger(maxIssuesPerMinute) ||
+      maxRetained <= 0 ||
+      maxRetained > MAX_TRACKING_GRANT_CONFIGURATION ||
+      maxIssuesPerMinute <= 0 ||
+      maxIssuesPerMinute > MAX_TRACKING_GRANT_CONFIGURATION
     ) {
       throw new Error('Invalid tracking grant');
     }
 
+    this.cleanup(now);
+    const minuteMs = 60_000;
+    const windowStartedAt = Math.floor(now / minuteMs) * minuteMs;
     this.ctx.storage.sql.exec(
-      `INSERT INTO tracking_grant (
-         singleton, expected_download_location, expires_at, status
-       ) VALUES (1, ?, ?, 'issued')
-       ON CONFLICT(singleton) DO NOTHING`,
+      `INSERT INTO tracking_grant_issue_window (
+         singleton, window_started_at, issue_count
+       ) VALUES (1, ?, 0)
+       ON CONFLICT(singleton) DO UPDATE SET
+         window_started_at = excluded.window_started_at,
+         issue_count = 0
+       WHERE tracking_grant_issue_window.window_started_at != excluded.window_started_at`,
+      windowStartedAt,
+    );
+    const window = this.ctx.storage.sql
+      .exec<{ issue_count: number }>(
+        `SELECT issue_count FROM tracking_grant_issue_window
+         WHERE singleton = 1`,
+      )
+      .one();
+    const retainedRows = this.ctx.storage.sql
+      .exec<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM tracking_grants',
+      )
+      .one().count;
+    if (
+      window.issue_count >= maxIssuesPerMinute ||
+      retainedRows >= maxRetained
+    ) {
+      const earliestCleanup = this.ctx.storage.sql
+        .exec<{ cleanup_at: number }>(
+          `SELECT MIN(expires_at) + ? AS cleanup_at FROM tracking_grants`,
+          TRACKING_GRANT_RETENTION_MS,
+        )
+        .toArray()[0]?.cleanup_at;
+      const resetAt =
+        window.issue_count >= maxIssuesPerMinute
+          ? windowStartedAt + minuteMs
+          : earliestCleanup;
+      return {
+        kind: 'exhausted',
+        retryAfterSeconds: Number.isSafeInteger(resetAt)
+          ? Math.max(1, Math.ceil((resetAt - now) / 1_000))
+          : 60,
+      };
+    }
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO tracking_grants (
+         token_id, expected_download_location, expires_at, status
+       ) VALUES (?, ?, ?, 'issued')`,
+      tokenId,
       normalized,
       expiresAt,
     );
-    const stored = this.ctx.storage.sql
-      .exec<{ expected_download_location: string; expires_at: number }>(
-        `SELECT expected_download_location, expires_at
-         FROM tracking_grant
-         WHERE singleton = 1`,
-      )
-      .toArray()[0];
-    if (
-      !stored ||
-      stored.expected_download_location !== normalized ||
-      stored.expires_at !== expiresAt
-    ) {
-      throw new Error('Tracking grant identity mismatch');
-    }
-    await this.ctx.storage.setAlarm(expiresAt + TRACKING_GRANT_RETENTION_MS);
+    this.ctx.storage.sql.exec(
+      `UPDATE tracking_grant_issue_window
+       SET issue_count = issue_count + 1 WHERE singleton = 1`,
+    );
+    await this.scheduleCleanup();
+    return { kind: 'issued', retained: retainedRows + 1 };
   }
 
-  private releaseAttempt(owner: string): void {
+  private releaseAttempt(tokenId: string, owner: string): void {
     this.ctx.storage.sql.exec(
-      `UPDATE tracking_grant
+      `UPDATE tracking_grants
        SET status = 'issued', attempt_owner = NULL, attempt_expires_at = NULL
-       WHERE singleton = 1 AND status = 'tracking' AND attempt_owner = ?`,
+       WHERE token_id = ? AND status = 'tracking' AND attempt_owner = ?`,
+      tokenId,
       owner,
     );
   }
 
-  async consume(downloadLocation: string): Promise<TrackingGrantResult> {
+  async consume(
+    tokenId: string,
+    downloadLocation: string,
+  ): Promise<TrackingGrantResult> {
     const normalized = parseDownloadLocation(downloadLocation)?.toString();
-    if (!normalized) {
+    if (
+      this.ctx.id.name !== TRACKING_GRANT_OBJECT_NAME ||
+      !TRACKING_TOKEN_ID_PATTERN.test(tokenId) ||
+      !normalized
+    ) {
       return { kind: 'location_mismatch' };
     }
 
     const now = Date.now();
     const grant = this.ctx.storage.sql
       .exec<GrantRow>(
-        `SELECT expected_download_location, expires_at, status,
+        `SELECT token_id, expected_download_location, expires_at, status,
                 attempt_expires_at, permanent_status
-         FROM tracking_grant
-         WHERE singleton = 1`,
+         FROM tracking_grants
+         WHERE token_id = ?`,
+        tokenId,
       )
       .toArray()[0];
     if (!grant) {
@@ -879,9 +1447,9 @@ export class TrackingGrant extends DurableObject<Env> {
 
     const owner = crypto.randomUUID();
     const acquired = this.ctx.storage.sql.exec(
-      `UPDATE tracking_grant
+      `UPDATE tracking_grants
        SET status = 'tracking', attempt_owner = ?, attempt_expires_at = ?
-       WHERE singleton = 1
+       WHERE token_id = ?
          AND expires_at > ?
          AND (
            status = 'issued'
@@ -892,6 +1460,7 @@ export class TrackingGrant extends DurableObject<Env> {
          )`,
       owner,
       now + TRACKING_ATTEMPT_LEASE_MS,
+      tokenId,
       now,
       now,
     );
@@ -902,33 +1471,62 @@ export class TrackingGrant extends DurableObject<Env> {
     try {
       await requestUnsplash(new URL(normalized), this.env);
       this.ctx.storage.sql.exec(
-        `UPDATE tracking_grant
+        `UPDATE tracking_grants
          SET status = 'consumed', consumed_at = ?, attempt_owner = NULL,
              attempt_expires_at = NULL
-         WHERE singleton = 1 AND status = 'tracking' AND attempt_owner = ?`,
+         WHERE token_id = ? AND status = 'tracking' AND attempt_owner = ?`,
         Date.now(),
+        tokenId,
         owner,
       );
       return { kind: 'consumed' };
     } catch (error) {
       if (error instanceof UpstreamError && error.status === 404) {
         this.ctx.storage.sql.exec(
-          `UPDATE tracking_grant
+          `UPDATE tracking_grants
            SET status = 'permanent', permanent_status = 404,
                attempt_owner = NULL, attempt_expires_at = NULL
-           WHERE singleton = 1 AND status = 'tracking' AND attempt_owner = ?`,
+           WHERE token_id = ? AND status = 'tracking' AND attempt_owner = ?`,
+          tokenId,
           owner,
         );
         return { kind: 'permanent', upstreamStatus: 404 };
       }
-      this.releaseAttempt(owner);
+      this.releaseAttempt(tokenId, owner);
       return { kind: 'error', failure: serializeFailure(error) };
     }
   }
 
   async alarm(): Promise<void> {
-    // Keep the schema so this live instance remains usable after cleanup.
-    this.ctx.storage.sql.exec('DELETE FROM tracking_grant');
+    if (this.ctx.id.name !== TRACKING_GRANT_OBJECT_NAME) {
+      const hasLegacyTable =
+        this.ctx.storage.sql
+          .exec<{ count: number }>(
+            `SELECT COUNT(*) AS count FROM sqlite_master
+             WHERE type = 'table' AND name = 'tracking_grant'`,
+          )
+          .one().count === 1;
+      if (!hasLegacyTable) {
+        await this.ctx.storage.deleteAll();
+        return;
+      }
+      const legacyGrant = this.ctx.storage.sql
+        .exec<{ expires_at: number }>(
+          `SELECT expires_at FROM tracking_grant WHERE singleton = 1`,
+        )
+        .toArray()[0];
+      const cleanupAt = legacyGrant
+        ? legacyGrant.expires_at + TRACKING_GRANT_RETENTION_MS
+        : 0;
+      if (!legacyGrant || cleanupAt <= Date.now()) {
+        await this.ctx.storage.deleteAll();
+      } else {
+        await this.ctx.storage.setAlarm(cleanupAt);
+      }
+      return;
+    }
+    this.cleanup(Date.now());
+    await this.scheduleCleanup();
   }
 }
 
@@ -1003,6 +1601,7 @@ function parseTargetAspect(
 }
 
 async function handlePhoto(request: Request, env: Env): Promise<Response> {
+  const trackingTokenSecret = requireTrackingTokenSecret(env);
   const searchParams = new URL(request.url).searchParams;
   const requested = searchParams.get('category');
   const requestedOrientation = searchParams.get('orientation');
@@ -1051,6 +1650,7 @@ async function handlePhoto(request: Request, env: Env): Promise<Response> {
   );
   const issueLimit = await issueLimiter.limit({ key: photoRateLimitKey(request) });
   if (!issueLimit.success) {
+    recordOperationalEvent('photo_rejected', { reason: 'source_limit' });
     return json<ErrorBody>(
       { error: 'Too many photo requests' },
       request,
@@ -1078,10 +1678,38 @@ async function handlePhoto(request: Request, env: Env): Promise<Response> {
   }
 
   const grants = requireBinding(env.TRACKING_GRANTS, 'TRACKING_GRANTS');
-  const trackingToken = crypto.randomUUID();
-  await grants
-    .getByName(trackingToken)
-    .issue(result.photo.downloadLocation, Date.now() + TRACKING_GRANT_TTL_MS);
+  const grantConfiguration = trackingGrantConfiguration(env);
+  const trackingTokenId = crypto.randomUUID();
+  const trackingToken = await createTrackingToken(
+    trackingTokenId,
+    trackingTokenSecret,
+  );
+  const grantResult = await grants
+    .getByName(TRACKING_GRANT_OBJECT_NAME)
+    .issue(
+      trackingTokenId,
+      result.photo.downloadLocation,
+      Date.now() + TRACKING_GRANT_TTL_MS,
+      grantConfiguration.maxRetained,
+      grantConfiguration.maxIssuesPerMinute,
+    );
+  if (grantResult.kind === 'exhausted') {
+    recordOperationalEvent('photo_rejected', {
+      reason: 'global_grant_limit',
+    });
+    return json<ErrorBody>(
+      { error: 'Photo service is temporarily at capacity' },
+      request,
+      env,
+      503,
+      { 'Retry-After': String(grantResult.retryAfterSeconds) },
+    );
+  }
+
+  recordOperationalEvent('photo_issued', {
+    category: category.id,
+    source: requested ? 'category' : 'surprise',
+  });
 
   return json(
     {
@@ -1118,11 +1746,20 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
   const location = isRecord(body)
     ? parseDownloadLocation(body.downloadLocation)
     : null;
-  if (
-    typeof trackingToken !== 'string' ||
-    !TRACKING_TOKEN_PATTERN.test(trackingToken) ||
-    !location
-  ) {
+  if (typeof trackingToken !== 'string' || !location) {
+    return json<ErrorBody>(
+      { error: 'Invalid tracking grant or download location' },
+      request,
+      env,
+      400,
+    );
+  }
+
+  const trackingTokenId = await verifyTrackingToken(
+    trackingToken,
+    requireTrackingTokenSecret(env),
+  );
+  if (!trackingTokenId) {
     return json<ErrorBody>(
       { error: 'Invalid tracking grant or download location' },
       request,
@@ -1132,8 +1769,13 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
   }
 
   const limiter = requireBinding(env.TRACKING_RATE_LIMITER, 'TRACKING_RATE_LIMITER');
-  const limit = await limiter.limit({ key: trackingToken });
-  if (!limit.success) {
+  const sourceLimit = await limiter.limit({
+    key: `source:${photoRateLimitKey(request)}`,
+  });
+  const grantLimit = sourceLimit.success
+    ? await limiter.limit({ key: `grant:${trackingTokenId}` })
+    : null;
+  if (!sourceLimit.success || !grantLimit?.success) {
     return json<ErrorBody>(
       { error: 'Too many tracking attempts' },
       request,
@@ -1145,8 +1787,8 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
 
   const grants = requireBinding(env.TRACKING_GRANTS, 'TRACKING_GRANTS');
   const result = await grants
-    .getByName(trackingToken)
-    .consume(location.toString());
+    .getByName(TRACKING_GRANT_OBJECT_NAME)
+    .consume(trackingTokenId, location.toString());
   if (result.kind === 'invalid_or_expired') {
     return json<ErrorBody>(
       { error: 'Tracking grant is invalid or expired' },
@@ -1179,6 +1821,12 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
     throwFailure(result.failure);
   }
 
+  recordOperationalEvent(
+    result.kind === 'already_consumed'
+      ? 'tracking_idempotent'
+      : 'tracking_consumed',
+  );
+
   return new Response(null, {
     status: 204,
     headers: { 'Cache-Control': 'no-store', ...corsHeaders(request, env) },
@@ -1188,6 +1836,15 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
 function errorResponse(error: unknown, request: Request, env: Env): Response {
   if (error instanceof ConfigurationError) {
     return json<ErrorBody>({ error: error.message }, request, env, 503);
+  }
+  if (error instanceof ProviderCapacityError) {
+    return json<ErrorBody>(
+      { error: error.message },
+      request,
+      env,
+      503,
+      { 'Retry-After': String(error.retryAfterSeconds) },
+    );
   }
   if (error instanceof PermanentTrackingError) {
     return json<ErrorBody>(
@@ -1218,13 +1875,51 @@ function methodNotAllowed(request: Request, env: Env, allow: string): Response {
   );
 }
 
-function readiness(env: Env): Record<string, boolean> {
+function readiness(env: Env): {
+  deploymentId: string | null;
+  checks: Record<string, boolean>;
+} {
+  let providerBudgetConfig = false;
+  let trackingGrantConfig = false;
+  let photoApiEnabled = false;
+  let trackingTokenSecret = false;
+  let workersPaidPlan = false;
+  let deploymentId: string | null = null;
+  try {
+    providerBudgetConfiguration(env);
+    providerBudgetConfig = true;
+    trackingGrantConfiguration(env);
+    trackingGrantConfig = true;
+    requireTrackingTokenSecret(env);
+    trackingTokenSecret = true;
+  } catch {
+    // The individual check remains false without exposing configuration input.
+  }
+  try {
+    workersPaidPlan = workersPaidPlanConfirmed(env);
+    photoApiEnabled = !photoApiDisabled(env) && workersPaidPlan;
+  } catch {
+    // Invalid or unconfirmed capacity stays fail-closed.
+  }
+  try {
+    deploymentId = photoApiDeploymentId(env);
+  } catch {
+    // Never echo malformed configuration; readiness exposes only null.
+  }
   return {
-    categoryPools: Boolean(env.CATEGORY_POOLS),
-    trackingGrants: Boolean(env.TRACKING_GRANTS),
-    photoIssueRateLimiter: Boolean(env.PHOTO_ISSUE_RATE_LIMITER),
-    trackingRateLimiter: Boolean(env.TRACKING_RATE_LIMITER),
-    unsplashAccessKey: Boolean(env.UNSPLASH_ACCESS_KEY?.trim()),
+    deploymentId,
+    checks: {
+      categoryPools: Boolean(env.CATEGORY_POOLS),
+      trackingGrants: Boolean(env.TRACKING_GRANTS) && trackingGrantConfig,
+      providerBudget: Boolean(env.PROVIDER_BUDGET) && providerBudgetConfig,
+      photoIssueRateLimiter: Boolean(env.PHOTO_ISSUE_RATE_LIMITER),
+      trackingRateLimiter: Boolean(env.TRACKING_RATE_LIMITER),
+      unsplashAccessKey: Boolean(env.UNSPLASH_ACCESS_KEY?.trim()),
+      trackingTokenSecret,
+      workersPaidPlan,
+      photoApiEnabled,
+      deploymentIdentity: deploymentId !== null,
+    },
   };
 }
 
@@ -1244,21 +1939,41 @@ const worker = {
         if (request.method !== 'GET') {
           return methodNotAllowed(request, env, 'GET, OPTIONS');
         }
-        const checks = readiness(env);
+        const { checks, deploymentId } = readiness(env);
         const ready = Object.values(checks).every(Boolean);
         return json(
-          { status: ready ? 'ok' : 'not_ready', checks },
+          { status: ready ? 'ok' : 'not_ready', deploymentId, checks },
           request,
           env,
           ready ? 200 : 503,
         );
       }
       if (pathname === '/photo') {
+        if (photoServiceDisabled(env)) {
+          recordOperationalEvent('api_disabled', { endpoint: 'photo' });
+          return json<ErrorBody>(
+            { error: 'Photo service is temporarily unavailable' },
+            request,
+            env,
+            503,
+            { 'Retry-After': '300' },
+          );
+        }
         return request.method === 'GET'
           ? await handlePhoto(request, env)
           : methodNotAllowed(request, env, 'GET, OPTIONS');
       }
       if (pathname === '/track') {
+        if (photoServiceDisabled(env)) {
+          recordOperationalEvent('api_disabled', { endpoint: 'track' });
+          return json<ErrorBody>(
+            { error: 'Photo service is temporarily unavailable' },
+            request,
+            env,
+            503,
+            { 'Retry-After': '300' },
+          );
+        }
         return request.method === 'POST'
           ? await handleTrack(request, env)
           : methodNotAllowed(request, env, 'POST, OPTIONS');
@@ -1270,6 +1985,10 @@ const worker = {
   },
 
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    if (photoServiceDisabled(env)) {
+      recordOperationalEvent('api_disabled', { endpoint: 'scheduled' });
+      return;
+    }
     const results = await Promise.all(
       CATEGORIES.map((category) =>
         env.CATEGORY_POOLS
@@ -1279,7 +1998,11 @@ const worker = {
     );
     const failure = results.find((result) => result.kind === 'error');
     if (failure?.kind === 'error') {
-      throw new Error(`Scheduled category refill failed: ${failure.failure.message}`);
+      const reason =
+        failure.failure.kind === 'provider_capacity'
+          ? 'provider capacity exhausted'
+          : failure.failure.message;
+      throw new Error(`Scheduled category refill failed: ${reason}`);
     }
   },
 } satisfies ExportedHandler<Env>;

@@ -3,6 +3,21 @@
 # commit the populated file, or put this value in an EXPO_PUBLIC_* variable.
 UNSPLASH_ACCESS_KEY=
 
+# Generate an independent random value with at least 32 characters. This signs
+# one-time tracking grants and must never be exposed to the app.
+TRACKING_TOKEN_SECRET=
+
 # Optional comma-separated HTTPS origins for browser builds. Native clients do
 # not send an Origin header.
 ALLOWED_ORIGINS=
+
+# Keep local abuse-control behavior explicit. Production values are versioned
+# in wrangler.jsonc and may be overridden deliberately during an incident.
+PROVIDER_REQUESTS_PER_HOUR=1000
+PROVIDER_RESERVE_PER_HOUR=100
+MAX_RETAINED_TRACKING_GRANTS=10000
+TRACKING_GRANT_ISSUES_PER_MINUTE=5
+# Local-only acknowledgement so local requests can run. Production must set 1
+# only after the intended Cloudflare account is actually verified on Paid.
+WORKERS_PAID_PLAN_CONFIRMED=1
+PHOTO_API_DISABLED=0

@@ -3,11 +3,15 @@
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  RELEASE_PAGE_CONTENT_CONTRACTS,
+  releasePageContentFailures,
+} from './release-content-contract.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicRoot = join(root, 'public');
-const pages = ['index.html', 'privacy/index.html'];
-const releaseContact = 'targix8@gmail.com';
+const pageContracts = Object.values(RELEASE_PAGE_CONTENT_CONTRACTS);
+const pages = pageContracts.map(({ file }) => file);
 const failures = [];
 
 function fail(file, message) {
@@ -24,7 +28,8 @@ function internalTarget(href, file) {
   return join(dirname(file), path.replace(/^\//, ''));
 }
 
-for (const file of pages) {
+for (const contract of pageContracts) {
+  const { file } = contract;
   const html = await readFile(join(publicRoot, file), 'utf8');
 
   if (!/^<!doctype html>/i.test(html)) fail(file, 'missing HTML doctype');
@@ -36,8 +41,9 @@ for (const file of pages) {
   if ((html.match(/<h1\b/gi) ?? []).length !== 1) fail(file, 'must contain exactly one h1');
   if (/<script\b/i.test(html)) fail(file, 'page must not load or run scripts');
   if (/\b(?:src|href)="http:\/\//i.test(html)) fail(file, 'contains insecure HTTP resource');
-  if (!html.includes(releaseContact)) fail(file, 'release contact is missing');
-  if (!html.includes('RELEASE_CONTACT:')) fail(file, 'contact replacement marker is missing');
+  for (const contentFailure of releasePageContentFailures(html, contract)) {
+    fail(file, contentFailure);
+  }
 
   for (const match of html.matchAll(/\bhref="([^"]+)"/gi)) {
     const href = match[1];

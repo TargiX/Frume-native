@@ -10,30 +10,43 @@ target is iOS 16.0.
 
 - **Classic is free.** Every Classic difficulty is available without a
   purchase.
-- **Premium Cuts is a one-time lifetime unlock.** Organic and Living are paid
+- **Premium Cuts is a one-time lifetime unlock.** Organic, Living, Living
+  spectrum, Crystal, Crystal quartered, Amoeba, and Amoeba columnar are paid
   cut styles under the same entitlement.
 - **Difficulty is never paywalled.** The paid value is a visibly different
   cutting algorithm, not a comfort setting.
 - **Fractal is not advertised or selectable yet.** The cutter type remains an
   architectural extension point, but unfinished algorithms fail closed instead
   of silently falling back to Classic.
-- Photos are curated by theme. The app displays photographer attribution and
-  records each started Unsplash photo use through the server-side proxy.
+- Photos are curated by theme. The app displays photographer attribution in
+  setup and puzzle options, and records each started Unsplash photo use through
+  the server-side proxy.
 
 ## What is implemented
 
-- Classic 3x3, 4x4, and 5x5 cuts with matching Bezier tabs and slots.
-- Deterministic Organic cuts with irregular, matching amoeba-like seams.
-- Deterministic Living cuts with non-grid Voronoi cells, variable neighbors,
-  and matching shared seams.
+- Classic cuts from 3x3 through 14x14 (9–196 pieces), with matching Bezier
+  tabs and slots.
+- Seven deterministic Premium Cuts: Organic is generated on-device, while the
+  six simulated styles use pre-baked, fail-closed geometry. Missing baked
+  release assets never trigger a synchronous on-device solver.
 - Drag, snap, tray scrolling, guide, completion, haptics, and responsive
-  portrait/landscape layout.
-- Durable local puzzle recovery across backgrounding and app restarts.
+  portrait/landscape layout, plus first-run gesture help and an explicit
+  restart action.
+- Transactional local puzzle recovery across backgrounding and app restarts,
+  a compact last-completion receipt, source-aware Next behavior, and redacted
+  support diagnostics retained only on the device until the player shares
+  them.
 - RevenueCat client integration for purchasing and restoring the
   `premium_cut_styles` entitlement; the store product and dashboard
   configuration remain release gates.
-- Curated photo gallery, attribution, bounded offline use-event retry, and a
-  Cloudflare Worker that keeps the Unsplash credential out of the app.
+- One curated photograph per selected theme, attribution in setup and puzzle
+  options, bounded offline use-event retry, and a Cloudflare Worker that keeps
+  the Unsplash credential out of the app. Provider photographs are hotlinked
+  and therefore need network access after relaunch; the app does not make
+  persistent local copies of them.
+- Own-photo imports remain on device, are downsampled to a bounded decoded
+  pixel budget, excluded from iCloud Backup, and deleted only after durable
+  ownership changes.
 - About, privacy/support entry points, semantic labels, minimum touch targets,
   compact-phone layouts, and generated release icons.
 
@@ -41,12 +54,14 @@ target is iOS 16.0.
 
 The puzzle engine is independent of the UI. Cutters implement the
 `PuzzleCutter` contract and are registered in
-`src/puzzle/cutters/registry.ts`. The shipping registry contains Classic,
-Organic, and Biomorphic (shown to players as Living).
+`src/puzzle/cutters/registry.ts`. The shipping registry contains Classic plus
+Organic, Living, Living spectrum, Crystal, Crystal quartered, Amoeba, and
+Amoeba columnar.
 
-The mobile app never receives an Unsplash access key. `server/` owns photo
-curation, short-lived photo-use grants, and provider tracking. Client-visible
-`EXPO_PUBLIC_*` values are configuration, not secrets.
+The mobile app never receives an Unsplash access key or tracking-token signing
+secret. `server/` owns photo curation, short-lived HMAC-authenticated photo-use
+grants, globally bounded grant storage/issuance, and provider tracking.
+Client-visible `EXPO_PUBLIC_*` values are configuration, not secrets.
 
 ## Local verification
 
@@ -56,6 +71,7 @@ Install both workspaces and run the complete source checks:
 npm ci
 npm --prefix server ci
 npm run check
+npm run security:dependencies
 npm --prefix server run deploy -- --dry-run
 ```
 
@@ -66,8 +82,8 @@ launcher described by the workspace instructions; do not assume a fixed port.
 
 [RELEASE.md](./RELEASE.md) is the release operator runbook and the source of
 truth for external gates such as Cloudflare deployment, Unsplash Production
-approval, RevenueCat products, EAS linking, public privacy/support URLs, native
-purchase QA, and store submission.
+approval, RevenueCat products, the guarded local iOS archive, public
+privacy/support URLs, native purchase QA, and store submission.
 
 [STORE_METADATA.md](./STORE_METADATA.md) contains truthful App Store 1.0
 listing copy, review notes, and the required iPhone/iPad screenshot sequence.

@@ -1,6 +1,7 @@
 export {
   PUZZLE_SESSION_SCHEMA_VERSION,
   PUZZLE_SESSION_STORAGE_KEY,
+  PUZZLE_SESSION_CORRUPTION_STORAGE_KEY,
   PuzzleSessionPersistence,
   deserializePuzzleSession,
   serializePuzzleSession,
@@ -9,18 +10,27 @@ export {
 export type {
   AsyncKeyValueStorage,
   PuzzleSessionLoadResult,
+  PuzzleSessionCorruptionDiagnostic,
+  PuzzleSessionGuardedReplaceResult,
   PuzzleSessionSnapshot,
   RestoredPuzzleSession,
 } from './PuzzleSessionPersistence';
 
-export {
-  MAX_CACHED_PUZZLE_IMAGE_BYTES,
-  PuzzleImageCache,
-} from './PuzzleImageCache';
+export { PuzzleImageCache } from './PuzzleImageCache';
 export type {
-  CachedPuzzleImageFile,
   PuzzleImageCacheResult,
   PuzzleImageCacheSlot,
   PuzzleImageFileStore,
 } from './PuzzleImageCache';
 export { ExpoPuzzleImageFileStore } from './ExpoPuzzleImageFileStore';
+export {
+  PUZZLE_COMPLETION_STORAGE_KEY,
+  PuzzleCompletionPersistence,
+  completionReceiptFromSnapshot,
+  deserializePuzzleCompletionReceipt,
+  serializePuzzleCompletionReceipt,
+} from './PuzzleCompletionPersistence';
+export type {
+  PuzzleCompletionLoadResult,
+  PuzzleCompletionReceipt,
+} from './PuzzleCompletionPersistence';

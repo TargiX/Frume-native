@@ -1,14 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { PuzzleLayout } from '../../types/layout';
 import { getCutter, listCutters } from '../registry';
 import { BiomorphicCutter } from './BiomorphicCutter';
+import { BAKED_CUT_LIBRARY } from './bakedLibrary.generated';
+import { clearBakedCutLibrary, installBakedCutLibrary } from './bakedCutSource';
 
 const image = {
   uri: 'https://images.example/biomorphic-puzzle.jpg?secret=not-persisted',
   width: 1600,
   height: 1200,
 };
+
+beforeAll(() => installBakedCutLibrary(BAKED_CUT_LIBRARY));
+afterAll(() => clearBakedCutLibrary());
 
 function normalizedPathNumbers(layout: PuzzleLayout, pieceIndex: number): number[] {
   const numbers =

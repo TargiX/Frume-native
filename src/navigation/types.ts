@@ -11,6 +11,8 @@ export type PlayStackParamList = {
     photographerName?: string;
     photographerUrl?: string;
     photoDescription?: string;
+    /** Managed file staged by the picker; released if setup is abandoned. */
+    ownPhotoCandidateUri?: string;
     /** The theme the player asked for; absent means "Surprise me". */
     categoryId?: string;
     categoryLabel?: string;

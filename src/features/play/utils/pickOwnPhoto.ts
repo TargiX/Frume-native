@@ -1,6 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
 
-import { pruneOwnPhotos, storeOwnPhoto } from './ownPhotoLibrary';
+import { storeOwnPhoto } from './ownPhotoLibrary';
+import {
+  discardTemporaryOwnPhoto,
+  normalizeOwnPhotoCandidate,
+} from './ownPhotoNormalization';
 import {
   resolveOwnPhotoRejection,
   type OwnPhotoCandidate,
@@ -19,11 +23,12 @@ export type PickOwnPhotoResult =
  * permission prompt to manage. The file is copied into the app's own storage
  * before it is returned, because the picker's copy lives in the cache.
  *
- * `keepUris` are photographs still in use — typically the saved session's —
- * which must survive the cleanup that follows an import.
+ * `_currentlyOwnedUris` remains in the signature for callers that already
+ * supply the saved session. Import is deliberately non-destructive now: the
+ * session owner calls `reconcileOwnPhotoOwnership` only after commit/rollback.
  */
 export async function pickOwnPhoto(
-  keepUris: readonly (string | undefined)[] = [],
+  _currentlyOwnedUris: readonly (string | undefined)[] = [],
 ): Promise<PickOwnPhotoResult> {
   let picked: ImagePicker.ImagePickerResult;
   try {
@@ -59,14 +64,22 @@ export async function pickOwnPhoto(
     return { status: 'rejected', message: rejection };
   }
 
+  let normalized;
   try {
-    const stored = await storeOwnPhoto(candidate.uri);
-    // Only after the new copy exists: a failed import must not delete the
-    // photograph the saved puzzle is still using.
-    await pruneOwnPhotos([...keepUris, stored.uri]).catch(() => undefined);
+    normalized = await normalizeOwnPhotoCandidate(candidate);
+  } catch {
+    return {
+      status: 'rejected',
+      message:
+        'That photograph could not be resized safely. Try a smaller or standard-resolution copy.',
+    };
+  }
+
+  try {
+    const stored = await storeOwnPhoto(normalized.photo.uri);
     return {
       status: 'picked',
-      photo: { ...candidate, uri: stored.uri },
+      photo: { ...normalized.photo, uri: stored.uri },
     };
   } catch (caught) {
     return {
@@ -76,5 +89,7 @@ export async function pickOwnPhoto(
           ? caught.message
           : 'That photograph could not be saved on this device.',
     };
+  } finally {
+    await discardTemporaryOwnPhoto(normalized.temporaryUri);
   }
 }

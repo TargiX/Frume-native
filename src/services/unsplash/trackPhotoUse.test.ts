@@ -39,7 +39,8 @@ describe('sendPhotoUse', () => {
     const request = sendPhotoUse({
       downloadLocation:
         'https://api.unsplash.com/photos/deadline/download?ixid=deadline',
-      trackingToken: '00000000-0000-4000-8000-000000000099',
+      trackingToken:
+        `00000000-0000-4000-8000-000000000099.${'A'.repeat(43)}`,
     });
     const rejection = expect(request).rejects.toMatchObject({
       code: 'request_timeout',

@@ -1,11 +1,12 @@
 import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -17,6 +18,11 @@ import {
 } from '../../../accessibility';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
+import {
+  buildClientDiagnosticsReport,
+  clientDiagnostics,
+  type ClientDiagnostic,
+} from '../../../diagnostics/clientDiagnostics';
 import type { PlayStackParamList } from '../../../navigation/types';
 import { usePremiumAccess } from '../../../premium';
 import {
@@ -99,6 +105,10 @@ export function AboutSupportScreen(_props: Props) {
   } = usePremiumAccess();
   const [linkError, setLinkError] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<ClientDiagnostic[]>([]);
+  const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(
+    null,
+  );
   const privacyLink = useMemo(
     () =>
       parsePublicLink(
@@ -127,6 +137,22 @@ export function AboutSupportScreen(_props: Props) {
       : purchaseError ?? restoreMessage;
   useAccessibilityAnnouncement(isFocused ? linkError : null);
   useAccessibilityAnnouncement(isFocused ? purchaseStatus : null);
+  useAccessibilityAnnouncement(isFocused ? diagnosticsMessage : null);
+
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+    let current = true;
+    void clientDiagnostics.load().then((records) => {
+      if (current) {
+        setDiagnostics(records);
+      }
+    });
+    return () => {
+      current = false;
+    };
+  }, [isFocused]);
 
   const openExternalLink = async (link: PublicLink) => {
     if (link.status !== 'ready') {
@@ -152,6 +178,36 @@ export function AboutSupportScreen(_props: Props) {
     if (restored) {
       setRestoreMessage('Premium Cuts restored.');
     }
+  };
+
+  const shareDiagnostics = async () => {
+    if (diagnostics.length === 0) {
+      setDiagnosticsMessage('There are no saved diagnostics to share.');
+      return;
+    }
+    setDiagnosticsMessage(null);
+    try {
+      await Share.share({
+        message: buildClientDiagnosticsReport(
+          diagnostics,
+          appVersion,
+          nativeBuild,
+        ),
+        title: 'Frume diagnostics',
+      });
+    } catch {
+      setDiagnosticsMessage('Diagnostics could not be shared. Try again.');
+    }
+  };
+
+  const clearDiagnostics = async () => {
+    setDiagnosticsMessage(null);
+    if (!(await clientDiagnostics.clear())) {
+      setDiagnosticsMessage('Diagnostics could not be cleared. Try again.');
+      return;
+    }
+    setDiagnostics([]);
+    setDiagnosticsMessage('Saved diagnostics cleared.');
   };
 
   return (
@@ -205,7 +261,7 @@ export function AboutSupportScreen(_props: Props) {
         </Text>
         <Text style={styles.sectionIntro}>
           Theme covers are credited here. Puzzle photos also include linked
-          photographer credit on setup and during play.
+          photographer credit on setup and in puzzle options.
         </Text>
         <View style={styles.card}>
           {CATEGORY_COVER_CREDITS.map((credit, index) => (
@@ -290,6 +346,53 @@ export function AboutSupportScreen(_props: Props) {
               )}
             >
               {purchaseStatus}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
+          Diagnostics
+        </Text>
+        <View style={styles.card}>
+          <Text style={styles.rowTitle}>
+            {diagnostics.length === 0
+              ? 'No saved incidents'
+              : `${diagnostics.length} saved incident${
+                  diagnostics.length === 1 ? '' : 's'
+                }`}
+          </Text>
+          <Text style={styles.rowDescription}>
+            Frume keeps at most ten redacted JavaScript incident receipts on
+            this device. They contain no photos, URLs, exception messages,
+            names, or device identifiers, and leave the device only when you
+            choose to share them.
+          </Text>
+          <View style={styles.diagnosticActions}>
+            <Button
+              label="Share diagnostics"
+              onPress={() => void shareDiagnostics()}
+              variant="secondary"
+              disabled={diagnostics.length === 0}
+              accessibilityHint="Opens the system share sheet with redacted incident receipts"
+            />
+            <Button
+              label="Clear diagnostics"
+              onPress={() => void clearDiagnostics()}
+              variant="secondary"
+              disabled={diagnostics.length === 0}
+              accessibilityHint="Deletes all saved incident receipts from this device"
+            />
+          </View>
+          {diagnosticsMessage ? (
+            <Text
+              style={styles.purchaseStatus}
+              accessibilityLiveRegion={androidAccessibilityLiveRegion(
+                'polite',
+              )}
+            >
+              {diagnosticsMessage}
             </Text>
           ) : null}
         </View>
@@ -406,6 +509,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   restoreButton: {
+    marginTop: spacing.lg,
+  },
+  diagnosticActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
     marginTop: spacing.lg,
   },
   error: {

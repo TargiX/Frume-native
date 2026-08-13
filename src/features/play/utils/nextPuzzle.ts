@@ -4,6 +4,7 @@ import type {
 } from '../../../puzzle/hooks';
 import type { PuzzleSessionReplacement } from '../../../puzzle/hooks/usePuzzleSession';
 import type { PuzzlePhotoResult } from '../../../services/unsplash';
+import type { PuzzleImageContentSource } from '../../../puzzle/types';
 
 type NextPuzzleLayout = Pick<
   StartPuzzleSessionParams,
@@ -17,6 +18,8 @@ export type NextPuzzleStartResult =
   | 'started'
   | 'start_failed'
   | 'tracking_failed'
+  | 'commit_failed'
+  | 'rollback_failed'
   | 'cancelled';
 
 type NextPuzzleStartDependencies = {
@@ -88,9 +91,10 @@ export function finishNextPuzzleRequest(
 }
 
 /**
- * A new Unsplash use belongs to a session that actually started. Once it has
- * started, failure to durably enqueue that required use rolls the session back
- * instead of leaving untracked resumable play behind.
+ * A new Unsplash use is durably queued before its prepared session can become
+ * resumable. A later commit failure can conservatively over-report an attempted
+ * use, but the reverse state — resumable play with no durable receipt — is
+ * never exposed.
  */
 export async function startTrackedNextPuzzle(
   params: StartPuzzleSessionParams,
@@ -111,29 +115,64 @@ export async function startTrackedNextPuzzle(
     return isRequestCurrent() ? 'start_failed' : 'cancelled';
   }
   if (!isRequestCurrent()) {
-    await rollbackSessionReplacement(replacement).catch(() => false);
-    return 'cancelled';
+    const rolledBack = await rollbackSessionReplacement(replacement).catch(
+      () => false,
+    );
+    return rolledBack ? 'cancelled' : 'rollback_failed';
   }
 
   try {
     await enqueuePhotoUse();
   } catch {
     const failureBelongsToCurrentRequest = isRequestCurrent();
-    await rollbackSessionReplacement(replacement).catch(() => false);
+    const rolledBack = await rollbackSessionReplacement(replacement).catch(
+      () => false,
+    );
+    if (!rolledBack) {
+      return 'rollback_failed';
+    }
     return failureBelongsToCurrentRequest ? 'tracking_failed' : 'cancelled';
   }
 
   if (!isRequestCurrent()) {
-    await rollbackSessionReplacement(replacement).catch(() => false);
-    return 'cancelled';
+    const rolledBack = await rollbackSessionReplacement(replacement).catch(
+      () => false,
+    );
+    return rolledBack ? 'cancelled' : 'rollback_failed';
   }
   if (
     !(await commitSessionReplacement(replacement, isRequestCurrent))
   ) {
-    await rollbackSessionReplacement(replacement).catch(() => false);
-    return 'cancelled';
+    const failureBelongsToCurrentRequest = isRequestCurrent();
+    const rolledBack = await rollbackSessionReplacement(replacement).catch(
+      () => false,
+    );
+    if (!rolledBack) {
+      return 'rollback_failed';
+    }
+    return failureBelongsToCurrentRequest ? 'commit_failed' : 'cancelled';
   }
   return 'started';
+}
+
+/**
+ * A category label is meaningful only beside the category identifier that the
+ * next request can actually repeat. Surprise results deliberately remain a
+ * generic Unsplash intent even though the returned photo has a display theme.
+ */
+export function createUnsplashContentSource(
+  categoryId?: string,
+  categoryLabel?: string,
+): PuzzleImageContentSource {
+  return {
+    kind: 'unsplash',
+    ...(categoryId
+      ? {
+          categoryId,
+          ...(categoryLabel ? { categoryLabel } : {}),
+        }
+      : {}),
+  };
 }
 
 export function buildNextPuzzleSessionParams(
@@ -149,6 +188,13 @@ export function buildNextPuzzleSessionParams(
       height: photo.height,
       accessibilityLabel:
         photo.alt_description ?? `${category.label} puzzle photograph`,
+      contentSource:
+        current.layout.image.contentSource?.kind === 'unsplash'
+          ? createUnsplashContentSource(
+              current.layout.image.contentSource.categoryId,
+              current.layout.image.contentSource.categoryLabel,
+            )
+          : createUnsplashContentSource(),
       attribution: {
         photographerName: photo.user.name,
         photographerUrl: photo.user.links.html,
