@@ -49,6 +49,14 @@ const reviewedRevenueCatStrings = [
 ];
 const repoDirectory = fileURLToPath(new URL('..', import.meta.url));
 
+function archivePreflightEnvironment(overrides) {
+  const env = { ...process.env, ...overrides };
+  delete env.FRUME_RELEASE_SOURCE_STAGE;
+  delete env.FRUME_RELEASE_SOURCE_DIR;
+  delete env.FRUME_RELEASE_HANDOFF_PATH;
+  return env;
+}
+
 function response(status, { body = '', contentType = 'text/html', location } = {}) {
   return {
     status,
@@ -419,8 +427,7 @@ test('archive preflight is wired to reject a RevenueCat test key', () => {
   const result = spawnSync('./scripts/archive-ios-release.sh', {
     cwd: repoDirectory,
     encoding: 'utf8',
-    env: {
-      ...process.env,
+    env: archivePreflightEnvironment({
       FRUME_DEVELOPMENT_TEAM: 'TESTTEAM',
       FRUME_BUILD_NUMBER: '3',
       EXPO_PUBLIC_PHOTO_API_URL: 'https://photos.example.com',
@@ -428,7 +435,7 @@ test('archive preflight is wired to reject a RevenueCat test key', () => {
       EXPO_PUBLIC_REVENUECAT_IOS_PREMIUM_CUTS_PRODUCT_ID: 'frume_premium_cuts',
       EXPO_PUBLIC_PRIVACY_URL: 'https://frume.example/privacy',
       EXPO_PUBLIC_SUPPORT_URL: 'https://frume.example/support',
-    },
+    }),
   });
 
   assert.equal(result.status, 2);
@@ -440,8 +447,7 @@ test('archive fails closed without reviewed source and Worker deployment identit
   const result = spawnSync('./scripts/archive-ios-release.sh', {
     cwd: repoDirectory,
     encoding: 'utf8',
-    env: {
-      ...process.env,
+    env: archivePreflightEnvironment({
       FRUME_DEVELOPMENT_TEAM: 'TESTTEAM',
       FRUME_BUILD_NUMBER: '3',
       EXPO_PUBLIC_PHOTO_API_URL: 'https://photos.example.com',
@@ -451,7 +457,7 @@ test('archive fails closed without reviewed source and Worker deployment identit
       EXPO_PUBLIC_SUPPORT_URL: 'https://frume.example/support',
       FRUME_REVIEWED_RELEASE_SHA: '',
       FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID: '',
-    },
+    }),
   });
 
   assert.equal(result.status, 2);
