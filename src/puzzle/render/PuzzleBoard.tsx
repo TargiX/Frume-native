@@ -61,6 +61,7 @@ import type {
   SnapFeedback,
 } from '../types';
 import { BoardSurface } from './BoardSurface';
+import { resolveBoardLayerClip } from './boardLayerClip';
 import {
   isPieceEntranceVisible,
   PIECE_ENTRANCE_BATCH_COUNT,
@@ -535,6 +536,15 @@ export function PuzzleBoard({
         originY,
       ),
     [originX, originY, surfaceInset, trayMetrics, trayPlacement],
+  );
+  const boardLayerClip = useMemo(
+    () =>
+      resolveBoardLayerClip(
+        { width: workspaceWidth, height: workspaceHeight },
+        traySurfaceFrame,
+        trayPlacement,
+      ),
+    [trayPlacement, traySurfaceFrame, workspaceHeight, workspaceWidth],
   );
   const { visuals, engineSync } = useMemo(() => {
     const nextVisuals = new Map<string, PieceVisualState>();
@@ -1254,7 +1264,10 @@ export function PuzzleBoard({
         <View
           style={[
             styles.boardSurface,
-            { width: workspaceWidth, height: workspaceHeight },
+            {
+              width: boardLayerClip.width,
+              height: boardLayerClip.height,
+            },
           ]}
           pointerEvents="none"
         >
@@ -1267,7 +1280,61 @@ export function PuzzleBoard({
           />
         </View>
 
-        {/* The shelf is viewport UI: board zoom and pan never move it. */}
+        <Canvas
+          style={styles.scene}
+          pointerEvents="none"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={
+            image.accessibilityLabel ?? 'The photograph being assembled'
+          }
+        >
+          <Group clip={boardLayerClip}>
+            <Group transform={sceneTransform}>
+              <Group opacity={piecesOpacity}>
+                {orderedPieces.map((definition) => {
+                  const runtime = pieces[definition.id];
+                  const visual = visuals.get(definition.id);
+                  if (!runtime || !visual) {
+                    return null;
+                  }
+                  return (
+                    <PieceDrawing
+                      key={definition.id}
+                      definition={definition}
+                      runtime={runtime}
+                      visual={visual}
+                      skiaImage={skiaImage}
+                      boardWidth={boardSize.width}
+                      boardHeight={boardSize.height}
+                      showSeams={!completed}
+                      trayScroll={trayScroll}
+                      trayPlacement={trayPlacement}
+                      layer="board"
+                    />
+                  );
+                })}
+              </Group>
+              <Group
+                opacity={fullOpacity}
+                clip={{
+                  x: 0,
+                  y: 0,
+                  width: boardSize.width,
+                  height: boardSize.height,
+                }}
+              >
+                <DrawBoardImage
+                  skiaImage={skiaImage}
+                  boardWidth={boardSize.width}
+                  boardHeight={boardSize.height}
+                />
+              </Group>
+            </Group>
+          </Group>
+        </Canvas>
+
+        {/* The shelf is fixed furniture above the camera-controlled field. */}
         <View
           style={[
             styles.scene,
@@ -1287,15 +1354,8 @@ export function PuzzleBoard({
           </GestureDetector>
         </View>
 
-        <Canvas
-          style={styles.scene}
-          pointerEvents="none"
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={
-            image.accessibilityLabel ?? 'The photograph being assembled'
-          }
-        >
+        {/* Waiting pieces stay above the shelf and outside the board camera. */}
+        <Canvas style={styles.scene} pointerEvents="none">
           <Group transform={[{ translateX: originX }, { translateY: originY }]}>
             <Group opacity={piecesOpacity} clip={tableClip}>
               {orderedPieces.map((definition) => {
@@ -1320,47 +1380,6 @@ export function PuzzleBoard({
                   />
                 );
               })}
-            </Group>
-          </Group>
-          <Group transform={sceneTransform}>
-            <Group opacity={piecesOpacity}>
-              {orderedPieces.map((definition) => {
-                const runtime = pieces[definition.id];
-                const visual = visuals.get(definition.id);
-                if (!runtime || !visual) {
-                  return null;
-                }
-                return (
-                  <PieceDrawing
-                    key={definition.id}
-                    definition={definition}
-                    runtime={runtime}
-                    visual={visual}
-                    skiaImage={skiaImage}
-                    boardWidth={boardSize.width}
-                    boardHeight={boardSize.height}
-                    showSeams={!completed}
-                    trayScroll={trayScroll}
-                    trayPlacement={trayPlacement}
-                    layer="board"
-                  />
-                );
-              })}
-            </Group>
-            <Group
-              opacity={fullOpacity}
-              clip={{
-                x: 0,
-                y: 0,
-                width: boardSize.width,
-                height: boardSize.height,
-              }}
-            >
-              <DrawBoardImage
-                skiaImage={skiaImage}
-                boardWidth={boardSize.width}
-                boardHeight={boardSize.height}
-              />
             </Group>
           </Group>
         </Canvas>
@@ -1498,6 +1517,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+    overflow: 'hidden',
   },
   tray: {
     position: 'absolute',
