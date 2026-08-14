@@ -47,6 +47,11 @@ import {
   zoomAround,
   type BoardCameraBounds,
 } from '../interaction/boardCamera';
+import {
+  boardPointToViewport,
+  piecePointToViewport,
+  viewportPointToBoard,
+} from '../interaction/pieceCoordinateSpace';
 import type {
   PieceRuntimeState,
   PuzzleGuideMode,
@@ -56,7 +61,6 @@ import type {
   SnapFeedback,
 } from '../types';
 import { BoardSurface } from './BoardSurface';
-import { resolveCameraViewStyle } from './cameraViewStyle';
 import {
   isPieceEntranceVisible,
   PIECE_ENTRANCE_BATCH_COUNT,
@@ -123,6 +127,7 @@ type PieceDrawingProps = {
   showSeams: boolean;
   trayScroll: SharedValue<number>;
   trayPlacement: 'bottom' | 'right';
+  layer: 'board' | 'tray';
 };
 
 function PieceDrawing({
@@ -135,6 +140,7 @@ function PieceDrawing({
   showSeams,
   trayScroll,
   trayPlacement,
+  layer,
 }: PieceDrawingProps) {
   const piecePath = useMemo(
     () => Skia.Path.MakeFromSVGString(definition.path),
@@ -176,6 +182,11 @@ function PieceDrawing({
         (runtime.locked ? 1 : visual.trayFactor.value),
     },
   ]);
+  const layerOpacity = useDerivedValue(() =>
+    visual.trayAttached.value === (layer === 'tray')
+      ? visual.opacity.value
+      : 0,
+  );
   const center = {
     x: definition.bounds.x + definition.bounds.width / 2,
     y: definition.bounds.y + definition.bounds.height / 2,
@@ -186,7 +197,7 @@ function PieceDrawing({
   }
 
   return (
-    <Group opacity={visual.opacity} transform={positionTransform}>
+    <Group opacity={layerOpacity} transform={positionTransform}>
       <Group origin={center} transform={pieceTransform}>
         {!runtime.locked ? (
           <Path
@@ -244,6 +255,8 @@ type PieceGestureOverlayProps = {
   trayPlacement: 'bottom' | 'right';
   trayScale: number;
   cameraScale: SharedValue<number>;
+  cameraX: SharedValue<number>;
+  cameraY: SharedValue<number>;
   minTrayScroll: number;
   maxTrayScroll: number;
   totalPieces: number;
@@ -264,6 +277,8 @@ function PieceGestureOverlay({
   trayPlacement,
   trayScale,
   cameraScale,
+  cameraX,
+  cameraY,
   minTrayScroll,
   maxTrayScroll,
   totalPieces,
@@ -299,26 +314,44 @@ function PieceGestureOverlay({
     trayFactor: visual.trayFactor,
     trayScale,
     cameraScale,
+    cameraX,
+    cameraY,
+    surfaceOriginX: surfaceInset,
+    surfaceOriginY: surfaceInsetY,
     positionX: visual.x,
     positionY: visual.y,
     hapticsEnabled,
   });
-  const animatedStyle = useAnimatedStyle(() => ({
-    left:
-      visual.x.value +
-      (visual.trayAttached.value && trayPlacement === 'bottom'
-        ? trayScroll.value
-        : 0) +
-      hitOffsetX + surfaceInset,
-    top:
-      visual.y.value +
-      (visual.trayAttached.value && trayPlacement === 'right'
-        ? trayScroll.value
-        : 0) +
-      hitOffsetY + surfaceInsetY,
-    opacity: visual.opacity.value,
-    transform: [{ rotate: `${visual.rotation.value}deg` }],
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    const attached = visual.trayAttached.value;
+    const scale = attached ? 1 : cameraScale.value;
+    const center = piecePointToViewport({
+      point: {
+        x: visual.x.value + hitOffsetX + hitWidth / 2,
+        y: visual.y.value + hitOffsetY + hitHeight / 2,
+      },
+      trayAttached: attached,
+      trayOffset: {
+        x: attached && trayPlacement === 'bottom' ? trayScroll.value : 0,
+        y: attached && trayPlacement === 'right' ? trayScroll.value : 0,
+      },
+      camera: {
+        scale: cameraScale.value,
+        x: cameraX.value,
+        y: cameraY.value,
+      },
+      surfaceOrigin: { x: surfaceInset, y: surfaceInsetY },
+    });
+    return {
+      left: center.x - hitWidth / 2,
+      top: center.y - hitHeight / 2,
+      opacity: visual.opacity.value,
+      transform: [
+        { scale },
+        { rotate: `${visual.rotation.value}deg` },
+      ],
+    };
+  });
   const placeWithAssistiveTechnology = useCallback(() => {
     if (!interactive) {
       return;
@@ -716,14 +749,6 @@ export function PuzzleBoard({
     cameraY,
   ]);
 
-  const cameraStyle = useAnimatedStyle(() =>
-    resolveCameraViewStyle({
-      scale: cameraScale.value,
-      x: cameraX.value,
-      y: cameraY.value,
-    }),
-  );
-
   /**
    * The same view, handed to Skia instead of applied to its output. Scaling the
    * canvas as a view magnifies the pixels it already drew, which thickens every
@@ -744,15 +769,14 @@ export function PuzzleBoard({
       gesture.activeOffsetY([-6, 6]).failOffsetX([-12, 12]);
     }
     return gesture.onChange((event) => {
-      const scale = cameraScale.value || 1;
       const change =
-        (trayPlacement === 'bottom' ? event.changeX : event.changeY) / scale;
+        trayPlacement === 'bottom' ? event.changeX : event.changeY;
       trayScroll.value = Math.min(
         maxScroll,
         Math.max(minScroll, trayScroll.value + change),
       );
     });
-  }, [cameraScale, maxScroll, minScroll, trayPlacement, trayScroll]);
+  }, [maxScroll, minScroll, trayPlacement, trayScroll]);
 
   // Keep at least one waiting piece on screen. Without this the last pieces can
   // sit entirely beyond the edge with nothing to say they are there.
@@ -941,26 +965,37 @@ export function PuzzleBoard({
           });
         synced.inTray = runtime.inTray;
         if (runtime.inTray) {
-          // Change from surface coordinates to tray-content coordinates
-          // without changing the drawn position, then animate home inside the
-          // scrollable content space.
-          const visibleX =
-            visual.x.value +
-            (visual.trayAttached.value && trayPlacement === 'bottom'
-              ? trayScroll.value
-              : 0);
-          const visibleY =
-            visual.y.value +
-            (visual.trayAttached.value && trayPlacement === 'right'
-              ? trayScroll.value
-              : 0);
+          // Change from the camera-controlled board into the fixed tray
+          // coordinate space without moving on screen.
+          const viewportPoint = visual.trayAttached.value
+            ? {
+                x:
+                  originX +
+                  visual.x.value +
+                  (trayPlacement === 'bottom' ? trayScroll.value : 0),
+                y:
+                  originY +
+                  visual.y.value +
+                  (trayPlacement === 'right' ? trayScroll.value : 0),
+              }
+            : boardPointToViewport(
+                { x: visual.x.value, y: visual.y.value },
+                {
+                  scale: cameraScale.value,
+                  x: cameraX.value,
+                  y: cameraY.value,
+                },
+                { x: originX, y: originY },
+              );
           cancelAnimation(visual.x);
           cancelAnimation(visual.y);
           visual.x.value =
-            visibleX -
+            viewportPoint.x -
+            originX -
             (trayPlacement === 'bottom' ? trayScroll.value : 0);
           visual.y.value =
-            visibleY -
+            viewportPoint.y -
+            originY -
             (trayPlacement === 'right' ? trayScroll.value : 0);
           visual.trayAttached.value = true;
           synced.x = runtime.position.x;
@@ -978,9 +1013,32 @@ export function PuzzleBoard({
                 stiffness: 380,
               });
         } else {
-          // A gesture worklet has already folded tray scroll into the visual
-          // position. Assist has no gesture, so it still needs a visible move
-          // from the tray slot to the newly locked engine coordinates.
+          // Assist has no lifting gesture, so convert its fixed tray point to
+          // board coordinates before switching layers and animating home.
+          if (visual.trayAttached.value) {
+            const boardPoint = viewportPointToBoard(
+              {
+                x:
+                  originX +
+                  visual.x.value +
+                  (trayPlacement === 'bottom' ? trayScroll.value : 0),
+                y:
+                  originY +
+                  visual.y.value +
+                  (trayPlacement === 'right' ? trayScroll.value : 0),
+              },
+              {
+                scale: cameraScale.value,
+                x: cameraX.value,
+                y: cameraY.value,
+              },
+              { x: originX, y: originY },
+            );
+            cancelAnimation(visual.x);
+            cancelAnimation(visual.y);
+            visual.x.value = boardPoint.x;
+            visual.y.value = boardPoint.y;
+          }
           visual.trayAttached.value = false;
           synced.x = runtime.position.x;
           synced.y = runtime.position.y;
@@ -1040,8 +1098,13 @@ export function PuzzleBoard({
     });
   }, [
     engineSync,
+    cameraScale,
+    cameraX,
+    cameraY,
     layout.pieces,
     pieces,
+    originX,
+    originY,
     reduceMotion,
     trayMetrics.scale,
     trayPlacement,
@@ -1204,12 +1267,11 @@ export function PuzzleBoard({
           />
         </View>
 
-        {/* Behind the pieces: drag anywhere on the strip to scroll the tray. */}
-        <Animated.View
+        {/* The shelf is viewport UI: board zoom and pan never move it. */}
+        <View
           style={[
             styles.scene,
             { width: workspaceWidth, height: workspaceHeight },
-            cameraStyle,
           ]}
           pointerEvents="box-none"
         >
@@ -1223,7 +1285,7 @@ export function PuzzleBoard({
               />
             </View>
           </GestureDetector>
-        </Animated.View>
+        </View>
 
         <Canvas
           style={styles.scene}
@@ -1234,7 +1296,7 @@ export function PuzzleBoard({
             image.accessibilityLabel ?? 'The photograph being assembled'
           }
         >
-          <Group transform={sceneTransform}>
+          <Group transform={[{ translateX: originX }, { translateY: originY }]}>
             <Group opacity={piecesOpacity} clip={tableClip}>
               {orderedPieces.map((definition) => {
                 const runtime = pieces[definition.id];
@@ -1254,6 +1316,33 @@ export function PuzzleBoard({
                     showSeams={!completed}
                     trayScroll={trayScroll}
                     trayPlacement={trayPlacement}
+                    layer="tray"
+                  />
+                );
+              })}
+            </Group>
+          </Group>
+          <Group transform={sceneTransform}>
+            <Group opacity={piecesOpacity}>
+              {orderedPieces.map((definition) => {
+                const runtime = pieces[definition.id];
+                const visual = visuals.get(definition.id);
+                if (!runtime || !visual) {
+                  return null;
+                }
+                return (
+                  <PieceDrawing
+                    key={definition.id}
+                    definition={definition}
+                    runtime={runtime}
+                    visual={visual}
+                    skiaImage={skiaImage}
+                    boardWidth={boardSize.width}
+                    boardHeight={boardSize.height}
+                    showSeams={!completed}
+                    trayScroll={trayScroll}
+                    trayPlacement={trayPlacement}
+                    layer="board"
                   />
                 );
               })}
@@ -1276,11 +1365,10 @@ export function PuzzleBoard({
           </Group>
         </Canvas>
 
-        <Animated.View
+        <View
           style={[
             styles.scene,
             { width: workspaceWidth, height: workspaceHeight },
-            cameraStyle,
           ]}
           pointerEvents="box-none"
         >
@@ -1312,6 +1400,8 @@ export function PuzzleBoard({
                   trayPlacement={trayPlacement}
                   trayScale={trayMetrics.scale}
                   cameraScale={cameraScale}
+                  cameraX={cameraX}
+                  cameraY={cameraY}
                   minTrayScroll={minScroll}
                   maxTrayScroll={maxScroll}
                   totalPieces={layout.pieces.length}
@@ -1361,7 +1451,7 @@ export function PuzzleBoard({
               />
             </View>
           ) : null}
-        </Animated.View>
+        </View>
       </View>
     </GestureDetector>
   );
