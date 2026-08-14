@@ -11,6 +11,10 @@ import {
 import { playPuzzlePlacementHaptic } from '../../haptics';
 import type { PuzzleEngine } from '../engine';
 import { beginPieceDrag, completePieceDrag } from './dragLifecycle';
+import {
+  boardPointToViewport,
+  viewportPointToBoard,
+} from './pieceCoordinateSpace';
 import { BOARD_PIECE_ACTIVATION_DISTANCE } from './pieceDragIntent';
 
 const INTENT_ACTIVATION_DISTANCE = 6;
@@ -41,6 +45,10 @@ type UsePieceGestureParams = {
    * finger travelled to stay underneath it.
    */
   cameraScale: SharedValue<number>;
+  cameraX: SharedValue<number>;
+  cameraY: SharedValue<number>;
+  surfaceOriginX: number;
+  surfaceOriginY: number;
   positionX: SharedValue<number>;
   positionY: SharedValue<number>;
   hapticsEnabled: boolean;
@@ -63,6 +71,10 @@ export function usePieceGesture({
   trayFactor,
   trayScale,
   cameraScale,
+  cameraX,
+  cameraY,
+  surfaceOriginX,
+  surfaceOriginY,
   positionX,
   positionY,
   hapticsEnabled,
@@ -70,6 +82,8 @@ export function usePieceGesture({
   const reduceMotion = useReducedMotion();
   const originX = useSharedValue(0);
   const originY = useSharedValue(0);
+  const fixedOriginX = useSharedValue(0);
+  const fixedOriginY = useSharedValue(0);
   const dragActive = useSharedValue(false);
 
   const beginDrag = useCallback(() => {
@@ -115,13 +129,30 @@ export function usePieceGesture({
         dragActive.value = true;
         // A tray piece is drawn at its slot plus the tray's scroll. Fold the
         // scroll into its position and detach both shared values in the same
-        // UI-thread event, so the piece never draws with the offset twice.
+        // UI-thread event. The tray is fixed in viewport space, so convert the
+        // visible point through the inverse board camera before switching the
+        // drawing to the zoomed board layer.
         if (inTray) {
-          if (trayPlacement === 'bottom') {
-            positionX.value += trayScroll.value;
-          } else {
-            positionY.value += trayScroll.value;
-          }
+          fixedOriginX.value =
+            positionX.value +
+            (trayPlacement === 'bottom' ? trayScroll.value : 0);
+          fixedOriginY.value =
+            positionY.value +
+            (trayPlacement === 'right' ? trayScroll.value : 0);
+          const boardPoint = viewportPointToBoard(
+            {
+              x: surfaceOriginX + fixedOriginX.value,
+              y: surfaceOriginY + fixedOriginY.value,
+            },
+            {
+              scale: cameraScale.value,
+              x: cameraX.value,
+              y: cameraY.value,
+            },
+            { x: surfaceOriginX, y: surfaceOriginY },
+          );
+          positionX.value = boardPoint.x;
+          positionY.value = boardPoint.y;
           trayAttached.value = false;
           trayFactor.value = reduceMotion
             ? 1
@@ -143,30 +174,69 @@ export function usePieceGesture({
         if (dragActive.value) {
           dragActive.value = false;
           const axisPosition =
-            trayPlacement === 'bottom' ? positionY.value : positionX.value;
+            trayPlacement === 'bottom'
+              ? boardPointToViewport(
+                  { x: positionX.value, y: positionY.value },
+                  {
+                    scale: cameraScale.value,
+                    x: cameraX.value,
+                    y: cameraY.value,
+                  },
+                  { x: surfaceOriginX, y: surfaceOriginY },
+                ).y
+              : boardPointToViewport(
+                  { x: positionX.value, y: positionY.value },
+                  {
+                    scale: cameraScale.value,
+                    x: cameraX.value,
+                    y: cameraY.value,
+                  },
+                  { x: surfaceOriginX, y: surfaceOriginY },
+                ).x;
           const pieceExtent =
             trayPlacement === 'bottom' ? pieceHeight : pieceWidth;
           const trayStart =
-            trayPlacement === 'bottom' ? trayTop : trayLeft;
+            trayPlacement === 'bottom'
+              ? surfaceOriginY + trayTop
+              : surfaceOriginX + trayLeft;
           const droppedInTray =
-            axisPosition + pieceExtent / 2 >= trayStart;
+            axisPosition + (pieceExtent * cameraScale.value) / 2 >= trayStart;
           if (inTray && droppedInTray) {
+            const viewportPoint = boardPointToViewport(
+              { x: positionX.value, y: positionY.value },
+              {
+                scale: cameraScale.value,
+                x: cameraX.value,
+                y: cameraY.value,
+              },
+              { x: surfaceOriginX, y: surfaceOriginY },
+            );
+            const fixedX = viewportPoint.x - surfaceOriginX;
+            const fixedY = viewportPoint.y - surfaceOriginY;
             if (trayPlacement === 'bottom') {
-              const targetX = originX.value - trayScroll.value;
+              const attachedX = fixedX - trayScroll.value;
+              const targetX = fixedOriginX.value - trayScroll.value;
+              positionX.value = attachedX;
+              positionY.value = fixedY;
+              trayAttached.value = true;
               positionX.value = reduceMotion
                 ? targetX
                 : withSpring(targetX, { damping: 40, stiffness: 380 });
               positionY.value = reduceMotion
-                ? originY.value
-                : withSpring(originY.value, {
+                ? fixedOriginY.value
+                : withSpring(fixedOriginY.value, {
                     damping: 40,
                     stiffness: 380,
                   });
             } else {
-              const targetY = originY.value - trayScroll.value;
+              const attachedY = fixedY - trayScroll.value;
+              const targetY = fixedOriginY.value - trayScroll.value;
+              positionX.value = fixedX;
+              positionY.value = attachedY;
+              trayAttached.value = true;
               positionX.value = reduceMotion
-                ? originX.value
-                : withSpring(originX.value, {
+                ? fixedOriginX.value
+                : withSpring(fixedOriginX.value, {
                     damping: 40,
                     stiffness: 380,
                   });
@@ -174,7 +244,6 @@ export function usePieceGesture({
                 ? targetY
                 : withSpring(targetY, { damping: 40, stiffness: 380 });
             }
-            trayAttached.value = true;
             trayFactor.value = reduceMotion
               ? trayScale
               : withSpring(trayScale, {
@@ -230,9 +299,8 @@ export function usePieceGesture({
     }
     scrollTray
       .onChange((event) => {
-        const scale = cameraScale.value || 1;
         const change =
-          (trayPlacement === 'bottom' ? event.changeX : event.changeY) / scale;
+          trayPlacement === 'bottom' ? event.changeX : event.changeY;
         trayScroll.value = Math.min(
           maxTrayScroll,
           Math.max(minTrayScroll, trayScroll.value + change),
@@ -242,8 +310,12 @@ export function usePieceGesture({
   }, [
       beginDrag,
       cameraScale,
+      cameraX,
+      cameraY,
       dragActive,
       endDrag,
+      fixedOriginX,
+      fixedOriginY,
       inTray,
       locked,
       maxTrayScroll,
@@ -260,6 +332,8 @@ export function usePieceGesture({
       trayScale,
       trayScroll,
       trayTop,
+      surfaceOriginX,
+      surfaceOriginY,
       pieceHeight,
       pieceWidth,
     ]);
