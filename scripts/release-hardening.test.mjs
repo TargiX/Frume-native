@@ -301,6 +301,26 @@ test('RevenueCat logical-string guard requires every reviewed premium identifier
       ),
     /unreviewed RevenueCat/,
   );
+  // A PostHog personal API key grants read and write access to the whole
+  // account, and Metro inlines every EXPO_PUBLIC_* value, so the bundle is the
+  // last place it can be caught before it ships to every device.
+  assert.throws(
+    () =>
+      validateRevenueCatBundle(
+        [...reviewedRevenueCatStrings, `phx_${'g'.repeat(40)}`],
+        iosKey,
+        premiumProductId,
+      ),
+    /PostHog personal API key/,
+  );
+  // The project token is meant to be public and must not trip the same guard.
+  assert.doesNotThrow(() =>
+    validateRevenueCatBundle(
+      [...reviewedRevenueCatStrings, `phc_${'h'.repeat(40)}`],
+      iosKey,
+      premiumProductId,
+    ),
+  );
   assert.throws(
     () =>
       validateRevenueCatBundle(

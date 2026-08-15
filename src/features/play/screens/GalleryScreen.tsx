@@ -16,6 +16,7 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
@@ -125,6 +126,12 @@ export function GalleryScreen({ navigation }: Props) {
         setError('No suitable photo found. Try another theme.');
         return;
       }
+      // Recorded on reaching setup rather than on the tap, so the step counts
+      // players who actually got a photograph to work with.
+      track('photo_source_chosen', {
+        source: 'theme',
+        theme_id: categoryId ?? 'surprise',
+      });
       navigation.navigate(
         'Difficulty',
         buildDifficultyRouteParams(result, categoryId),
@@ -172,6 +179,7 @@ export function GalleryScreen({ navigation }: Props) {
       return;
     }
     setPending(null);
+    track('photo_source_chosen', { source: 'own_photo' });
     navigation.navigate('Difficulty', {
       imageUri: result.photo.uri,
       imageWidth: result.photo.width,

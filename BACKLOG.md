@@ -104,7 +104,10 @@ unavailable and fail closed.
 - Tune haptics so the first correctly seated piece has intentional feedback
   without making every drop noisy.
 - Consider additional session history and personal bests only after a privacy
-  and product review; no analytics/account system is required for 1.0.
+  and product review. No account system is required for 1.0. Anonymous product
+  analytics now ships — see `src/analytics/` and the App Privacy bullet in
+  `STORE_METADATA.md` — but it is aggregate measurement, not per-player history,
+  and must not become one.
 
 ## Content and merchandising
 

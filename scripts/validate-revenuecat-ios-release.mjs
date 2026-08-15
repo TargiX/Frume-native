@@ -10,8 +10,11 @@ import { isDirectCli } from './is-direct-cli.mjs';
 const IOS_PUBLIC_KEY_PATTERN = /^appl_[A-Za-z0-9]{8,128}$/;
 const IOS_PRODUCT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$/;
 export const PREMIUM_CUTS_ENTITLEMENT_ID = 'premium_cut_styles';
+// `phx_` is a PostHog personal API key: a private read/write credential that
+// must never reach a shipped bundle. A `phc_` project token is deliberately
+// public and is therefore not listed here.
 const EMBEDDED_CREDENTIAL_PATTERN =
-  /^(?:appl|mac|goog|amzn|strp|test|sk|atk)_[A-Za-z0-9]{8,128}$/;
+  /^(?:appl|mac|goog|amzn|strp|test|sk|atk|phx)_[A-Za-z0-9]{8,128}$/;
 const STRING_TABLE_ENTRY_PATTERN =
   /^[is]\d+\[(?:ASCII|UTF-16),[^\]]+\](?: #[A-Fa-f0-9]+)?: (.*)$/;
 
@@ -108,7 +111,7 @@ export function validateRevenueCatBundle(
       EMBEDDED_CREDENTIAL_PATTERN.test(bundleString)
     ) {
       throw new Error(
-        'The archived JavaScript bundle contains an unreviewed RevenueCat test, other-platform, secret, or stale public key.',
+        'The archived JavaScript bundle contains an unreviewed RevenueCat test, other-platform, secret, or stale public key, or a PostHog personal API key.',
       );
     }
   }

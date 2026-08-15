@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark">
     <meta
       name="description"
-      content="Frume Privacy Policy: how the iPhone and iPad app handles saved puzzles, attributed photos, purchase access, and support messages."
+      content="Frume Privacy Policy: how the iPhone and iPad app handles saved puzzles, attributed photos, purchase access, support messages, and optional anonymous usage counts."
     >
     <meta property="og:type" content="website">
     <meta property="og:title" content="Frume Privacy Policy">
@@ -39,21 +39,22 @@
     <main id="main-content">
       <section class="policy-hero shell" aria-labelledby="privacy-title">
         <div>
-          <p class="eyebrow">Privacy policy · Effective July 31, 2026</p>
+          <p class="eyebrow">Privacy policy · Effective August 15, 2026</p>
           <h1 id="privacy-title">A puzzle,<br>not a profile.</h1>
         </div>
         <div class="policy-summary">
           <p>
-            Frume does not require an account and does not include ads,
-            analytics, or cross-app tracking. This policy explains the limited
-            data needed to save one puzzle, provide attributed photographs,
-            and verify the optional Premium Cuts purchase.
+            Frume does not require an account and does not include ads or
+            cross-app tracking. This policy explains the limited data needed to
+            save one puzzle, provide attributed photographs, verify the optional
+            Premium Cuts purchase, and — unless you switch it off — count
+            anonymously how the app is used.
           </p>
           <ul class="privacy-badges" aria-label="Privacy summary">
             <li>No Frume account</li>
             <li>No advertising</li>
-            <li>No analytics</li>
             <li>No cross-app tracking</li>
+            <li>Usage counts you can switch off</li>
           </ul>
         </div>
       </section>
@@ -209,6 +210,39 @@
                   you choose a destination in the system share sheet.
                 </p>
               </div>
+
+              <div class="policy-card">
+                <h3>Anonymous usage counts</h3>
+                <p>
+                  Unless you switch it off, Frume counts how the app is used so
+                  its design can be improved: the app being opened, which photo
+                  source you chose, a puzzle being started, completed, or left
+                  unfinished and how far it had got, the Premium Cuts screen
+                  being shown, and a purchase or restore succeeding. A count
+                  carries only the cut style, piece count, theme name, elapsed
+                  time, and product identifier involved.
+                </p>
+                <p>
+                  Counts are labelled with a random identifier Frume creates on
+                  this device. It is not your Apple Account, not an advertising
+                  identifier, and not derived from your device, so it cannot be
+                  connected to you or to any other app. No profile is built from
+                  the counts and no location is derived from them. Nothing about
+                  your photographs is included: no image, filename, path,
+                  description, or photographer.
+                </p>
+                <p>
+                  If the device is offline the counts wait in a bounded local
+                  queue and are sent when Frume next launches or changes
+                  foreground state.
+                </p>
+                <p>
+                  You can turn measurement off in About &amp; Support.
+                  Switching it off deletes that identifier, stops collection at
+                  once, and discards anything still queued, so turning it back
+                  on begins an unrelated identifier.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -225,11 +259,18 @@
               </p>
             </div>
             <p>
-              Frume contains no advertising SDK and no product-analytics SDK.
-              It does not request an advertising identifier, contact list,
-              precise location, microphone, or camera access, and no access to your
+              Frume contains no advertising SDK. It does not request an
+              advertising identifier, contact list, precise location,
+              microphone, or camera access, and no access to your
               photo library — choosing your own photograph goes through the
               system picker, which hands over one file and nothing else.
+            </p>
+            <p>
+              The anonymous usage counts described above are also not
+              advertising tracking. They are labelled with an identifier that
+              exists only for this installation of Frume, are never sold or
+              shared with advertisers or data brokers, and cannot follow you to
+              another app or website.
             </p>
           </section>
 
@@ -271,6 +312,16 @@
                 <a
                   href="https://www.revenuecat.com/privacy/"
                   aria-label="Read the RevenueCat privacy policy"
+                >Privacy policy</a>
+              </li>
+              <li>
+                <div>
+                  <strong>PostHog</strong>
+                  <span>Anonymous usage counts, while measurement is left on</span>
+                </div>
+                <a
+                  href="https://posthog.com/privacy"
+                  aria-label="Read the PostHog privacy policy"
                 >Privacy policy</a>
               </li>
               <li>
@@ -328,6 +379,12 @@
                 operational obligations.
               </li>
               <li>
+                <strong>Anonymous usage counts:</strong> held locally only until
+                they are delivered, and discarded at once if you switch
+                measurement off or delete Frume. Delivered counts are retained
+                by PostHog under Frume's project configuration.
+              </li>
+              <li>
                 <strong>Redacted diagnostics:</strong> limited to the ten most
                 recent records and kept locally until you clear app data,
                 delete Frume, or use the in-app clear action. Sharing creates a
@@ -340,8 +397,9 @@
             <p class="section-number" aria-hidden="true">06</p>
             <h2 id="choices-title">Your choices</h2>
             <p>
-              You can remove the last result and clear redacted diagnostics in
-              the app, or remove all local Frume data by deleting the app. An
+              You can switch anonymous usage counts off, remove the last
+              result, and clear redacted diagnostics in the app, or remove all
+              local Frume data by deleting the app. An
               own-photo puzzle remains available offline. A curated-photo
               puzzle may need to reload its hotlinked image, and an internet
               connection is required to load another curated photo and to

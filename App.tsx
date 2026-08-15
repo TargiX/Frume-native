@@ -5,6 +5,12 @@ import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import {
+  flushAnalytics,
+  initializeAnalytics,
+  startAnalyticsFlushRetries,
+  track,
+} from './src/analytics';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { installGlobalErrorDiagnostics } from './src/diagnostics/globalErrorHandler';
 import { isPhaseFieldLabUrl, PhaseFieldLabScreen } from './src/features/lab';
@@ -43,6 +49,35 @@ export default function App() {
   }, [isPhaseFieldLab]);
 
   useEffect(() => installGlobalErrorDiagnostics(), []);
+
+  useEffect(() => {
+    if (isPhaseFieldLab) return;
+    // Recorded before initialization resolves: the client buffers it until the
+    // stored preference is known, and discards it if the answer is no.
+    track('app_opened', { cold_start: true });
+    void initializeAnalytics();
+    return startAnalyticsFlushRetries({
+      initialState: AppState.currentState,
+      flush: flushAnalytics,
+      subscribe: (listener) => AppState.addEventListener('change', listener),
+    });
+  }, [isPhaseFieldLab]);
+
+  useEffect(() => {
+    if (isPhaseFieldLab) return;
+    // A return from the background is a new session for retention, and a player
+    // who leaves Frume open for days would otherwise never be counted again.
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const returnedToForeground =
+        nextState === 'active' && previousState !== 'active';
+      previousState = nextState;
+      if (returnedToForeground) {
+        track('app_opened', { cold_start: false });
+      }
+    });
+    return () => subscription.remove();
+  }, [isPhaseFieldLab]);
 
   if (isPhaseFieldLab) {
     return (

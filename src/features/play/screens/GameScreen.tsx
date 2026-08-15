@@ -22,6 +22,7 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { usePuzzleMusic } from '../../../audio';
 import {
@@ -56,6 +57,11 @@ import {
   computeSafeAreaPlayLayout,
   TABLE_INSET,
 } from '../utils/boardLayout';
+import {
+  advancePlayAnalytics,
+  puzzleAbandonedProperties,
+  type PlaySnapshot,
+} from '../utils/playAnalytics';
 import {
   loadTableAppearance,
   saveTableAppearance,
@@ -181,6 +187,68 @@ export function GameScreen({ navigation }: Props) {
         setNextPuzzleLoading(false);
       };
     }, []),
+  );
+
+  // Measurement of the play loop. Progress is mirrored into a ref so a puzzle
+  // the player walked away from can still be described once `state` is gone.
+  const playSnapshotRef = useRef<PlaySnapshot | null>(null);
+  const completedSessionRef = useRef<object | null>(null);
+
+  const reportAbandoned = useCallback((snapshot: PlaySnapshot | null) => {
+    if (!snapshot) {
+      return;
+    }
+    const properties = puzzleAbandonedProperties(snapshot);
+    if (properties) {
+      track('puzzle_abandoned', properties);
+    }
+  }, []);
+
+  useEffect(() => {
+    const next: PlaySnapshot | null =
+      session && state
+        ? {
+            sessionKey: session,
+            cutId: session.cutterId,
+            pieceCount: state.layout.pieces.length,
+            placedCount: Object.values(state.pieces).filter(
+              (piece) => piece.locked,
+            ).length,
+          }
+        : null;
+    const { abandoned, snapshot } = advancePlayAnalytics(
+      playSnapshotRef.current,
+      next,
+      state?.status === 'completed',
+    );
+    playSnapshotRef.current = snapshot;
+    reportAbandoned(abandoned);
+  }, [reportAbandoned, session, state]);
+
+  useEffect(() => {
+    // Keyed on the session object so replaying or starting the next puzzle
+    // without leaving this screen is measured as its own completion.
+    if (!isCompleted || !session || !state) {
+      return;
+    }
+    if (completedSessionRef.current === session) {
+      return;
+    }
+    completedSessionRef.current = session;
+    track('puzzle_completed', {
+      cut_id: session.cutterId,
+      piece_count: state.layout.pieces.length,
+      duration_s: state.activeElapsedMs / 1000,
+    });
+  }, [isCompleted, session, state]);
+
+  useEffect(
+    () => () => {
+      const snapshot = playSnapshotRef.current;
+      playSnapshotRef.current = null;
+      reportAbandoned(snapshot);
+    },
+    [reportAbandoned],
   );
 
   useEffect(() => {

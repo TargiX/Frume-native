@@ -6,6 +6,11 @@ const SHARED_REQUIRED_MARKERS = Object.freeze([
 
 const SHARED_FORBIDDEN_MARKERS = Object.freeze([
   'Organic and Living cuts',
+  // The app measures anonymous usage. A published page that still claims
+  // otherwise is a misrepresentation, not merely stale copy.
+  'No analytics',
+  'no product-analytics SDK',
+  'advertising, analytics, or cross-app',
 ]);
 
 function releasePageContract({ label, file, requiredMarkers }) {
@@ -40,6 +45,9 @@ export const RELEASE_PAGE_CONTENT_CONTRACTS = Object.freeze({
       'up to ten recent JavaScript',
       'does not upload this log automatically',
       'expires after 24 hours',
+      'Anonymous usage counts',
+      'Switching it off deletes that identifier',
+      'PostHog',
     ],
   }),
 });

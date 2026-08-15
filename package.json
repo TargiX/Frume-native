@@ -37,6 +37,7 @@
     "doctor": "EXPO_NO_DOTENV=1 expo-doctor",
     "security:dependencies": "node ./scripts/validate-dependency-audit.mjs",
     "release:verify:public-pages": "FRUME_VERIFY_PUBLIC_RELEASE_PAGES=1 node ./scripts/validate-public-release-pages.mjs",
+    "analytics:verify": "FRUME_VERIFY_ANALYTICS=1 node ./scripts/verify-analytics-transport.mjs",
     "release:guards": "npm run toolchain:check && sh -n scripts/archive-ios-release.sh scripts/build-ios-release-simulator.sh scripts/test-production-photo-api-url.sh && node --test scripts/release-hardening.test.mjs scripts/release-revision-adversarial.test.mjs scripts/release-stage-handoff.test.mjs scripts/dependency-audit.test.mjs scripts/public-release-page-content-contract.test.mjs scripts/validate-production-photo-api-health.test.mjs && node support-site/check.mjs && ./scripts/test-production-photo-api-url.sh",
     "check": "npm run typecheck && npm test && npm run server:typecheck && npm run server:test && npm run doctor && npm run release:guards"
   },
