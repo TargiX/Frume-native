@@ -18,6 +18,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { isDirectCli } from './is-direct-cli.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+// The archive performs two independent shallow fetches so neither the local
+// checkout nor the first export can forge canonical source. GitHub fetches on
+// the release machine have exceeded one minute even when the fetched tree is
+// valid, so keep the fail-closed timeout generous enough for a cold transfer.
+const CANONICAL_FETCH_TIMEOUT_MS = 180_000;
 export const REVIEWED_RELEASE_REMOTE_URL =
   'https://github.com/TargiX/Frume-native.git';
 export const REVIEWED_RELEASE_BRANCH = 'main';
@@ -193,7 +198,7 @@ export function exportReviewedReleaseSource({
       {
         stdio: ['ignore', 'ignore', 'pipe'],
         env: sanitizedGitEnvironment(),
-        timeout: 60_000,
+        timeout: CANONICAL_FETCH_TIMEOUT_MS,
       },
     );
     const fetchedSha = execFileSync(
