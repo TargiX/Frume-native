@@ -20,6 +20,7 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { MAX_CONTENT_WIDTH, Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
@@ -304,6 +305,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     if (cutterId !== 'fractal') {
       premiumReturnFocusRef.current = cutOptionRefs.current[cutterId] ?? null;
     }
+    track('paywall_shown', { trigger_cut_id: cutterId });
     setShowPremium(true);
   };
 
@@ -572,6 +574,18 @@ export function DifficultyScreen({ navigation, route }: Props) {
         isStartCurrent,
       );
       const started = startResult === 'started';
+      if (started) {
+        track('puzzle_started', {
+          cut_id: intent.sessionParams.cutterId ?? 'classic',
+          piece_count: pieceCount(intent.sessionParams.difficulty),
+          // Only an imported photograph carries the `own` content source; a
+          // curated one always carries the provider's.
+          source:
+            intent.sessionParams.image.contentSource?.kind === 'own'
+              ? 'own_photo'
+              : 'theme',
+        });
+      }
       if (
         ownPhotoCandidateUri &&
         startResult !== 'started' &&

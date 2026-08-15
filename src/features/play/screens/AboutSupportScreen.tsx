@@ -8,6 +8,7 @@ import {
   Pressable,
   Share,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -16,6 +17,7 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { useAnalyticsPreference } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import {
@@ -103,6 +105,13 @@ export function AboutSupportScreen(_props: Props) {
     error: purchaseError,
     restorePurchases,
   } = usePremiumAccess();
+  const {
+    analyticsEnabled,
+    analyticsPreferenceLoaded,
+    analyticsFeedback,
+    setAnalyticsEnabled,
+    retryAnalyticsPreference,
+  } = useAnalyticsPreference();
   const [linkError, setLinkError] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<ClientDiagnostic[]>([]);
@@ -251,6 +260,65 @@ export function AboutSupportScreen(_props: Props) {
               Your current puzzle state is kept in the app&apos;s local storage
               so you can continue it later.
             </Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingCopy}>
+              <Text style={styles.rowTitle}>Anonymous usage</Text>
+              <Text style={styles.rowDescription}>
+                Counts of which screens, cuts, and puzzle sizes are used, under
+                a random identifier Frume creates on this device. There is no
+                account, no advertising identifier, no location, and nothing
+                about your photographs. Turning this off deletes that
+                identifier and anything still waiting to be sent.
+              </Text>
+              <Text
+                style={[
+                  styles.rowDescription,
+                  analyticsFeedback.kind === 'error' && styles.settingError,
+                ]}
+                accessibilityLiveRegion={androidAccessibilityLiveRegion(
+                  'polite',
+                )}
+              >
+                {analyticsFeedback.message}
+              </Text>
+              {analyticsFeedback.retryAvailable ? (
+                <View style={styles.settingRetry}>
+                  <Button
+                    label={analyticsFeedback.retryLabel}
+                    onPress={retryAnalyticsPreference}
+                    variant="secondary"
+                    accessibilityHint={
+                      analyticsFeedback.retryLabel === 'Retry loading'
+                        ? 'Attempts to load the saved anonymous usage setting again'
+                        : 'Attempts to save the current anonymous usage setting again'
+                    }
+                  />
+                </View>
+              ) : null}
+            </View>
+            <Switch
+              value={analyticsEnabled}
+              disabled={!analyticsPreferenceLoaded}
+              onValueChange={setAnalyticsEnabled}
+              accessibilityLabel="Anonymous usage"
+              accessibilityHint={
+                analyticsFeedback.kind === 'error'
+                  ? analyticsFeedback.message
+                  : 'Shares anonymous counts of how Frume is used'
+              }
+              accessibilityValue={{
+                text: analyticsPreferenceLoaded
+                  ? `${analyticsEnabled ? 'On' : 'Off'}. ${
+                      analyticsFeedback.message
+                    }`
+                  : 'Loading setting',
+              }}
+              trackColor={{ false: colors.borderStrong, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+              ios_backgroundColor={colors.surfaceRaised}
+            />
           </View>
         </View>
       </View>
@@ -458,6 +526,23 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     gap: spacing.xs,
+  },
+  settingRow: {
+    minHeight: MIN_TOUCH_TARGET,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.lg,
+  },
+  settingCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  settingError: {
+    color: colors.danger,
+  },
+  settingRetry: {
+    marginTop: spacing.sm,
+    alignItems: 'flex-start',
   },
   rowTitle: {
     color: colors.textPrimary,

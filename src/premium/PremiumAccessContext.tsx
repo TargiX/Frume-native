@@ -18,6 +18,7 @@ import Purchases, {
   type PurchasesOfferings,
 } from 'react-native-purchases';
 
+import { track } from '../analytics';
 import { hasPremiumCuts } from './access';
 import { premiumStoreErrorMessage } from './errorPresentation';
 
@@ -277,6 +278,13 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
     try {
       const result = await Purchases.purchasePackage(premiumPackage);
       const active = applyCustomerInfo(result.customerInfo);
+      if (active) {
+        // Reported once the entitlement is actually granted, so the funnel
+        // counts access rather than a completed store transaction.
+        track('purchase_completed', {
+          product_id: premiumPackage.product.identifier,
+        });
+      }
       if (mounted.current) {
         if (!active) {
           setError('The purchase completed, but access is still pending.');
@@ -335,6 +343,11 @@ export function PremiumAccessProvider({ children }: { children: React.ReactNode 
     try {
       const customerInfo = await Purchases.restorePurchases();
       const active = applyCustomerInfo(customerInfo);
+      if (active) {
+        // A restore that found nothing is not a completion; it is a player
+        // discovering they never bought.
+        track('restore_completed', {});
+      }
       if (mounted.current) {
         if (!active) {
           setError('No previous Premium Cuts purchase was found.');

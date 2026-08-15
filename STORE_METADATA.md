@@ -25,14 +25,35 @@ Use the existing [Frume App Store Connect record](https://appstoreconnect.apple.
 - Current source default: marketing version `1.0.0`, build `3`; build `3`
   still requires an availability check immediately before archive
 
-The live listing still represents the superseded photo-frame product: obsolete
-subtitle, description, keywords, and screenshots; primary category Photo &
-Video and secondary Lifestyle; automatic release; Support URL
-`https://frume.vercel.app/`; Privacy Policy URL
-`https://frume.vercel.app/privacy`; `Data Not Collected`; no in-app purchase;
-12+/13+ age rating with new social-feature questions pending; and 2022
-copyright. This was a read-only audit on 2026-07-31. No App Store Connect change
-described in this document has been saved.
+**Live dashboard state, read through the App Store Connect API on 2026-08-15.**
+This supersedes the 2026-07-31 read-only audit, which described the old
+photo-frame listing and is no longer true of anything below.
+
+- Name `Frume`, subtitle `Quiet photo puzzles`, primary locale `en-US`
+- Keywords
+  `jigsaw,puzzle,photo,my photos,relaxing,calm,focus,brain,organic,generative`
+- Primary category **Games**; no secondary category
+- Age rating **4+**
+- Support URL `https://support-site-one-alpha.vercel.app/`, privacy policy
+  `https://support-site-one-alpha.vercel.app/privacy/`
+- Content rights: `USES_THIRD_PARTY_CONTENT`
+- In-app purchase `com.targix.frumenative.premiumcuts`, non-consumable, **in
+  review**
+- Builds 2 through 7 uploaded and valid; build 7 uploaded 2026-08-14. The 2022
+  build 1 entries are expired.
+- Release type `AFTER_APPROVAL` — still automatic release, not the manual
+  release this document recommends below
+- **Version 1.0.0 is `REJECTED`.** A review submission on 2026-08-14 sits in
+  `UNRESOLVED_ISSUES` under **Guideline 2.1, Information Needed**: Apple asked
+  for the App Review Information notes and a screen recording, and raised no
+  functional defect. The answer is drafted under "App Store review notes" below.
+
+The description and promotional text on the listing are the puzzle copy, not the
+old photo-frame copy. Screenshots have not been verified through the API and
+still need checking against the exact candidate.
+
+Treat this section as a snapshot with a date, not as live state: re-read the API
+before relying on it.
 
 The dashboard also shows active Paid Apps and Free Apps Agreements (through
 2027-07-03), plus active banking and foreign-status tax records. The base app is
@@ -154,30 +175,169 @@ Do not show placeholder pricing, a development client, simulator chrome,
 personal notifications, broken images, test products, or unfinished Fractal
 controls.
 
-## App Store review notes draft
+## App Store review notes
 
-Frume does not require an account. Classic cuts and every size from 9 to 196
-pieces are free.
+Build 7 was rejected on 2026-08-14 under Guideline 2.1, Information Needed. That
+rejection asked for eight specific things in the App Review Information notes
+plus a screen recording; it raised no functional defect. The numbered answers
+below map one-to-one onto Apple's request and are meant to be pasted into the
+**Notes** field.
 
-To reach the in-app purchase:
+**These answers describe the next build, which adds anonymous product
+analytics**, not build 7. Answer 5 lists it and the App Privacy declaration
+below declares it; the two must never move apart. Do not paste these notes
+against build 7 — that build contains no analytics, and the declaration would
+then overstate what the binary does.
 
-1. Open **Choose a photograph**.
-2. Select any theme.
+**One fact must be supplied before pasting, because it is about the exact
+binary rather than this repository:** the device and OS list in answer 2.
+
+### 1. Screen recording
+
+Not a text answer. Record on a physical iPhone running the current iOS, start
+from launching the app, and cover, in one take:
+
+1. Launch to Home.
+2. **Choose a photograph** → theme gallery → pick a theme.
+3. Setup screen: photographer credit, cut choice, difficulty choice.
+4. Start a Classic puzzle, place several pieces, complete or leave it.
+5. Back to setup, tap a cut marked **Premium** → the Premium Cuts sheet opens →
+   show the real localized price and the **Restore** action.
+6. Complete a sandbox purchase, showing that the premium cut then plays.
+7. **Choose from library** → the system photo picker → cut and start that photo.
+8. **About & Support**, showing Restore purchases, the privacy and support
+   links, and the **anonymous usage** switch that turns analytics off.
+
+There is no account, no registration, no login, no account deletion, no
+user-generated content, and no App Tracking Transparency prompt, so none of
+those appear. The only system prompt in the flow is the photo picker in step 7,
+and it is `PHPickerViewController`, which hands over one chosen photograph
+without granting library access.
+
+### 2. Devices and operating systems tested
+
+Supply the real list from the TestFlight and device QA runs. Frume's deployment
+target is **iOS 16.0** and it supports both iPhone and iPad. Do not paste a
+device list that was not actually exercised — Apple treats this answer as a
+factual claim.
+
+### 3. What the app does, who it is for, and what problem it solves
+
+Frume turns a photograph into a jigsaw puzzle that you solve by dragging pieces
+into place on the device.
+
+The audience is casual puzzle players and people who want a calm, unhurried
+activity on a phone or iPad — the same audience as a physical jigsaw. The
+problem it solves is that existing photo puzzle apps surround the picture with
+advertising, timers, currencies, and daily-reward mechanics; Frume keeps the
+photograph at the centre with an interface that stays out of the way. It shows
+no advertising, requires no account, and has no timers or scores that pressure
+the player.
+
+The value is twofold: any photograph from the player's own library becomes a
+puzzle, and the paid cut styles cut the picture along shapes that a
+conventional grid-and-tab jigsaw cannot produce.
+
+### 4. Setting up and reaching the main features
+
+**No login, no credentials, no sample files are needed.** The app opens straight
+into its functionality.
+
+- **Curated photograph:** Home → **Choose a photograph** → pick one of six
+  themes (Nature, City, Animals, Travel, Food, Ocean) → setup screen → choose a
+  cut and a size → **Start**.
+- **Own photograph:** Home → **Choose a photograph** → **choose a photo from
+  your library** → the system picker returns one photograph → same setup screen.
+- **Playing:** drag a piece from the tray onto the board; a correctly placed
+  piece snaps and locks. Pinch to zoom on larger boards. The photo guide and
+  the restart action are in the puzzle menu.
+- **Resuming:** leaving and relaunching restores the puzzle in progress.
+
+Every Classic difficulty from 3x3 (9 pieces) to 14x14 (196 pieces) is free.
+
+An internet connection is required to load a curated photograph, because those
+are fetched from the provider rather than bundled. A photograph chosen from the
+library stays on the device and plays offline.
+
+### 5. External services used
+
+| Service | Purpose | Notes |
+|---|---|---|
+| Unsplash | Curated puzzle photographs and photographer attribution | Reached only through Frume's own Cloudflare Worker; the app never holds the provider credential |
+| Cloudflare Workers | Frume's own server-side photo proxy | Keeps the Unsplash key off the device and registers photo use with the provider |
+| RevenueCat | In-app purchase and restore handling | Anonymous app-user identifier; no Frume account |
+| Apple StoreKit | The purchase itself | Via RevenueCat |
+| PostHog | Anonymous product analytics | Eight fixed events about which screens and puzzle sizes are used; opt-out in About & Support |
+
+On the analytics specifically, because it is the only thing here that observes
+the player: Frume sends eight declared events, listed exhaustively in the app's
+own source, carrying only a cut style identifier, a piece count, a duration, and
+a screen name. It attaches a random identifier Frume generates on the device —
+**not** the advertising identifier and **not** the vendor identifier — creates no
+person profile, sends no IP address, records no location, and touches no
+photograph or photo metadata. It can be switched off in **About & Support**, and
+switching it off deletes the identifier. None of it is used for tracking as
+Apple defines the term, and the app therefore shows no App Tracking Transparency
+prompt.
+
+There is no authentication service, no payment processor other than Apple, no
+advertising network, no attribution SDK, and **no AI service of any kind**.
+Frume's generative cut styles are deterministic geometry computed on the device
+or shipped pre-computed in the bundle; nothing is generated by a model and no
+data is sent anywhere to produce them.
+
+### 6. Regional differences
+
+**None.** Frume behaves identically in every territory. There is one language
+(English), one price for the single in-app purchase in each storefront's local
+currency, the same six photo themes, the same cut styles, and the same free
+difficulties everywhere. No feature, photograph, or purchase is gated by region.
+
+### 7. Regulated industry and third-party material
+
+Frume is not in a regulated industry.
+
+It does display third-party material: photographs provided through the
+**Unsplash API**, which is why the app's content rights declaration is set to
+"uses third-party content". Frume holds **production** Unsplash API access, uses
+the photographs under the Unsplash API Terms, displays photographer and Unsplash
+attribution on the setup screen and in the puzzle options, links that
+attribution back to the source, and registers each photo use with Unsplash as
+the terms require. **Frume does not sell photographs.** The paid product is the
+cutting geometry, which is Frume's own work.
+
+Photographs the player imports from their own library are their own material,
+stay on the device, and are never uploaded.
+
+### 8. What the in-app purchase sells and how to reach it
+
+One product only: **Premium Cuts**, product ID
+`com.targix.frumenative.premiumcuts`, a **non-consumable one-time purchase**,
+not a subscription and not auto-renewing. Its RevenueCat entitlement identifier
+is `premium_cut_styles`.
+
+It unlocks seven cut styles that shape the pieces differently from the free
+Classic cut: Organic, Living, Living spectrum, Crystal, Crystal quartered,
+Amoeba, and Amoeba columnar.
+
+**It does not unlock any difficulty or size.** Every size from 9 to 196 pieces
+is free with the Classic cut, before and after purchase.
+
+To reach it:
+
+1. Home → **Choose a photograph**.
+2. Select any theme, or choose a photograph from the library.
 3. On the setup screen, select any cut marked **Premium**.
-4. The **Premium Cuts** sheet opens.
+4. The **Premium Cuts** sheet opens with the price and the purchase action.
 
-The product is a non-consumable lifetime unlock, not a subscription. Its
-RevenueCat entitlement identifier is `premium_cut_styles`. A restore action is
-available on the paywall and in **About & Support**.
+**Restore** is available both on that sheet and in **About & Support**.
 
-Loading a curated puzzle photo requires network access. Progress is stored
-locally; a curated Unsplash photograph remains hotlinked and therefore needs a
-connection when it is displayed again. A photograph selected through the
-system picker stays on the device and can resume offline. Photo attribution
-links open outside the app.
+### Before pasting
 
-Before submitting these notes, add only verified App Review contact information
-and any StoreKit sandbox instructions Apple requires.
+Add verified App Review contact information and any StoreKit sandbox account
+Apple asks for. Apple's letter also asks that this information be kept in the
+Notes field for future submissions, so it should stay there rather than being
+sent only as a reply.
 
 ## Exact App Store dashboard update
 
@@ -210,6 +370,40 @@ These are pending edits, not saved dashboard state:
   for **App Functionality**, not linked to the user's identity, and not used for
   tracking. Re-audit the final SDK graph before confirming that no other data
   types apply.
+- **Declare `Usage Data → Product Interaction` for `Analytics` and `App
+  Functionality`, not linked to the user's identity, and not used for
+  tracking.** Frume sends eight declared events — app opens, photo source,
+  puzzle start, completion, abandonment, paywall view, purchase, and restore —
+  to the PostHog project configured by `EXPO_PUBLIC_ANALYTICS_HOST` and
+  `EXPO_PUBLIC_ANALYTICS_API_KEY`. Confirm the following against the final
+  binary before answering, because each one is load-bearing for the answer:
+  - The complete set of events and their permitted properties is the allowlist
+    in `src/analytics/analyticsEvents.ts`. Values outside it are dropped before
+    storage, so no photograph, filename, URL, photographer name, or free text
+    can be transmitted. A build that adds an event there changes this answer.
+  - The identifier is a random value Frume generates and stores on the device.
+    It is not the advertising identifier, not the vendor identifier, and not
+    derived from any device property, so it supports **not linked to identity**.
+    `$process_person_profile: false` is sent with every event so the receiving
+    project builds no person record.
+  - `$geoip_disable: true` is sent with every event, so PostHog derives no
+    location from the request address and no location is stored on the event.
+    **Whether the raw address itself is retained is a PostHog project setting,
+    not something the app controls** — Settings > Project > Privacy > "IP data
+    capture configuration" must be set to discard client IP addresses, and
+    `RELEASE.md` requires verifying it. With that confirmed, **do not declare
+    Location**; without it, re-answer this question rather than assuming.
+  - There is no advertising SDK, no third-party attribution, and no data broker,
+    so **not used for tracking** holds and App Tracking Transparency is not
+    required.
+  - Collection is on by default and switchable off in **About & Support**, which
+    also deletes the identifier and any events still queued. **This default is
+    only defensible outside the EU. Resolving the Digital Services Act status
+    and distributing in the EU requires making the setting opt-in or adding a
+    consent step first.**
+  - A build with neither analytics environment value configured sends nothing at
+    all. If the submitted binary is built that way, this data type must not be
+    declared.
 - **Photographs the player imports are deliberately not declared as collected.**
   Apple's definition of collection is transmission off the device: an imported
   picture is copied into Frume's own storage, is never uploaded to the photo

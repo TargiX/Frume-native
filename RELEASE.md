@@ -260,6 +260,39 @@ but Apple's required Support URL must be a website with real contact
 information. Prefer one canonical HTTPS support page for the app and App Store
 Connect.
 
+`EXPO_PUBLIC_ANALYTICS_HOST` and `EXPO_PUBLIC_ANALYTICS_API_KEY` enable
+anonymous product analytics. The host must be a bare origin; the code appends
+`/batch/`, so do not include a path.
+
+**The host must match the cloud region the PostHog project lives in** —
+`https://us.i.posthog.com` or `https://eu.i.posthog.com`. They are separate
+deployments and a project token exists in exactly one of them. A mismatch is
+silent: the capture endpoint answers `200 {"status":"Ok"}` to a token from the
+other region and discards the event, so a build can pass every local check and
+still measure nothing. Run `npm run analytics:verify`, which authenticates the
+token against the configured region before sending, and then confirm the check
+event actually appears in the project. **The key must be the PostHog project token, which starts with `phc_`.**
+A personal API key starts with `phx_`, grants read and write access to the whole
+account, and would be inlined into the shipped bundle by Metro exactly like
+every other `EXPO_PUBLIC_*` value; it also does not authenticate the capture
+endpoint. The client refuses to send with any non-`phc_` key, and the archived
+bundle scan in `scripts/validate-revenuecat-ios-release.mjs` fails the archive
+if a `phx_` key reaches it. If a personal key was ever placed in an environment
+file, revoke it in PostHog rather than only replacing it.
+**Both must be set, or the app sends nothing.** Decide
+this before freezing store metadata: a build that sends events must declare
+`Usage Data → Product Interaction` in App Privacy, and a build that does not
+must leave it undeclared. See the App Privacy bullet in
+[STORE_METADATA.md](./STORE_METADATA.md) for the exact answer and the facts it
+depends on.
+
+If analytics is enabled, one setting must also be verified in the PostHog
+project itself, because the app cannot assert it from a payload: **Settings >
+Project > Privacy > "IP data capture configuration" must discard client IP
+addresses.** The client sends `$geoip_disable: true`, which stops location being
+derived from the request, but retention of the raw address is a project-side
+decision. Record the observed setting; do not assume the account default.
+
 For the guarded local Xcode archive, make the five reviewed Apple release
 values available during the release prebuild and bundle step:
 
@@ -268,6 +301,9 @@ values available during the release prebuild and bundle step:
 - `EXPO_PUBLIC_REVENUECAT_IOS_PREMIUM_CUTS_PRODUCT_ID`
 - `EXPO_PUBLIC_PRIVACY_URL`
 - `EXPO_PUBLIC_SUPPORT_URL`
+
+Add the two analytics values to that step as well when the candidate is meant
+to measure anything; omitting them is a silent decision to ship blind.
 
 `.env.example` also retains `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` for a
 future Android release. It is not required for the Apple 1.0 candidate and must

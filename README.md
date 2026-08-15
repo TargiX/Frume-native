@@ -49,6 +49,13 @@ target is iOS 16.0.
   ownership changes.
 - About, privacy/support entry points, semantic labels, minimum touch targets,
   compact-phone layouts, and generated release icons.
+- Anonymous product analytics behind a single `track` seam, covering eight
+  declared events under a random on-device identifier, with no account, no
+  advertising identifier, no address, and no person profile. Every permitted
+  property is allowlisted in `src/analytics/analyticsEvents.ts`, delivery is
+  queued and retried from the app lifecycle, and the whole feature is off in
+  any build without both analytics environment values and switchable off in
+  About & Support.
 
 ## Architecture
 
@@ -62,6 +69,12 @@ The mobile app never receives an Unsplash access key or tracking-token signing
 secret. `server/` owns photo curation, short-lived HMAC-authenticated photo-use
 grants, globally bounded grant storage/issuance, and provider tracking.
 Client-visible `EXPO_PUBLIC_*` values are configuration, not secrets.
+
+Analytics is a separate, self-contained module under `src/analytics/`. Screens
+import only `track`; they never see the transport, the queue, the identifier, or
+the preference. Everything that can leave the device is therefore the union of
+one contract file and one transport file, which is what the App Privacy answer
+in [STORE_METADATA.md](./STORE_METADATA.md) relies on.
 
 ## Local verification
 
