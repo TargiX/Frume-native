@@ -12,13 +12,11 @@ export const REVIEWED_MOBILE_VULNERABILITY_CHAIN = new Set([
   '@expo/cli',
   '@expo/metro',
   '@expo/metro-config',
-  '@react-native/community-cli-plugin',
   'expo',
   'image-size',
   'metro',
   'metro-config',
   'metro-transform-worker',
-  'react-native',
 ]);
 
 function isRecord(value) {

@@ -91,6 +91,22 @@ npm --prefix server run deploy -- --dry-run
 Local development servers must be launched through the repository-safe
 launcher described by the workspace instructions; do not assume a fixed port.
 
+## Over-the-air updates
+
+Frume is linked to the EAS project `@targix/frume`. Store archives embed the
+`production` update channel, while release-simulator proofs default to
+`preview`. Both use Expo's `fingerprint` runtime policy, so an update is
+eligible only for binaries with the same native dependencies and generated
+native configuration. The reviewed embedded bundle remains the offline and
+recovery fallback, and launch never waits for an update download.
+
+Run `npm run ota:verify` before any update work. Publishing commands and the
+first-binary rollout sequence live in [RELEASE.md](./RELEASE.md). An OTA update
+may change only compatible JavaScript and bundled assets within the App Store
+reviewed product contract. Native dependencies, Expo SDK/config plugins,
+permissions, entitlements, or materially new functionality require a new
+App Store build and review.
+
 ## Release
 
 [RELEASE.md](./RELEASE.md) is the release operator runbook and the source of

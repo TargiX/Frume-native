@@ -115,15 +115,19 @@ describe('PuzzleEngine recoverability', () => {
   });
 
   it('snaps an edge-overhanging piece exactly and keeps the locked piece immovable', () => {
-    const engine = new PuzzleEngine(layout());
+    // piece-a's correct position sits on the board edge so a release that
+    // still overhangs can be inside the piece-scaled snap radius.
+    const engine = new PuzzleEngine(
+      layout(100, 80, [piece('piece-a', 0, 0, 10), piece('piece-b', 1, 55, 10)]),
+    );
 
-    engine.takeFromTray('piece-a', { x: -14, y: 10 });
+    engine.takeFromTray('piece-a', { x: -6, y: 10 });
     const snapped = engine.releasePiece('piece-a');
 
     expect(snapped).toMatchObject({
       snapped: true,
       locked: true,
-      position: { x: 10, y: 10 },
+      position: { x: 0, y: 10 },
     });
 
     engine.movePiece('piece-a', { x: -500, y: 500 });
@@ -132,11 +136,11 @@ describe('PuzzleEngine recoverability', () => {
     expect(lockedRelease).toMatchObject({
       snapped: true,
       locked: true,
-      position: { x: 10, y: 10 },
+      position: { x: 0, y: 10 },
     });
     expect(engine.getState().pieces['piece-a']).toMatchObject({
       locked: true,
-      position: { x: 10, y: 10 },
+      position: { x: 0, y: 10 },
     });
   });
 

@@ -20,12 +20,13 @@ this App Store submission.
 | Unsplash credential | A gitignored root `.env` contains legacy Unsplash access/secret variable entries. Rotation is not confirmed; treat both values as compromised. | Invalidate them in Unsplash, obtain a replacement Access Key, verify the old value no longer works, remove the legacy local entries, and store the replacement only in Cloudflare or a gitignored `server/.dev.vars`. |
 | Unsplash API capacity | **Conflict to resolve:** the operator stated on 2026-07-29 that Frume already holds Unsplash **Production** access at 1000 requests/hour, but this runbook has never recorded verified dashboard/header evidence of it. The deployed Worker caps usable provider traffic at 900/hour and the scheduled baseline is 12 searches/hour; live `/photo` and `/track` succeeded. | Verify live `X-Ratelimit-*` headers under expected load and add operational alerting before store release. Use `PHOTO_API_DISABLED=1` if the assumed upstream allowance is disproven. |
 | Expo photo API | The gitignored release environment uses `https://frume-photos.targix8.workers.dev` and the identity-bound live health guard passes. | Re-run the guard from the exact archive environment immediately before building. |
+| EAS Update | Project `@targix/frume` (`bf4ccaf6-6236-4faa-b86f-4b2cfdf6d91d`) has empty `preview` and `production` channels. App configuration enables updates with the native `fingerprint` runtime policy, an embedded fallback, anti-bricking measures, and a non-blocking launch check. No OTA update has been published, and every previously uploaded binary has updates disabled. | Ship and verify one new update-enabled App Store/TestFlight binary before relying on OTA. Prove preview publication/rollback first; publish production only from reviewed source with reviewed public environment values and no native change. |
 | RevenueCat | The Frume RevenueCat project has an App Store app, production `appl_` public SDK key, `default` offering, `$rc_lifetime` package, product `com.targix.frumenative.premiumcuts`, and entitlement `premium_cut_styles`; the gitignored release environment passes the checked-in identifier guard. | Confirm the product is attached to the reconciled App Store version and pass StoreKit sandbox/TestFlight purchase and restore QA on the exact candidate. |
 | Premium contract | Entitlement is exactly `premium_cut_styles`. A purchase is enabled only when a package in the current offering contains the explicitly configured iOS product ID and RevenueCat reports `NON_SUBSCRIPTION`, `NON_CONSUMABLE`, and a null subscription period. The package label is not inspected; every product or metadata mismatch fails closed. | Attach that exact iOS non-consumable to the entitlement and a package in the current offering, then record and compile its reviewed product ID. |
 | iOS build path | The only enabled 1.0 build path pins Node `24.16.0`, npm `11.13.0`, and Xcode `26.6 (17F113)`; performs clean root and Worker installs from both lockfiles; defaults to build `3`; rejects non-`appl_` RevenueCat keys; and verifies the exact reviewed key, product ID, and `premium_cut_styles` entitlement in the optimized `main.jsbundle`. A signed archive additionally requires `HEAD` to equal an explicitly approved full SHA and the live `main` tip at the hardcoded canonical GitHub repository, then independently fetches, raw-manifests, and materializes that exact remote Git tree into a new temporary source directory. Every install, check, prebuild, Metro bundle, and Xcode input runs from the reviewed export, excluding inherited Git rewrites, ignored/local files, hidden index flags, clean filters, and mutable-worktree races. It also requires the exact live Worker nine-check health and Cloudflare version identity contract, blocks developer dotenv and Android-key contamination, regenerates iOS cleanly, and injects own-photo backup exclusion through a versioned config plugin. Remote EAS builds fail in `eas-build-pre-install` until they reproduce these guards. A fresh post-protocol unsigned `1.0.0 (3)` structural simulator proof now compiles and launches without Metro. | Merge the reviewed source and produce a signed build 3+ archive with real production configuration through `npm run ios:archive`. Test that exact processed binary on physical iPhone/iPad and TestFlight; local generation/build/upload/processing/submission remain separate evidence states. |
 | Public links | Current support/privacy content is deployed publicly at `https://support-site-one-alpha.vercel.app/` and `/privacy/`. The anonymous live content guard passed on 2026-08-13 with no authentication redirect. | Install the same URLs in App Store Connect and verify both links from the exact binary on Wi-Fi and cellular. |
 | iOS privacy manifest | The latest local prebuild generated an app manifest containing required-reason API entries and declaring no collection/tracking, and RevenueCat supplies its own manifest. The generated native directory is ignored and no release archive has been audited. | Review the manifests supplied by every native dependency and validate the exact archived binary and store declarations. |
-| Dependency audit | Re-audited 2026-08-12 after compatible lockfile fixes and exact `postcss`/`uuid` overrides: mobile production audit fell from 27 findings to **10 high, 0 critical/moderate/low**. All ten are one Expo/Metro build-tool chain rooted in two `image-size` parser advisories for which npm publishes no fixed version; they process repository build assets, not player photos in the shipped runtime. A checked-in allowlist matches the exact two GHSA URLs and exact dependency chain, so the manual release gate fails on any new advisory. The Worker reports zero. | Keep the exception narrow, do not feed untrusted assets to the release build, and migrate from Expo 54 only on a dedicated device-tested branch. Run `npm run security:dependencies` from the exact candidate; never use `npm audit fix --force` as a release shortcut. |
+| Dependency audit | Re-audited 2026-08-29 after the Expo 54 OTA patch alignment: mobile production audit reports **8 high, 0 critical/moderate/low**. All eight are one Expo/Metro build-tool chain rooted in two `image-size` parser advisories for which npm publishes no fixed version; they process repository build assets, not player photos in the shipped runtime. A checked-in allowlist matches the exact two GHSA URLs and exact dependency chain, so the manual release gate fails on any new advisory. The Worker reports zero. | Keep the exception narrow, do not feed untrusted assets to the release build, and migrate from Expo 54 only on a dedicated device-tested branch. Run `npm run security:dependencies` from the exact candidate; never use `npm audit fix --force` as a release shortcut. |
 | Photo library access | iOS uses `PHPickerViewController` through `expo-image-picker`, so Frume receives only the selected file. Valid 48 MP photos are downsampled locally in a native background operation to a 16 MP derivative before durable copy; extreme source decodes and unusable panoramas fail with actionable copy. Managed files have transactional ownership, are excluded from iCloud Backup by a config plugin that survives clean prebuild, and are never uploaded. | On the exact archive, verify the photo usage string, absence of camera permission, privacy manifests, backup exclusion, orientation, 48 MP HEIF/JPEG, iCloud-backed selection, low-storage interruption, replacement/clear deletion, and App Privacy answers. |
 | Client incident visibility | Global JavaScript handlers and the app error boundary write bounded, redacted diagnostics on device; About & Support can share or clear them. Photo URLs, paths, tokens, and query strings are not retained. This is a user-assisted incident path, not remote crash alerting, and native/framework symbolication remains unproven. | Choose and document the 1.0 contract: provision a privacy-reviewed remote crash service with release symbols, or explicitly sign off Apple Organizer reports plus user-shared diagnostics. Prove a controlled release-like crash is actionable. |
 | QA matrix and screenshots | **Stale as of 2026-08-12.** The 2026-08-01 evidence predates the new Home, imported photographs, 9–196 size ladder, board zoom/pan, multi-row tray, transactional replacement/completion, teaching, paywall continuation, and accessibility controls. The latest unsigned `.app` contains roughly 19 MB of music and 504 KB of category covers; the separate 12 MB store-art source directory was not bundled. | Re-run the device QA matrix and capture fresh iPhone and iPad screenshots from the exact signed candidate. Review the 19 MB shipped music footprint and verify the signed archive contents separately. |
@@ -47,6 +48,11 @@ The checked-in configuration currently establishes:
   1.0 because they do not yet reproduce the local archive's live-page,
   clean-install, and post-Hermes-artifact gates. `FRUME_BUILD_NUMBER` may
   override the checked-in build number only through the guarded local flow.
+- EAS Update remains usable from the guarded local workflow even though remote
+  EAS builds are blocked. App Store archives force the `production` channel;
+  release-simulator proofs default to `preview`. Both channels use a native
+  fingerprint runtime, keep the embedded update, keep Expo anti-bricking
+  enabled, and apply a downloaded update only on a subsequent cold launch.
 - The Worker exposes `GET /health`, `GET /photo`, and `POST /track`, and
   schedules a six-category refill every thirty minutes.
 - Category pools and photo-use grants are globally coordinated by SQLite
@@ -96,10 +102,58 @@ output before building:
 | Existing version/review state | `1.0`; Rejected 2022-12-21, Guideline 4.2 Minimum Functionality |
 | Existing TestFlight trains | `1.0.0`, `1.0.1`, `1.0.3`, `1.0.4`; build `1` appears in `1.0.0` and `1.0.4` |
 | Invalid uploaded build | `1.0.0 (2)`; contains a RevenueCat test key; never attach or submit |
+| EAS Update project and channels | `@targix/frume`, project ID `bf4ccaf6-6236-4faa-b86f-4b2cfdf6d91d`; empty `preview` and `production` channels created 2026-08-29 |
 | Planned next source version/build | `1.0.0 (3)`; confirm build `3` is unused before archive |
 | Agreements | Paid Apps active 2026-07-04–2027-07-03; Free Apps active 2026-07-03–2027-07-03 |
 | Banking/tax readiness | Active in read-only dashboard audit; no sensitive details copied |
 | DSA status | Rejected for 27 EU countries; app currently identified as non-trader; action required |
+
+## EAS Update operations
+
+The update-enabled configuration does not retrofit older App Store or
+TestFlight binaries. First archive and upload a new binary through the existing
+guarded `npm run ios:archive` path, verify its generated `Expo.plist`, and test
+the embedded bundle on device. Do not treat project/channel creation as an OTA
+release or as App Store acceptance.
+
+For a compatible JavaScript/assets change:
+
+1. Confirm the change is within the already reviewed product behavior and does
+   not alter native packages, Expo/config-plugin inputs, permissions,
+   entitlements, or other native capabilities.
+2. From clean, reviewed source, load the same reviewed `EXPO_PUBLIC_*` values
+   used by the target binary. These values are compiled into the update bundle;
+   never use a private credential.
+3. Run `npm run check`, `npm run security:dependencies`, and
+   `npm run ota:verify`.
+4. Publish and validate preview first:
+
+   ```sh
+   FRUME_UPDATE_CHANNEL=preview \
+     npx --yes eas-cli@23.0.0 update \
+       --channel preview \
+       --platform ios \
+       --message "Describe the reviewed change"
+   ```
+
+5. Cold-launch the compatible preview binary twice, because the zero-wait
+   policy downloads on one launch and applies on the next. Verify offline
+   fallback and a rollback before production promotion.
+6. Only after approval, publish the exact reviewed source and configuration to
+   production:
+
+   ```sh
+   FRUME_UPDATE_CHANNEL=production \
+     npx --yes eas-cli@23.0.0 update \
+       --channel production \
+       --platform ios \
+       --message "Describe the approved change"
+   ```
+
+Record the update group ID, Git SHA, runtime fingerprint, channel, environment
+source, device proof, and rollback result. A successful EAS publication proves
+only server acceptance; it does not prove download, activation, user-flow QA,
+or App Store policy compliance.
 
 ## 1. Rotate the Unsplash key and deploy the Worker
 
@@ -671,7 +725,7 @@ Expected results:
   working-tree counts are not immutable candidate evidence.
 
 The audit commands are evidence, not authorization for a forced dependency
-rewrite. The 2026-08-12 mobile production audit reports ten high findings, all
+rewrite. The 2026-08-29 mobile production audit reports eight high findings, all
 in one Expo/Metro build-tool chain rooted in the two reviewed `image-size`
 advisories; no fixed `image-size` release exists and npm's suggested path is an
 unreviewed major Expo 57 migration. `npm run security:dependencies` enforces

@@ -1,5 +1,8 @@
 const DEFAULT_IOS_BUILD_NUMBER = '3';
+const EAS_PROJECT_ID = 'bf4ccaf6-6236-4faa-b86f-4b2cfdf6d91d';
+const UPDATE_CHANNELS = new Set(['preview', 'production']);
 const configuredIosBuildNumber = process.env.FRUME_BUILD_NUMBER;
+const updateChannel = process.env.FRUME_UPDATE_CHANNEL ?? 'production';
 const iosBuildNumber =
   configuredIosBuildNumber === undefined
     ? DEFAULT_IOS_BUILD_NUMBER
@@ -11,14 +14,42 @@ if (!/^[1-9][0-9]*$/.test(iosBuildNumber)) {
   );
 }
 
+if (!UPDATE_CHANNELS.has(updateChannel)) {
+  throw new Error('FRUME_UPDATE_CHANNEL must be preview or production.');
+}
+
 module.exports = {
   expo: {
     name: 'Frume',
+    owner: 'targix',
     slug: 'frume',
     version: '1.0.0',
     orientation: 'default',
     icon: './assets/frume-icon.png',
     scheme: 'frume',
+    runtimeVersion: {
+      // The update layer may run only on a binary with the exact same native
+      // dependency and configuration fingerprint.
+      policy: 'fingerprint',
+    },
+    updates: {
+      enabled: true,
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+      checkAutomatically: 'ON_LOAD',
+      // Launch the newest cached/embedded bundle immediately. An update found
+      // on this check is applied on the following cold launch.
+      fallbackToCacheTimeout: 0,
+      useEmbeddedUpdate: true,
+      disableAntiBrickingMeasures: false,
+      requestHeaders: {
+        'expo-channel-name': updateChannel,
+      },
+    },
+    extra: {
+      eas: {
+        projectId: EAS_PROJECT_ID,
+      },
+    },
     userInterfaceStyle: 'dark',
     newArchEnabled: true,
     splash: {

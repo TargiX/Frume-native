@@ -12,6 +12,12 @@ fi
 # configuration after the clean prebuild has finished.
 export EXPO_NO_DOTENV=1
 
+if [ -n "${FRUME_UPDATE_CHANNEL:-}" ] && [ "$FRUME_UPDATE_CHANNEL" != "production" ]; then
+  echo "The App Store archive must embed the production EAS Update channel." >&2
+  exit 2
+fi
+export FRUME_UPDATE_CHANNEL=production
+
 : "${FRUME_DEVELOPMENT_TEAM:?Set the reviewed Apple Developer team ID}"
 : "${FRUME_BUILD_NUMBER:?Set the App Store Connect build number}"
 : "${EXPO_PUBLIC_PHOTO_API_URL:?Set the verified production Worker URL}"
@@ -29,6 +35,7 @@ photo_api_url_validator="$script_dir/validate-production-photo-api-url.mjs"
 photo_api_health_validator="$script_dir/validate-production-photo-api-health.mjs"
 revenuecat_validator="$script_dir/validate-revenuecat-ios-release.mjs"
 public_pages_validator="$script_dir/validate-public-release-pages.mjs"
+ota_config_validator="$script_dir/validate-ota-config.mjs"
 apple_toolchain_validator="$script_dir/validate-apple-toolchain.mjs"
 release_revision_validator="$script_dir/validate-release-revision.mjs"
 frume_tmp_root=${TMPDIR:-/tmp}
@@ -44,6 +51,7 @@ if [ "$release_source_stage" != "1" ]; then
     exit 2
   fi
   node "$apple_toolchain_validator" || exit 2
+  node "$ota_config_validator" || exit 2
   node "$revenuecat_validator" || exit 2
 
   if [ -z "${FRUME_REVIEWED_RELEASE_SHA:-}" ]; then

@@ -515,6 +515,8 @@ test('archive path always enforces live legal pages and dependency risk', () => 
   );
   assert.match(archiveScript, /node "\$photo_api_health_validator"/);
   assert.match(archiveScript, /node "\$apple_toolchain_validator"/);
+  assert.match(archiveScript, /node "\$ota_config_validator"/);
+  assert.match(archiveScript, /export FRUME_UPDATE_CHANNEL=production/);
   assert.match(archiveScript, /node "\$release_revision_validator"/);
   assert.match(archiveScript, /FRUME_RELEASE_SOURCE_EXPORT="\$release_source_dir"/);
   assert.match(archiveScript, /FRUME_RELEASE_SOURCE_STAGE=1/);
@@ -585,6 +587,11 @@ test('Release simulator builds cannot import a developer dotenv implicitly', () 
   assert.match(simulatorScript, /Archive identity verified|Release identity verified/);
   assert.doesNotMatch(simulatorScript, /photo_api_health_validator/);
   assert.match(simulatorScript, /node "\$apple_toolchain_validator"/);
+  assert.match(simulatorScript, /node "\$ota_config_validator"/);
+  assert.match(
+    simulatorScript,
+    /FRUME_UPDATE_CHANNEL=\$\{FRUME_UPDATE_CHANNEL:-preview\}/,
+  );
 });
 
 test('production photo API health guard requires the exact ready contract', async () => {
