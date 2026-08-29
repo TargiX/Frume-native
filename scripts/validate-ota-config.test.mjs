@@ -13,6 +13,7 @@ const repositoryEasConfig = JSON.parse(
 
 const projectId = '123e4567-e89b-42d3-a456-426614174000';
 
+/** Creates a minimal Expo configuration satisfying the OTA contract. */
 function validAppConfig() {
   return {
     runtimeVersion: { policy: 'fingerprint' },
@@ -33,6 +34,7 @@ function validAppConfig() {
   };
 }
 
+/** Creates matching preview and production EAS build profiles. */
 function validEasConfig() {
   return {
     build: {

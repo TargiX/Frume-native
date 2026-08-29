@@ -489,6 +489,7 @@ test('release entrypoints reject Node preload injection', () => {
   for (const script of [
     './scripts/archive-ios-release.sh',
     './scripts/build-ios-release-simulator.sh',
+    './scripts/publish-ota-update.sh',
   ]) {
     const result = spawnSync(script, {
       cwd: repoDirectory,

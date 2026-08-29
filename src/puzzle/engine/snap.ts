@@ -7,6 +7,7 @@ import {
   SNAP_THRESHOLD_RATIO,
 } from './constants';
 
+/** Returns the immutable board-space target assigned by the cutter. */
 export function getCorrectPosition(piece: PuzzlePieceDefinition): Point {
   return piece.correctPosition;
 }
@@ -20,10 +21,12 @@ export function snapThreshold(piece: PuzzlePieceDefinition): number {
   );
 }
 
+/** Reports whether the current position is within this piece's assisted radius. */
 export function shouldSnap(piece: PuzzlePieceDefinition, currentPosition: Point): boolean {
   return distance(currentPosition, piece.correctPosition) <= snapThreshold(piece);
 }
 
+/** Resolves a release to the exact target only when snapping is permitted. */
 export function resolveSnapPosition(
   piece: PuzzlePieceDefinition,
   currentPosition: Point,

@@ -6,9 +6,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,6 +28,48 @@ const CANONICAL_FETCH_TIMEOUT_MS = 180_000;
 export const REVIEWED_RELEASE_REMOTE_URL =
   'https://github.com/TargiX/Frume-native.git';
 export const REVIEWED_RELEASE_BRANCH = 'main';
+
+/**
+ * Hashes a materialized release tree with the same mode, Git blob, and path
+ * representation used by `exportReviewedReleaseSource`.
+ */
+export function releaseSourceManifestDigest(directory) {
+  const root = realpathSync(directory);
+  const manifest = [];
+
+  /** Adds every regular file beneath one directory to the raw manifest. */
+  function walk(currentDirectory, prefix = '') {
+    for (const entry of readdirSync(currentDirectory, { withFileTypes: true })) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolutePath = join(currentDirectory, entry.name);
+      if (entry.isDirectory()) {
+        walk(absolutePath, relativePath);
+      } else if (entry.isFile()) {
+        const contents = readFileSync(absolutePath);
+        const header = Buffer.from(`blob ${contents.length}\0`);
+        const objectId = createHash('sha1')
+          .update(header)
+          .update(contents)
+          .digest('hex');
+        const mode = statSync(absolutePath).mode & 0o111 ? '100755' : '100644';
+        manifest.push(`${mode} ${objectId}\t${relativePath}`);
+      } else {
+        throw new Error(
+          `Unsupported entry in the reviewed release tree: ${relativePath}.`,
+        );
+      }
+    }
+  }
+
+  walk(root);
+  if (manifest.length === 0) {
+    throw new Error('The reviewed release source tree is empty.');
+  }
+  manifest.sort((left, right) =>
+    Buffer.compare(Buffer.from(left), Buffer.from(right)),
+  );
+  return createHash('sha256').update(manifest.join('\n')).digest('hex');
+}
 
 export function sanitizedGitEnvironment(source = process.env) {
   const environment = Object.fromEntries(

@@ -124,36 +124,44 @@ For a compatible JavaScript/assets change:
 2. From clean, reviewed source, load the same reviewed `EXPO_PUBLIC_*` values
    used by the target binary. These values are compiled into the update bundle;
    never use a private credential.
-3. Run `npm run check`, `npm run security:dependencies`, and
-   `npm run ota:verify`.
-4. Publish and validate preview first:
+3. Set `FRUME_REVIEWED_RELEASE_SHA` to the full approved current canonical
+   `main` SHA and `FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID` to the reviewed live
+   Worker version. The publication command below rejects every other source,
+   disables dotenv loading, exports that remote Git tree into a fresh temporary
+   directory, installs both lockfiles with `npm ci`, runs the complete release
+   and dependency gates, validates the live public configuration, builds and
+   scans one iOS Hermes bundle, and gives EAS only those inspected bytes. It
+   also rejects any unreviewed `EXPO_PUBLIC_*` variable in the environment.
+4. Publish and validate preview first through that one guarded command:
 
    ```sh
+   FRUME_REVIEWED_RELEASE_SHA='<full approved canonical GitHub main SHA>' \
+   FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID='<active Cloudflare version ID>' \
    FRUME_UPDATE_CHANNEL=preview \
-     npx --yes eas-cli@23.0.0 update \
-       --channel preview \
-       --platform ios \
-       --message "Describe the reviewed change"
+   FRUME_UPDATE_MESSAGE='Describe the reviewed change' \
+     npm run ota:publish
    ```
 
 5. Cold-launch the compatible preview binary twice, because the zero-wait
    policy downloads on one launch and applies on the next. Verify offline
    fallback and a rollback before production promotion.
-6. Only after approval, publish the exact reviewed source and configuration to
-   production:
+6. Only after approval, publish the exact same reviewed source and explicit
+   configuration to production through the guarded command:
 
    ```sh
+   FRUME_REVIEWED_RELEASE_SHA='<full approved canonical GitHub main SHA>' \
+   FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID='<active Cloudflare version ID>' \
    FRUME_UPDATE_CHANNEL=production \
-     npx --yes eas-cli@23.0.0 update \
-       --channel production \
-       --platform ios \
-       --message "Describe the approved change"
+   FRUME_UPDATE_MESSAGE='Describe the approved change' \
+     npm run ota:publish
    ```
 
 Record the update group ID, Git SHA, runtime fingerprint, channel, environment
 source, device proof, and rollback result. A successful EAS publication proves
 only server acceptance; it does not prove download, activation, user-flow QA,
-or App Store policy compliance.
+or App Store policy compliance. Do not call EAS Update directly: doing so
+bypasses canonical-source, clean-install, live-environment, and bundle-scan
+gates.
 
 ## 1. Rotate the Unsplash key and deploy the Worker
 

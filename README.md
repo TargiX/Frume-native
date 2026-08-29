@@ -100,12 +100,14 @@ eligible only for binaries with the same native dependencies and generated
 native configuration. The reviewed embedded bundle remains the offline and
 recovery fallback, and launch never waits for an update download.
 
-Run `npm run ota:verify` before any update work. Publishing commands and the
-first-binary rollout sequence live in [RELEASE.md](./RELEASE.md). An OTA update
-may change only compatible JavaScript and bundled assets within the App Store
-reviewed product contract. Native dependencies, Expo SDK/config plugins,
-permissions, entitlements, or materially new functionality require a new
-App Store build and review.
+`npm run ota:publish` is the only supported publication entrypoint. It owns OTA
+configuration validation plus the canonical-source, explicit-environment,
+clean-install, full-check, post-bundle scan, and pinned EAS publication gates.
+Required operator inputs and the first-binary rollout sequence live in
+[RELEASE.md](./RELEASE.md). An OTA update may change only compatible JavaScript
+and bundled assets within the App Store reviewed product contract. Native
+dependencies, Expo SDK/config plugins, permissions, entitlements, or materially
+new functionality require a new App Store build and review.
 
 ## Release
 

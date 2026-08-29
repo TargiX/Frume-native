@@ -8,6 +8,7 @@ import {
 } from './constants';
 import { resolveSnapPosition, shouldSnap, snapThreshold } from './snap';
 
+/** Creates a minimal piece definition with configurable rendered bounds. */
 function piece(width: number, height: number): PuzzlePieceDefinition {
   return {
     id: 'piece',

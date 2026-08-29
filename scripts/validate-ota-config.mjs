@@ -8,10 +8,12 @@ const PROJECT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UPDATE_CHANNELS = new Set(['preview', 'production']);
 
+/** Throws a stable operator-facing error when one OTA invariant is absent. */
 function assertConfig(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+/** Validates the native runtime, fallback, project, and channel OTA contract. */
 export function validateOtaConfig({
   appConfig,
   easConfig,
@@ -74,6 +76,7 @@ export function validateOtaConfig({
   return { projectId, channel: expectedChannel };
 }
 
+/** Validates the checked-in Expo and EAS configuration for the selected channel. */
 function run() {
   const expectedChannel = process.env.FRUME_UPDATE_CHANNEL ?? 'production';
   const appConfig = require('../app.config.js').expo;
