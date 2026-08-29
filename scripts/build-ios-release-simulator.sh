@@ -10,6 +10,7 @@ fi
 # Release-like simulator proofs must use only the environment passed to this
 # process. A gitignored developer .env must never enter prebuild or Metro.
 export EXPO_NO_DOTENV=1
+export FRUME_UPDATE_CHANNEL=${FRUME_UPDATE_CHANNEL:-preview}
 
 : "${FRUME_BUILD_NUMBER:?Set the release-like iOS build number}"
 : "${EXPO_PUBLIC_PHOTO_API_URL:?Set the public HTTPS photo API URL under test}"
@@ -26,6 +27,7 @@ compiler_proxy="$script_dir/xcode-clang-proxy.py"
 photo_api_url_validator="$script_dir/validate-production-photo-api-url.mjs"
 revenuecat_validator="$script_dir/validate-revenuecat-ios-release.mjs"
 public_pages_validator="$script_dir/validate-public-release-pages.mjs"
+ota_config_validator="$script_dir/validate-ota-config.mjs"
 apple_toolchain_validator="$script_dir/validate-apple-toolchain.mjs"
 frume_tmp_root=${TMPDIR:-/tmp}
 derived_data=${FRUME_DERIVED_DATA_PATH:-}
@@ -36,6 +38,9 @@ if [ -n "${EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY:-}" ]; then
 fi
 
 if ! node "$apple_toolchain_validator"; then
+  exit 2
+fi
+if ! node "$ota_config_validator"; then
   exit 2
 fi
 
