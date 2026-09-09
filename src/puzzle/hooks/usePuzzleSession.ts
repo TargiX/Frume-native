@@ -5,6 +5,8 @@ import { isPremiumCutter, usePremiumAccess } from '../../premium';
 import { reconcileOwnPhotoOwnership } from '../../features/play/utils/ownPhotoLibrary';
 import { getCutter } from '../cutters';
 import { PuzzleEngine } from '../engine';
+import { isDiscoveryPuzzle } from '../discovery';
+import { puzzleLibrary, libraryPuzzleId } from '../persistence/PuzzleLibrary';
 import { DEFAULT_PUZZLE_GUIDE_MODE } from '../types';
 import {
   ExpoPuzzleImageFileStore,
@@ -48,8 +50,7 @@ export type StartPuzzleSessionParams = {
 };
 
 export type PuzzleSessionStartResult =
-  | { success: true; session: PuzzleSession }
-  | { success: false; error: string };
+  { success: true; session: PuzzleSession } | { success: false; error: string };
 
 /**
  * Opaque transaction returned while a replacement puzzle is awaiting its
@@ -115,6 +116,7 @@ export type UsePuzzleSessionResult = {
   setGameFocused: (focused: boolean) => void;
   /** Attempts to durably flush the exact active session again. */
   retrySave: () => Promise<boolean>;
+  openLibraryPuzzle: (id: string) => Promise<PuzzleSession | null>;
   clearSession: () => void;
   clearCompletion: () => Promise<boolean>;
 };
@@ -198,7 +200,11 @@ export async function preparePuzzleSession(
   resolveCutter = getCutter,
   premiumCutsUnlocked = false,
 ): Promise<PuzzleSessionStartResult> {
-  if (isPremiumCutter(cutterId) && !premiumCutsUnlocked) {
+  if (
+    isPremiumCutter(cutterId) &&
+    !premiumCutsUnlocked &&
+    !isDiscoveryPuzzle(image, cutterId, difficulty)
+  ) {
     return {
       success: false,
       error: PREMIUM_CUTS_REQUIRED_ERROR,
@@ -223,7 +229,8 @@ export async function preparePuzzleSession(
   } catch (caught) {
     return {
       success: false,
-      error: caught instanceof Error ? caught.message : 'Failed to create puzzle',
+      error:
+        caught instanceof Error ? caught.message : 'Failed to create puzzle',
     };
   }
 }
@@ -348,8 +355,8 @@ export function mustPreserveCompletedSessionSnapshot(
 ): boolean {
   return Boolean(
     session?.engine.isComplete() &&
-      visibleCompletion &&
-      visibleCompletion !== durableCompletion,
+    visibleCompletion &&
+    visibleCompletion !== durableCompletion,
   );
 }
 
@@ -391,10 +398,7 @@ export function retainFailedPromotedCompletionClear(
 }
 
 export type CompletionRemovalResult =
-  | 'cleared'
-  | 'snapshot_failed'
-  | 'receipt_failed'
-  | 'stale';
+  'cleared' | 'snapshot_failed' | 'receipt_failed' | 'stale';
 
 /** Clears the active completed snapshot before its receipt can be removed. */
 export async function removeCompletionDurably(
@@ -417,8 +421,9 @@ export async function removeCompletionDurably(
 export function usePuzzleSession(): UsePuzzleSessionResult {
   const { isPremium, verifyPremiumCuts } = usePremiumAccess();
   const [session, setSession] = useState<PuzzleSession | null>(null);
-  const [completion, setCompletion] =
-    useState<PuzzleCompletionReceipt | null>(null);
+  const [completion, setCompletion] = useState<PuzzleCompletionReceipt | null>(
+    null,
+  );
   const [completionSaving, setCompletionSaving] = useState(false);
   const [completionDurable, setCompletionDurable] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -444,8 +449,9 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
   const gameFocusedRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const persistenceRef = useRef<PuzzleSessionPersistence | null>(null);
-  const completionPersistenceRef =
-    useRef<PuzzleCompletionPersistence | null>(null);
+  const completionPersistenceRef = useRef<PuzzleCompletionPersistence | null>(
+    null,
+  );
   const imageCacheRef = useRef<PuzzleImageCache | null>(null);
 
   if (!persistenceRef.current) {
@@ -522,12 +528,22 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
               completionPersistence,
               () => completionRef.current === receipt,
             ).then(async ({ progressSaved, completionSaved }) => {
-              const stillCurrentCompletion =
-                completionRef.current === receipt;
+              const stillCurrentCompletion = completionRef.current === receipt;
               if (!progressSaved || !completionSaved) {
                 if (stillCurrentCompletion && mountedRef.current) {
                   setCompletionSaving(false);
                   setPersistenceError('Completed puzzle could not be saved');
+                }
+                return;
+              }
+              try {
+                await puzzleLibrary.remember(sessionSnapshot(current));
+              } catch {
+                if (mountedRef.current) {
+                  setCompletionSaving(false);
+                  setPersistenceError(
+                    'Your result could not be added to the album. Retry saving before leaving.',
+                  );
                 }
                 return;
               }
@@ -635,6 +651,34 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           setCompletion(receipt);
           setCompletionSaving(true);
           setCompletionDurable(false);
+          try {
+            await puzzleLibrary.remember(restored);
+          } catch {
+            if (
+              cancelled ||
+              requestId !== sessionRequestId.current ||
+              !mountedRef.current
+            )
+              return;
+            installSession({
+              layout: restored.engine.layout,
+              engine: PuzzleEngine.fromSnapshot(restored.engine),
+              cutterId: restored.cutterId,
+              difficulty: restored.difficulty,
+              guideMode: restored.guideMode,
+            });
+            setCompletionSaving(false);
+            setPersistenceError(
+              'Your completed puzzle could not be added to the album. Retry saving.',
+            );
+            return;
+          }
+          if (
+            cancelled ||
+            requestId !== sessionRequestId.current ||
+            !mountedRef.current
+          )
+            return;
           const promotion = await promoteRestoredCompletion(
             receipt,
             completionPersistence,
@@ -657,11 +701,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             ? null
             : receipt.image.uri;
           completedSnapshotClearRetentionRef.current =
-            retainFailedPromotedCompletionClear(
-              receipt,
-              requestId,
-              promotion,
-            );
+            retainFailedPromotedCompletionClear(receipt, requestId, promotion);
           if (!promotion.completionSaved) {
             const restoredLayout = {
               ...restored.engine.layout,
@@ -675,8 +715,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
               }),
               cutterId: restored.cutterId,
               difficulty: restored.difficulty,
-              guideMode:
-                restored.guideMode ?? DEFAULT_PUZZLE_GUIDE_MODE,
+              guideMode: restored.guideMode ?? DEFAULT_PUZZLE_GUIDE_MODE,
             };
             imageDurableRef.current = resolved.durable;
             installSession(restoredSession);
@@ -732,8 +771,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           engine,
           cutterId: restored.cutterId,
           difficulty: restored.difficulty,
-          guideMode:
-            restored.guideMode ?? DEFAULT_PUZZLE_GUIDE_MODE,
+          guideMode: restored.guideMode ?? DEFAULT_PUZZLE_GUIDE_MODE,
         };
         imageDurableRef.current = resolvedImage.durable;
         installSession(restoredSession);
@@ -799,19 +837,18 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       }
       if (nextState === 'inactive' || nextState === 'background') {
         const current = sessionRef.current;
-        void recoverAndFlushPuzzleSession(
-          current,
-          persistence,
-        ).then((saved) => {
-          if (
-            saved &&
-            imageDurableRef.current &&
-            mountedRef.current &&
-            sessionRef.current?.engine === current?.engine
-          ) {
-            setPersistenceError(null);
-          }
-        });
+        void recoverAndFlushPuzzleSession(current, persistence).then(
+          (saved) => {
+            if (
+              saved &&
+              imageDurableRef.current &&
+              mountedRef.current &&
+              sessionRef.current?.engine === current?.engine
+            ) {
+              setPersistenceError(null);
+            }
+          },
+        );
         return;
       }
       syncPuzzleSessionActivity(
@@ -877,9 +914,11 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       setRestoring(false);
       setError(null);
       try {
-        const premiumCutsUnlocked = isPremiumCutter(cutterId)
-          ? await verifyPremiumCuts()
-          : false;
+        const premiumCutsUnlocked =
+          isPremiumCutter(cutterId) &&
+          !isDiscoveryPuzzle(image, cutterId, difficulty)
+            ? await verifyPremiumCuts()
+            : false;
         if (!stillOwnsReplacement()) {
           return null;
         }
@@ -964,6 +1003,24 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         return false;
       }
 
+      if (replacement.previousSession) {
+        replacement.previousSession.engine.pause();
+        try {
+          await puzzleLibrary.remember(
+            sessionSnapshot(replacement.previousSession),
+            libraryPuzzleId(sessionSnapshot(replacement.nextSession)),
+          );
+        } catch (caught) {
+          setPersistenceError(
+            caught instanceof Error
+              ? caught.message
+              : 'Your puzzle could not be saved to the shelf.',
+          );
+          return false;
+        }
+        if (!isCurrent()) return false;
+      }
+
       // Commit the exact replacement snapshot before exposing its engine. If
       // the process exits here, restore sees the whole next session; if this
       // write fails, the player remains on the prior board/setup screen.
@@ -978,7 +1035,10 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         replaceResult === 'committed' || replaceResult === 'rollback_failed';
       if (replaceResult !== 'committed' || !isCurrent()) {
         if (mountedRef.current) {
-          if (replaceResult === 'failed' || replaceResult === 'rollback_failed') {
+          if (
+            replaceResult === 'failed' ||
+            replaceResult === 'rollback_failed'
+          ) {
             setPersistenceError('Progress could not be saved on this device');
           }
         }
@@ -990,6 +1050,12 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       completedSnapshotClearRetentionRef.current = null;
       imageDurableRef.current = replacement.nextImageDurable;
       installSession(replacement.nextSession);
+      // The active snapshot now owns this puzzle. A failed duplicate removal is harmless.
+      if (!replacement.nextSession.engine.isComplete()) {
+        await puzzleLibrary
+          .remove(libraryPuzzleId(sessionSnapshot(replacement.nextSession)))
+          .catch(() => undefined);
+      }
       await imageCache
         .retainOnly(replacement.nextSession.layout.image.uri)
         .catch(() => undefined);
@@ -1063,6 +1129,106 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       return durableRestored;
     },
     [imageCache, persistence],
+  );
+
+  const openLibraryPuzzle = useCallback(
+    async (id: string): Promise<PuzzleSession | null> => {
+      if (loading || restoring) return null;
+      const previousSession = sessionRef.current;
+      const requestId = ++sessionRequestId.current;
+      setLoading(true);
+      try {
+        const entry = (await puzzleLibrary.load()).find(
+          (item) => item.id === id,
+        );
+        if (!entry || requestId !== sessionRequestId.current) return null;
+        const saved = entry.snapshot;
+        if (
+          isPremiumCutter(saved.cutterId) &&
+          !isDiscoveryPuzzle(
+            saved.engine.layout.image,
+            saved.cutterId,
+            saved.difficulty,
+          ) &&
+          !(await verifyPremiumCuts())
+        ) {
+          setPersistenceError(
+            'Restore or unlock Premium Cuts to open this puzzle.',
+          );
+          return null;
+        }
+        const nextSession: PuzzleSession = {
+          layout: saved.engine.layout,
+          engine: PuzzleEngine.fromSnapshot(saved.engine),
+          cutterId: saved.cutterId,
+          difficulty: saved.difficulty,
+          guideMode: saved.guideMode,
+        };
+        const replacement: PuzzleSessionReplacement = {
+          previousSession,
+          nextSession,
+          requestId,
+          previousImageDurable: imageDurableRef.current,
+          nextImageDurable: true,
+          durableReplaced: false,
+          settled: false,
+        };
+        const committed = await commitSessionReplacement(
+          replacement,
+          () => mountedRef.current && requestId === sessionRequestId.current,
+        );
+        if (!committed) {
+          await rollbackSessionReplacement(replacement).catch(() => false);
+          return null;
+        }
+        if (
+          !mountedRef.current ||
+          requestId !== sessionRequestId.current ||
+          sessionRef.current !== nextSession
+        )
+          return null;
+        if (nextSession.engine.isComplete()) {
+          const receipt = completionReceiptFromSnapshot(
+            nextSession.engine.getSnapshot(),
+            nextSession.cutterId,
+            nextSession.difficulty,
+          );
+          completionRef.current = receipt;
+          setCompletion(receipt);
+          setCompletionSaving(true);
+          setCompletionDurable(false);
+          const savedReceipt = await completionPersistence.save(receipt);
+          if (
+            !mountedRef.current ||
+            requestId !== sessionRequestId.current ||
+            sessionRef.current !== nextSession
+          )
+            return null;
+          if (savedReceipt) durableCompletionRef.current = receipt;
+          if (mountedRef.current) {
+            setCompletionSaving(false);
+            setCompletionDurable(savedReceipt);
+          }
+        }
+        return nextSession;
+      } catch {
+        setPersistenceError(
+          'The saved puzzle could not be opened. Your shelf has been kept.',
+        );
+        return null;
+      } finally {
+        if (mountedRef.current && requestId === sessionRequestId.current)
+          setLoading(false);
+      }
+    },
+    [
+      loading,
+      restoring,
+      verifyPremiumCuts,
+      commitSessionReplacement,
+      rollbackSessionReplacement,
+      completionPersistence,
+    ],
   );
 
   const startSession = useCallback(
@@ -1186,10 +1352,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
 
     persistence.schedule(sessionSnapshot(current));
     const saved = await persistence.flush();
-    if (
-      !mountedRef.current ||
-      sessionRef.current?.engine !== current.engine
-    ) {
+    if (!mountedRef.current || sessionRef.current?.engine !== current.engine) {
       return false;
     }
 
@@ -1220,7 +1383,27 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         setPersistenceError('Completed puzzle could not be saved');
         return false;
       }
+      if (
+        !mountedRef.current ||
+        sessionRef.current !== current ||
+        completionRef.current !== completionReceipt
+      )
+        return false;
       if (completionSaved) {
+        try {
+          await puzzleLibrary.remember(sessionSnapshot(current));
+        } catch {
+          setPersistenceError(
+            'Your completed puzzle could not be added to the album. Retry saving.',
+          );
+          return false;
+        }
+        if (
+          !mountedRef.current ||
+          sessionRef.current !== current ||
+          completionRef.current !== completionReceipt
+        )
+          return false;
         durableCompletionRef.current = completionReceipt;
         setCompletionDurable(true);
       }
@@ -1456,7 +1639,14 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     completionSaving,
     completionDurable,
     sessionAccessBlocked:
-      !!session && isPremiumCutter(session.cutterId) && !isPremium,
+      !!session &&
+      isPremiumCutter(session.cutterId) &&
+      !isPremium &&
+      !isDiscoveryPuzzle(
+        session.layout.image,
+        session.cutterId,
+        session.difficulty,
+      ),
     loading,
     restoring,
     error,
@@ -1470,6 +1660,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     setGameFocused,
     retrySave,
     clearSession,
+    openLibraryPuzzle,
     clearCompletion,
   };
 }

@@ -60,6 +60,7 @@ import type {
   PuzzleTableAppearance,
   SnapFeedback,
 } from '../types';
+import { displayImageUri as resolveDisplayImageUri } from '../discoveryAsset';
 import { BoardSurface } from './BoardSurface';
 import { resolveBoardLayerClip } from './boardLayerClip';
 import {
@@ -163,30 +164,22 @@ function PieceDrawing({
           ? trayScroll.value
           : 0,
     });
-    return [
-      { translateX: translation.x },
-      { translateY: translation.y },
-    ];
+    return [{ translateX: translation.x }, { translateY: translation.y }];
   });
   const pieceTransform = useDerivedValue(() => [
     {
       rotate:
-        ((runtime.locked
-          ? definition.correctRotation
-          : visual.rotation.value) *
+        ((runtime.locked ? definition.correctRotation : visual.rotation.value) *
           Math.PI) /
         180,
     },
     {
       scale:
-        visual.scale.value *
-        (runtime.locked ? 1 : visual.trayFactor.value),
+        visual.scale.value * (runtime.locked ? 1 : visual.trayFactor.value),
     },
   ]);
   const layerOpacity = useDerivedValue(() =>
-    visual.trayAttached.value === (layer === 'tray')
-      ? visual.opacity.value
-      : 0,
+    visual.trayAttached.value === (layer === 'tray') ? visual.opacity.value : 0,
   );
   const center = {
     x: definition.bounds.x + definition.bounds.width / 2,
@@ -260,6 +253,7 @@ type PieceGestureOverlayProps = {
   cameraY: SharedValue<number>;
   minTrayScroll: number;
   maxTrayScroll: number;
+  companions: { x: SharedValue<number>; y: SharedValue<number> }[];
   totalPieces: number;
   surfaceInset: number;
   surfaceInsetY: number;
@@ -283,10 +277,22 @@ function PieceGestureOverlay({
   minTrayScroll,
   maxTrayScroll,
   totalPieces,
+  companions,
   surfaceInset,
   surfaceInsetY,
   hapticsEnabled,
 }: PieceGestureOverlayProps) {
+  const companionsRef = useRef(companions);
+  if (
+    companions.length !== companionsRef.current.length ||
+    companions.some(
+      (item, index) =>
+        item.x !== companionsRef.current[index]?.x ||
+        item.y !== companionsRef.current[index]?.y,
+    )
+  ) {
+    companionsRef.current = companions;
+  }
   const inTray = runtime.inTray;
   const hitWidth = Math.max(
     definition.bounds.width * (inTray ? trayScale : 1),
@@ -321,6 +327,7 @@ function PieceGestureOverlay({
     surfaceOriginY: surfaceInsetY,
     positionX: visual.x,
     positionY: visual.y,
+    companions: companionsRef.current,
     hapticsEnabled,
   });
   const animatedStyle = useAnimatedStyle(() => {
@@ -347,10 +354,7 @@ function PieceGestureOverlay({
       left: center.x - hitWidth / 2,
       top: center.y - hitHeight / 2,
       opacity: visual.opacity.value,
-      transform: [
-        { scale },
-        { rotate: `${visual.rotation.value}deg` },
-      ],
+      transform: [{ scale }, { rotate: `${visual.rotation.value}deg` }],
     };
   });
   const placeWithAssistiveTechnology = useCallback(() => {
@@ -469,7 +473,10 @@ export function PuzzleBoard({
     },
     [displayImageUri, image.remoteUri],
   );
-  const skiaImage = useImage(displayImageUri, handleImageError);
+  const skiaImage = useImage(
+    displayImageUri ? resolveDisplayImageUri(displayImageUri) : null,
+    handleImageError,
+  );
   const imageStatusMessage = imageError
     ? `Photograph unavailable. ${imageRetryPresentation.guidance}`
     : skiaImage
@@ -499,8 +506,7 @@ export function PuzzleBoard({
     visibleBatch: number;
   }>({ engine: null, signal: -1, visibleBatch: -1 });
   const visibleEntranceBatch =
-    entranceGate.engine === engine &&
-    entranceGate.signal === roundResetSignal
+    entranceGate.engine === engine && entranceGate.signal === roundResetSignal
       ? entranceGate.visibleBatch
       : -1;
   /**
@@ -600,9 +606,7 @@ export function PuzzleBoard({
   }, [image.uri, roundResetSignal]);
 
   const retryImageLoad = useCallback(() => {
-    const nextRetryCount = acceptManualImageLoadRetry(
-      manualImageLoadRetries,
-    );
+    const nextRetryCount = acceptManualImageLoadRetry(manualImageLoadRetries);
     if (nextRetryCount === null) {
       return;
     }
@@ -655,9 +659,7 @@ export function PuzzleBoard({
           ? definition.bounds.width
           : definition.bounds.height;
       const position =
-        trayPlacement === 'bottom'
-          ? runtime.position.x
-          : runtime.position.y;
+        trayPlacement === 'bottom' ? runtime.position.x : runtime.position.y;
       const inset = (boundsExtent * (1 - trayMetrics.scale)) / 2;
       const leading = position + inset;
       min = Math.min(min, leading);
@@ -779,8 +781,7 @@ export function PuzzleBoard({
       gesture.activeOffsetY([-6, 6]).failOffsetX([-12, 12]);
     }
     return gesture.onChange((event) => {
-      const change =
-        trayPlacement === 'bottom' ? event.changeX : event.changeY;
+      const change = trayPlacement === 'bottom' ? event.changeX : event.changeY;
       trayScroll.value = Math.min(
         maxScroll,
         Math.max(minScroll, trayScroll.value + change),
@@ -915,8 +916,7 @@ export function PuzzleBoard({
           timers.push(
             setTimeout(() => {
               setEntranceGate((current) =>
-                current.engine === engine &&
-                current.signal === roundResetSignal
+                current.engine === engine && current.signal === roundResetSignal
                   ? {
                       ...current,
                       visibleBatch: Math.max(current.visibleBatch, batch),
@@ -941,13 +941,7 @@ export function PuzzleBoard({
       });
     };
     // Relayout keeps the same engine and signal, so it cannot replay the deal.
-  }, [
-    engine,
-    engineSync,
-    reduceMotion,
-    roundResetSignal,
-    visuals,
-  ]);
+  }, [engine, engineSync, reduceMotion, roundResetSignal, visuals]);
 
   useEffect(() => {
     layout.pieces.forEach((definition) => {
@@ -967,12 +961,11 @@ export function PuzzleBoard({
 
       const trayTransition = runtime.inTray !== synced.inTray;
       if (trayTransition) {
-        const animateProgrammaticTrayExit =
-          shouldAnimateProgrammaticTrayExit({
-            engineInTray: synced.inTray,
-            runtimeInTray: runtime.inTray,
-            trayAttached: visual.trayAttached.value,
-          });
+        const animateProgrammaticTrayExit = shouldAnimateProgrammaticTrayExit({
+          engineInTray: synced.inTray,
+          runtimeInTray: runtime.inTray,
+          trayAttached: visual.trayAttached.value,
+        });
         synced.inTray = runtime.inTray;
         if (runtime.inTray) {
           // Change from the camera-controlled board into the fixed tray
@@ -1140,13 +1133,7 @@ export function PuzzleBoard({
     fullOpacity.value = withTiming(1, {
       duration: PUZZLE_SEAM_DISSOLVE_MS,
     });
-  }, [
-    completed,
-    fullOpacity,
-    piecesOpacity,
-    reduceMotion,
-    roundResetSignal,
-  ]);
+  }, [completed, fullOpacity, piecesOpacity, reduceMotion, roundResetSignal]);
 
   useEffect(() => {
     if (!snapFeedback) {
@@ -1404,6 +1391,13 @@ export function PuzzleBoard({
                   definition={definition}
                   runtime={runtime}
                   visual={visual}
+                  companions={engine
+                    .getConnectedPieceIds(definition.id)
+                    .filter((id) => id !== definition.id)
+                    .flatMap((id) => {
+                      const other = visuals.get(id);
+                      return other ? [{ x: other.x, y: other.y }] : [];
+                    })}
                   engine={engine}
                   interactive={
                     !completed &&

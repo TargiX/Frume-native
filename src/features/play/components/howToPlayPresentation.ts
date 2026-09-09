@@ -13,7 +13,7 @@ export const HOW_TO_PLAY_STEPS: readonly HowToPlayStep[] = [
     icon: 'hand-left-outline',
     title: 'Place a piece',
     detail:
-      'Drag a piece from the tray onto its matching place. With VoiceOver, focus a piece and activate Place piece.',
+      'Drag a piece from the tray onto its matching place, or join matching neighbours on the table and move the group together. With VoiceOver, focus a piece and activate Place piece.',
   },
   {
     icon: 'swap-horizontal-outline',

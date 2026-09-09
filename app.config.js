@@ -25,7 +25,7 @@ module.exports = {
     slug: 'frume',
     version: '1.0.0',
     orientation: 'default',
-    icon: './assets/frume-icon.png',
+    icon: './assets/frume-organic-icon.png',
     scheme: 'frume',
     runtimeVersion: {
       // The update layer may run only on a binary with the exact same native
@@ -53,9 +53,9 @@ module.exports = {
     userInterfaceStyle: 'dark',
     newArchEnabled: true,
     splash: {
-      image: './assets/frume-adaptive-foreground.png',
+      image: './assets/frume-organic-foreground.png',
       resizeMode: 'contain',
-      backgroundColor: '#03043f',
+      backgroundColor: '#1a3b38',
     },
     ios: {
       supportsTablet: true,
@@ -83,15 +83,15 @@ module.exports = {
         'android.permission.WRITE_EXTERNAL_STORAGE',
       ],
       adaptiveIcon: {
-        foregroundImage: './assets/frume-adaptive-foreground.png',
+        foregroundImage: './assets/frume-organic-foreground.png',
         // A flat alpha mask derived from the Frume mark for Android themed
-        // icons. The textured full-color foreground is intentionally not used.
-        monochromeImage: './assets/android-icon-monochrome.png',
-        backgroundColor: '#03043f',
+        // icons, generated from the same two-piece vector as the color icon.
+        monochromeImage: './assets/frume-organic-monochrome.png',
+        backgroundColor: '#1a3b38',
       },
     },
     web: {
-      favicon: './assets/favicon.png',
+      favicon: './assets/frume-organic-favicon.png',
     },
     plugins: [
       'expo-dev-client',

@@ -1,9 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type {
-  PieceRuntimeState,
-  PuzzleEngineSnapshot,
-} from '../types/engine';
+import type { PieceRuntimeState, PuzzleEngineSnapshot } from '../types/engine';
 import type { Point, Rect, Size } from '../types/geometry';
 import type {
   ImageClipRegion,
@@ -57,10 +54,7 @@ export type PuzzleSessionCorruptionDiagnostic = {
 };
 
 export type PuzzleSessionGuardedReplaceResult =
-  | 'committed'
-  | 'stale'
-  | 'failed'
-  | 'rollback_failed';
+  'committed' | 'stale' | 'failed' | 'rollback_failed';
 
 type PersistedPuzzleSession = RestoredPuzzleSession & {
   version: number;
@@ -144,7 +138,11 @@ function isUnsplashImageHttpsUrl(value: unknown): value is string {
 }
 
 function parsePoint(value: unknown): Point | null {
-  if (!isRecord(value) || !isFiniteNumber(value.x) || !isFiniteNumber(value.y)) {
+  if (
+    !isRecord(value) ||
+    !isFiniteNumber(value.x) ||
+    !isFiniteNumber(value.y)
+  ) {
     return null;
   }
   return { x: value.x, y: value.y };
@@ -184,7 +182,9 @@ function parseClipRegion(value: unknown): ImageClipRegion | null {
     : null;
 }
 
-export function parsePuzzleImageSource(value: unknown): PuzzleImageSource | null {
+export function parsePuzzleImageSource(
+  value: unknown,
+): PuzzleImageSource | null {
   if (!isRecord(value) || !isBoundedString(value.uri)) {
     return null;
   }
@@ -258,6 +258,11 @@ function parseImageContentSource(
   if (!isRecord(value)) {
     return null;
   }
+  if (value.kind === 'bundled') {
+    return value.id === 'coastal-morning'
+      ? { kind: 'bundled', id: 'coastal-morning' }
+      : null;
+  }
   if (value.kind === 'own') {
     return { kind: 'own' };
   }
@@ -318,9 +323,7 @@ function parseDifficulty(value: unknown): PuzzleDifficulty | null {
     : null;
 }
 
-function parseTrayPlacement(
-  value: unknown,
-): 'bottom' | 'right' | null {
+function parseTrayPlacement(value: unknown): 'bottom' | 'right' | null {
   return value === 'bottom' || value === 'right' ? value : null;
 }
 
@@ -501,6 +504,14 @@ function parseRuntimePiece(
   ) {
     return null;
   }
+  if (
+    value.groupId !== undefined &&
+    (typeof value.groupId !== 'string' ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(value.groupId) ||
+      value.locked ||
+      value.inTray)
+  )
+    return null;
   const position = parsePoint(value.position);
   if (!position || (value.locked && value.inTray)) {
     return null;
@@ -508,6 +519,12 @@ function parseRuntimePiece(
 
   return {
     pieceId,
+    ...(typeof value.groupId === 'string' &&
+    /^[A-Za-z0-9_-]{1,128}$/.test(value.groupId) &&
+    !value.inTray &&
+    !value.locked
+      ? { groupId: value.groupId }
+      : {}),
     position,
     rotation: value.rotation,
     locked: value.locked,
@@ -571,6 +588,51 @@ function parseEngine(
     pieces[definition.id] = runtime;
   }
 
+  const groups = new Map<string, string[]>();
+  for (const piece of Object.values(pieces))
+    if (piece.groupId)
+      groups.set(piece.groupId, [
+        ...(groups.get(piece.groupId) ?? []),
+        piece.pieceId,
+      ]);
+  for (const ids of groups.values()) {
+    if (ids.length < 2) return null;
+    const definitions = new Map(
+      layout.pieces.map((piece) => [piece.id, piece]),
+    );
+    const first = definitions.get(ids[0])!;
+    const offset = {
+      x: pieces[first.id].position.x - first.correctPosition.x,
+      y: pieces[first.id].position.y - first.correctPosition.y,
+    };
+    const visited = new Set<string>();
+    const pending = [first.id];
+    const members = new Set(ids);
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      for (const neighbor of definitions.get(id)!.neighborIds)
+        if (members.has(neighbor) && !visited.has(neighbor))
+          pending.push(neighbor);
+    }
+    if (
+      visited.size !== ids.length ||
+      ids.some((id) => {
+        const def = definitions.get(id)!;
+        const piece = pieces[id];
+        return (
+          Math.abs(piece.position.x - def.correctPosition.x - offset.x) >
+            0.01 ||
+          Math.abs(piece.position.y - def.correctPosition.y - offset.y) >
+            0.01 ||
+          piece.rotation !== def.correctRotation
+        );
+      })
+    )
+      return null;
+  }
+
   const allLocked = layout.pieces.every(
     (definition) => pieces[definition.id].locked,
   );
@@ -591,10 +653,7 @@ function parseEngine(
     // Treat the durable write as the end of its last known active interval.
     activeStartedAt = null;
   } else {
-    if (
-      !isFiniteNumber(value.activeElapsedMs) ||
-      value.activeElapsedMs < 0
-    ) {
+    if (!isFiniteNumber(value.activeElapsedMs) || value.activeElapsedMs < 0) {
       return null;
     }
     const parsedActiveStartedAt = parseTimestamp(value.activeStartedAt);

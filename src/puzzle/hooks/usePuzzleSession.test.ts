@@ -21,8 +21,13 @@ vi.mock('react-native-purchases', () => ({
   },
 }));
 
+import { DISCOVERY_IMAGE } from '../discovery';
 import { PuzzleEngine } from '../engine';
-import type { PuzzleCutter, PuzzleEngineSnapshot, PuzzleLayout } from '../types';
+import type {
+  PuzzleCutter,
+  PuzzleEngineSnapshot,
+  PuzzleLayout,
+} from '../types';
 import {
   beginCompletedSnapshotClearRetention,
   PREMIUM_CUTS_REQUIRED_ERROR,
@@ -84,32 +89,30 @@ describe('preparePuzzleSession', () => {
   });
 
   it('only reports success after a cutter returns a playable layout', async () => {
-    const generate = vi.fn<PuzzleCutter['generate']>(
-      async (image, options) => {
-        return {
-          cutterId: 'classic',
-          image,
-          boardSize: {
-            width: options.boardMaxWidth ?? 100,
-            height: options.boardMaxHeight ?? 80,
+    const generate = vi.fn<PuzzleCutter['generate']>(async (image, options) => {
+      return {
+        cutterId: 'classic',
+        image,
+        boardSize: {
+          width: options.boardMaxWidth ?? 100,
+          height: options.boardMaxHeight ?? 80,
+        },
+        pieces: [
+          {
+            id: 'piece-a',
+            index: 0,
+            row: 0,
+            col: 0,
+            path: 'M 0 0 L 30 0 L 30 20 L 0 20 Z',
+            bounds: { x: 0, y: 0, width: 30, height: 20 },
+            clipRegion: { x: 0, y: 0, width: 0.3, height: 0.25 },
+            correctPosition: { x: 0, y: 0 },
+            correctRotation: 0,
+            neighborIds: [],
           },
-          pieces: [
-            {
-              id: 'piece-a',
-              index: 0,
-              row: 0,
-              col: 0,
-              path: 'M 0 0 L 30 0 L 30 20 L 0 20 Z',
-              bounds: { x: 0, y: 0, width: 30, height: 20 },
-              clipRegion: { x: 0, y: 0, width: 0.3, height: 0.25 },
-              correctPosition: { x: 0, y: 0 },
-              correctRotation: 0,
-              neighborIds: [],
-            },
-          ],
-        };
-      },
-    );
+        ],
+      };
+    });
     const cutter: PuzzleCutter = {
       meta: {
         id: 'classic',
@@ -123,7 +126,9 @@ describe('preparePuzzleSession', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.session.engine.getState().layout).toBe(result.session.layout);
+      expect(result.session.engine.getState().layout).toBe(
+        result.session.layout,
+      );
       expect(result.session.layout.boardSize).toEqual({
         width: params.boardMaxWidth,
         height: params.boardMaxHeight,
@@ -379,9 +384,9 @@ describe('puzzle session replacement identity guard', () => {
     expect(
       isPuzzleSessionReplacementCurrent(replacement, previousSession, 7),
     ).toBe(true);
-    expect(
-      isPuzzleSessionReplacementCurrent(replacement, nextSession, 7),
-    ).toBe(false);
+    expect(isPuzzleSessionReplacementCurrent(replacement, nextSession, 7)).toBe(
+      false,
+    );
     expect(
       isPuzzleSessionReplacementCurrent(replacement, previousSession, 8),
     ).toBe(false);
@@ -528,15 +533,13 @@ describe('completed session clear safety', () => {
     const pending = beginCompletedSnapshotClearRetention(session, 17);
 
     expect(pending).toEqual({ requestId: 17, imageUri: params.image.uri });
-    expect(
-      finishCompletedSnapshotClearRetention(pending, 17, false),
-    ).toEqual(pending);
-    expect(
-      finishCompletedSnapshotClearRetention(pending, 18, true),
-    ).toEqual(pending);
-    expect(
-      finishCompletedSnapshotClearRetention(pending, 17, true),
-    ).toBeNull();
+    expect(finishCompletedSnapshotClearRetention(pending, 17, false)).toEqual(
+      pending,
+    );
+    expect(finishCompletedSnapshotClearRetention(pending, 18, true)).toEqual(
+      pending,
+    );
+    expect(finishCompletedSnapshotClearRetention(pending, 17, true)).toBeNull();
   });
 
   it('coordinates receipt removal after restored completion clear failure', () => {
@@ -602,5 +605,36 @@ describe('completed session clear safety', () => {
       ),
     ).resolves.toBe('cleared');
     expect(order).toEqual(['snapshot', 'receipt']);
+  });
+});
+
+describe('free discovery access', () => {
+  it('allows exactly the bundled Organic 4x4 sample without a purchase', async () => {
+    const result = await preparePuzzleSession({
+      ...params,
+      image: DISCOVERY_IMAGE,
+      cutterId: 'organic',
+      difficulty: '4x4',
+    });
+    expect(result.success).toBe(true);
+  });
+  it('does not grant premium access to another image, cut, or size', async () => {
+    for (const override of [
+      { image: { ...DISCOVERY_IMAGE, uri: 'file:///my-photo.jpg' } },
+      { cutterId: 'biomorphic' as const },
+      { difficulty: '3x3' as const },
+    ]) {
+      const result = await preparePuzzleSession({
+        ...params,
+        image: DISCOVERY_IMAGE,
+        cutterId: 'organic',
+        difficulty: '4x4',
+        ...override,
+      });
+      expect(result).toMatchObject({
+        success: false,
+        error: PREMIUM_CUTS_REQUIRED_ERROR,
+      });
+    }
   });
 });

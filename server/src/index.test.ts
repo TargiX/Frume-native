@@ -22,8 +22,7 @@ import worker, {
 const testEnv = env as unknown as Env;
 const TEST_TRACKING_TOKEN_SECRET =
   'server-only-tracking-token-secret-for-tests';
-const TEST_PHOTO_API_DEPLOYMENT_ID =
-  'frume-photo-api-test-deployment-20260812';
+const TEST_PHOTO_API_DEPLOYMENT_ID = 'frume-photo-api-test-deployment-20260812';
 const enabledTestEnv = {
   ...testEnv,
   PHOTO_API_DISABLED: '0',
@@ -61,7 +60,10 @@ afterEach(async () => {
   await reset();
 });
 
-async function fetchWorker(path: string, init?: RequestInit): Promise<Response> {
+async function fetchWorker(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
   return worker.fetch(
     new Request(`https://worker.example${path}`, init),
     enabledTestEnv,
@@ -74,36 +76,33 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 
 async function seedPhotos(photos: readonly PoolPhoto[]): Promise<void> {
   const stub = testEnv.CATEGORY_POOLS.getByName(CATEGORY.id);
-  await runInDurableObject(
-    stub,
-    (_instance: CategoryPhotoPool, state) => {
-      state.storage.sql.exec(
-        `INSERT INTO category_config (singleton, category_id, label, query)
+  await runInDurableObject(stub, (_instance: CategoryPhotoPool, state) => {
+    state.storage.sql.exec(
+      `INSERT INTO category_config (singleton, category_id, label, query)
          VALUES (1, ?, ?, ?)
          ON CONFLICT(singleton) DO NOTHING`,
-        CATEGORY.id,
-        CATEGORY.label,
-        CATEGORY.query,
-      );
-      for (const photo of photos) {
-        state.storage.sql.exec(
-          `INSERT INTO photos (
+      CATEGORY.id,
+      CATEGORY.label,
+      CATEGORY.query,
+    );
+    for (const photo of photos) {
+      state.storage.sql.exec(
+        `INSERT INTO photos (
              id, width, height, alt_description, url, photographer_name,
              photographer_url, download_location, added_at
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          photo.id,
-          photo.width,
-          photo.height,
-          photo.altDescription,
-          photo.url,
-          photo.photographerName,
-          photo.photographerUrl,
-          photo.downloadLocation,
-          Date.now(),
-        );
-      }
-    },
-  );
+        photo.id,
+        photo.width,
+        photo.height,
+        photo.altDescription,
+        photo.url,
+        photo.photographerName,
+        photo.photographerUrl,
+        photo.downloadLocation,
+        Date.now(),
+      );
+    }
+  });
 }
 
 async function seedPhoto(photo: PoolPhoto = SEEDED_PHOTO): Promise<void> {
@@ -121,8 +120,7 @@ function photoWithDimensions(
     width,
     height,
     url: `https://images.unsplash.com/${id}?ixid=hotlink`,
-    downloadLocation:
-      `https://api.unsplash.com/photos/${id}/download?ixid=tracking`,
+    downloadLocation: `https://api.unsplash.com/photos/${id}/download?ixid=tracking`,
   };
 }
 
@@ -217,9 +215,7 @@ describe('configuration and URL validation', () => {
       parseDownloadLocation(
         'https://api.unsplash.com/photos/abc_DEF-123/download?ixid=token',
       )?.toString(),
-    ).toBe(
-      'https://api.unsplash.com/photos/abc_DEF-123/download?ixid=token',
-    );
+    ).toBe('https://api.unsplash.com/photos/abc_DEF-123/download?ixid=token');
 
     for (const rejected of [
       'http://api.unsplash.com/photos/abc/download',
@@ -279,13 +275,12 @@ describe('configuration and URL validation', () => {
   });
 
   it('rejects a retained-grant ceiling below the full issuance window', () => {
-    expect(
-      () =>
-        trackingGrantConfiguration({
-          ...testEnv,
-          MAX_RETAINED_TRACKING_GRANTS: '5000',
-          TRACKING_GRANT_ISSUES_PER_MINUTE: '5',
-        }),
+    expect(() =>
+      trackingGrantConfiguration({
+        ...testEnv,
+        MAX_RETAINED_TRACKING_GRANTS: '5000',
+        TRACKING_GRANT_ISSUES_PER_MINUTE: '5',
+      }),
     ).toThrow(
       'MAX_RETAINED_TRACKING_GRANTS cannot safely retain the configured issuance rate',
     );
@@ -299,52 +294,46 @@ describe('configuration and URL validation', () => {
 describe('global provider budget', () => {
   it('atomically preserves the configured reserve across calendar-hour boundaries', async () => {
     const stub = testEnv.PROVIDER_BUDGET.getByName('global');
-    await runInDurableObject(
-      stub,
-      (instance: ProviderBudget) => {
-        const now = Date.UTC(2026, 7, 12, 10, 15);
-        expect(instance.reserve(5, 2, now)).toMatchObject({
-          kind: 'reserved',
-          remaining: 2,
-        });
-        expect(instance.reserve(5, 2, now)).toMatchObject({
-          kind: 'reserved',
-          remaining: 1,
-        });
-        expect(instance.reserve(5, 2, now)).toMatchObject({
-          kind: 'reserved',
-          remaining: 0,
-        });
-        expect(instance.reserve(5, 2, now)).toMatchObject({
-          kind: 'exhausted',
-          remaining: 0,
-        });
-        expect(instance.reserve(5, 2, now + 60 * 60 * 1_000)).toMatchObject({
-          kind: 'exhausted',
-          remaining: 0,
-        });
-        expect(instance.reserve(5, 2, now + 61 * 60 * 1_000)).toMatchObject({
-          kind: 'reserved',
-          remaining: 2,
-        });
-      },
-    );
+    await runInDurableObject(stub, (instance: ProviderBudget) => {
+      const now = Date.UTC(2026, 7, 12, 10, 15);
+      expect(instance.reserve(5, 2, now)).toMatchObject({
+        kind: 'reserved',
+        remaining: 2,
+      });
+      expect(instance.reserve(5, 2, now)).toMatchObject({
+        kind: 'reserved',
+        remaining: 1,
+      });
+      expect(instance.reserve(5, 2, now)).toMatchObject({
+        kind: 'reserved',
+        remaining: 0,
+      });
+      expect(instance.reserve(5, 2, now)).toMatchObject({
+        kind: 'exhausted',
+        remaining: 0,
+      });
+      expect(instance.reserve(5, 2, now + 60 * 60 * 1_000)).toMatchObject({
+        kind: 'exhausted',
+        remaining: 0,
+      });
+      expect(instance.reserve(5, 2, now + 61 * 60 * 1_000)).toMatchObject({
+        kind: 'reserved',
+        remaining: 2,
+      });
+    });
   });
 
   it('does not reset a rolling provider budget at the top of a UTC hour', async () => {
     const stub = testEnv.PROVIDER_BUDGET.getByName('global');
-    await runInDurableObject(
-      stub,
-      (instance: ProviderBudget) => {
-        const beforeBoundary = Date.UTC(2026, 7, 12, 10, 59, 30);
-        for (let request = 0; request < 3; request += 1) {
-          expect(instance.reserve(5, 2, beforeBoundary).kind).toBe('reserved');
-        }
-        expect(
-          instance.reserve(5, 2, Date.UTC(2026, 7, 12, 11, 0, 1)),
-        ).toMatchObject({ kind: 'exhausted', remaining: 0 });
-      },
-    );
+    await runInDurableObject(stub, (instance: ProviderBudget) => {
+      const beforeBoundary = Date.UTC(2026, 7, 12, 10, 59, 30);
+      for (let request = 0; request < 3; request += 1) {
+        expect(instance.reserve(5, 2, beforeBoundary).kind).toBe('reserved');
+      }
+      expect(
+        instance.reserve(5, 2, Date.UTC(2026, 7, 12, 11, 0, 1)),
+      ).toMatchObject({ kind: 'exhausted', remaining: 0 });
+    });
   });
 
   it('counts both refill and tracking provider calls against one authority', async () => {
@@ -359,25 +348,19 @@ describe('global provider budget', () => {
     );
 
     const stub = testEnv.PROVIDER_BUDGET.getByName('global');
-    await runInDurableObject(
-      stub,
-      (instance: ProviderBudget) => {
-        expect(instance.status(1_000, 100).request_count).toBe(1);
-      },
-    );
+    await runInDurableObject(stub, (instance: ProviderBudget) => {
+      expect(instance.status(1_000, 100).request_count).toBe(1);
+    });
   });
 
   it('degrades with a retryable 503 instead of presenting exhaustion as an upstream failure', async () => {
     const stub = testEnv.PROVIDER_BUDGET.getByName('global');
-    await runInDurableObject(
-      stub,
-      (instance: ProviderBudget) => {
-        for (let request = 0; request < 900; request += 1) {
-          expect(instance.reserve(1_000, 100).kind).toBe('reserved');
-        }
-        expect(instance.reserve(1_000, 100).kind).toBe('exhausted');
-      },
-    );
+    await runInDurableObject(stub, (instance: ProviderBudget) => {
+      for (let request = 0; request < 900; request += 1) {
+        expect(instance.reserve(1_000, 100).kind).toBe('reserved');
+      }
+      expect(instance.reserve(1_000, 100).kind).toBe('exhausted');
+    });
 
     const response = await fetchWorker('/photo?category=nature', {
       headers: { 'CF-Connecting-IP': '203.0.113.251' },
@@ -415,25 +398,22 @@ describe('SQLite category photo pools', () => {
     );
     expect(tokenId).not.toBeNull();
     const grant = testEnv.TRACKING_GRANTS.getByName('global');
-    await runInDurableObject(
-      grant,
-      (_instance: TrackingGrant, state) => {
-        const row = state.storage.sql
-          .exec<{
-            expected_download_location: string;
-            status: string;
-          }>(
-            `SELECT expected_download_location, status
+    await runInDurableObject(grant, (_instance: TrackingGrant, state) => {
+      const row = state.storage.sql
+        .exec<{
+          expected_download_location: string;
+          status: string;
+        }>(
+          `SELECT expected_download_location, status
              FROM tracking_grants WHERE token_id = ?`,
-            tokenId!,
-          )
-          .one();
-        expect(row).toEqual({
-          expected_download_location: SEEDED_PHOTO.downloadLocation,
-          status: 'issued',
-        });
-      },
-    );
+          tokenId!,
+        )
+        .one();
+      expect(row).toEqual({
+        expected_download_location: SEEDED_PHOTO.downloadLocation,
+        status: 'issued',
+      });
+    });
   });
 
   it('does not return a landscape photo to a portrait request', async () => {
@@ -528,7 +508,9 @@ describe('SQLite category photo pools', () => {
     ).toBe(200);
     const repeated = await fetchWorker('/photo?category=nature', { headers });
     expect(repeated.status).toBe(429);
-    expect(await readJson(repeated)).toEqual({ error: 'Too many photo requests' });
+    expect(await readJson(repeated)).toEqual({
+      error: 'Too many photo requests',
+    });
   });
 
   /**
@@ -606,35 +588,29 @@ describe('SQLite category photo pools', () => {
     expect(await readJson(warming)).toEqual({ error: 'Photo pool is warming' });
 
     const stub = testEnv.CATEGORY_POOLS.getByName(CATEGORY.id);
-    await runInDurableObject(
-      stub,
-      (_instance: CategoryPhotoPool, state) => {
-        expect(
-          state.storage.sql
-            .exec<{ count: number }>('SELECT COUNT(*) AS count FROM photos')
-            .one().count,
-        ).toBeGreaterThan(0);
-        expect(
-          state.storage.sql
-            .exec<{ count: number }>('SELECT COUNT(*) AS count FROM refill_lease')
-            .one().count,
-        ).toBe(0);
-      },
-    );
+    await runInDurableObject(stub, (_instance: CategoryPhotoPool, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>('SELECT COUNT(*) AS count FROM photos')
+          .one().count,
+      ).toBeGreaterThan(0);
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>('SELECT COUNT(*) AS count FROM refill_lease')
+          .one().count,
+      ).toBe(0);
+    });
   });
 
   it('honors a persisted refill lease after object activation', async () => {
     const stub = testEnv.CATEGORY_POOLS.getByName(CATEGORY.id);
-    await runInDurableObject(
-      stub,
-      (_instance: CategoryPhotoPool, state) => {
-        state.storage.sql.exec(
-          `INSERT INTO refill_lease (singleton, owner, expires_at)
+    await runInDurableObject(stub, (_instance: CategoryPhotoPool, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO refill_lease (singleton, owner, expires_at)
            VALUES (1, 'previous-owner', ?)`,
-          Date.now() + 60_000,
-        );
-      },
-    );
+        Date.now() + 60_000,
+      );
+    });
 
     const response = await fetchWorker('/photo?category=nature', {
       headers: { 'CF-Connecting-IP': '203.0.113.4' },
@@ -647,16 +623,13 @@ describe('SQLite category photo pools', () => {
     await worker.scheduled({} as ScheduledController, enabledTestEnv);
 
     const stub = testEnv.CATEGORY_POOLS.getByName(CATEGORY.id);
-    await runInDurableObject(
-      stub,
-      (_instance: CategoryPhotoPool, state) => {
-        expect(
-          state.storage.sql
-            .exec<{ count: number }>('SELECT COUNT(*) AS count FROM photos')
-            .one().count,
-        ).toBeGreaterThan(0);
-      },
-    );
+    await runInDurableObject(stub, (_instance: CategoryPhotoPool, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>('SELECT COUNT(*) AS count FROM photos')
+          .one().count,
+      ).toBeGreaterThan(0);
+    });
   });
 });
 
@@ -722,31 +695,28 @@ describe('tracking grants', () => {
       5,
     );
 
-    await runInDurableObject(
-      stub,
-      (_instance: TrackingGrant, state) => {
-        const plan = state.storage.sql
-          .exec<{ detail: string }>(
-            `EXPLAIN QUERY PLAN
+    await runInDurableObject(stub, (_instance: TrackingGrant, state) => {
+      const plan = state.storage.sql
+        .exec<{ detail: string }>(
+          `EXPLAIN QUERY PLAN
              SELECT MIN(expires_at) + ? AS cleanup_at FROM tracking_grants`,
-            60 * 60 * 1_000,
-          )
-          .toArray()
-          .map(({ detail }) => detail)
-          .join(' ');
-        expect(plan).toContain('tracking_grants_expires_at');
-        const cleanupPlan = state.storage.sql
-          .exec<{ detail: string }>(
-            `EXPLAIN QUERY PLAN
+          60 * 60 * 1_000,
+        )
+        .toArray()
+        .map(({ detail }) => detail)
+        .join(' ');
+      expect(plan).toContain('tracking_grants_expires_at');
+      const cleanupPlan = state.storage.sql
+        .exec<{ detail: string }>(
+          `EXPLAIN QUERY PLAN
              DELETE FROM tracking_grants WHERE expires_at <= ?`,
-            Date.now() - 60 * 60 * 1_000,
-          )
-          .toArray()
-          .map(({ detail }) => detail)
-          .join(' ');
-        expect(cleanupPlan).toContain('tracking_grants_expires_at');
-      },
-    );
+          Date.now() - 60 * 60 * 1_000,
+        )
+        .toArray()
+        .map(({ detail }) => detail)
+        .join(' ');
+      expect(cleanupPlan).toContain('tracking_grants_expires_at');
+    });
   });
 
   it('rejects oversized bodies from Content-Length before parsing', async () => {
@@ -759,7 +729,9 @@ describe('tracking grants', () => {
       body: '{}',
     });
     expect(response.status).toBe(413);
-    expect(await readJson(response)).toEqual({ error: 'Request body is too large' });
+    expect(await readJson(response)).toEqual({
+      error: 'Request body is too large',
+    });
   });
 
   it('bounds a streamed body even without Content-Length', async () => {
@@ -773,8 +745,7 @@ describe('tracking grants', () => {
 
   it('rejects forged grants before creating Durable Object storage', async () => {
     const before = await listDurableObjectIds(testEnv.TRACKING_GRANTS);
-    const forgedToken =
-      `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.${'a'.repeat(43)}`;
+    const forgedToken = `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.${'a'.repeat(43)}`;
     const response = await trackRequest(
       forgedToken,
       'https://api.unsplash.com/photos/unknown_photo/download?ixid=tracking',
@@ -788,10 +759,8 @@ describe('tracking grants', () => {
 
   it('removes a legacy per-token object when its alarm reaches retention', async () => {
     const legacy = testEnv.TRACKING_GRANTS.getByName(crypto.randomUUID());
-    await runInDurableObject(
-      legacy,
-      async (instance: TrackingGrant, state) => {
-        state.storage.sql.exec(`
+    await runInDurableObject(legacy, async (instance: TrackingGrant, state) => {
+      state.storage.sql.exec(`
           CREATE TABLE tracking_grant (
             singleton INTEGER PRIMARY KEY,
             expires_at INTEGER NOT NULL
@@ -799,23 +768,19 @@ describe('tracking grants', () => {
           INSERT INTO tracking_grant (singleton, expires_at)
           VALUES (1, ${Date.now() - 2 * 60 * 60 * 1_000});
         `);
-        await instance.alarm();
-      },
-    );
+      await instance.alarm();
+    });
 
-    await runInDurableObject(
-      legacy,
-      (_instance: TrackingGrant, state) => {
-        expect(
-          state.storage.sql
-            .exec<{ count: number }>(
-              `SELECT COUNT(*) AS count FROM sqlite_master
+    await runInDurableObject(legacy, (_instance: TrackingGrant, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>(
+            `SELECT COUNT(*) AS count FROM sqlite_master
                WHERE type = 'table' AND name = 'tracking_grant'`,
-            )
-            .one().count,
-        ).toBe(0);
-      },
-    );
+          )
+          .one().count,
+      ).toBe(0);
+    });
   });
 
   it('requires the location issued with the token', async () => {
@@ -835,38 +800,37 @@ describe('tracking grants', () => {
   });
 
   it('consumes a grant once and treats a retry as idempotent success', async () => {
-    const { token, tokenId, stub: grant } = await issueGrant(
-      crypto.randomUUID(),
-      SEEDED_PHOTO.downloadLocation,
-    );
+    const {
+      token,
+      tokenId,
+      stub: grant,
+    } = await issueGrant(crypto.randomUUID(), SEEDED_PHOTO.downloadLocation);
 
     const first = await trackRequest(token, SEEDED_PHOTO.downloadLocation);
     const retry = await trackRequest(token, SEEDED_PHOTO.downloadLocation);
     expect(first.status).toBe(204);
     expect(retry.status).toBe(204);
 
-    await runInDurableObject(
-      grant,
-      (_instance: TrackingGrant, state) => {
-        expect(
-          state.storage.sql
-            .exec<{ status: string }>(
-              'SELECT status FROM tracking_grants WHERE token_id = ?',
-              tokenId,
-            )
-            .one().status,
-        ).toBe('consumed');
-      },
-    );
+    await runInDurableObject(grant, (_instance: TrackingGrant, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ status: string }>(
+            'SELECT status FROM tracking_grants WHERE token_id = ?',
+            tokenId,
+          )
+          .one().status,
+      ).toBe('consumed');
+    });
   });
 
   it('persists an upstream 404 as a permanent tracking result', async () => {
     const location =
       'https://api.unsplash.com/photos/deleted_photo/download?ixid=tracking';
-    const { token, tokenId, stub: grant } = await issueGrant(
-      crypto.randomUUID(),
-      location,
-    );
+    const {
+      token,
+      tokenId,
+      stub: grant,
+    } = await issueGrant(crypto.randomUUID(), location);
 
     const first = await trackRequest(token, location);
     const retry = await trackRequest(token, location);
@@ -877,19 +841,67 @@ describe('tracking grants', () => {
       upstreamStatus: 404,
     });
 
-    await runInDurableObject(
-      grant,
-      (_instance: TrackingGrant, state) => {
-        expect(
-          state.storage.sql
-            .exec<{ status: string; permanent_status: number }>(
-              `SELECT status, permanent_status
+    await runInDurableObject(grant, (_instance: TrackingGrant, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ status: string; permanent_status: number }>(
+            `SELECT status, permanent_status
                FROM tracking_grants WHERE token_id = ?`,
-              tokenId,
-            )
-            .one(),
-        ).toEqual({ status: 'permanent', permanent_status: 404 });
-      },
+            tokenId,
+          )
+          .one(),
+      ).toEqual({ status: 'permanent', permanent_status: 404 });
+    });
+  });
+});
+
+describe('browse and select a photograph', () => {
+  it('returns a bounded collection without issuing a use grant', async () => {
+    await seedPhotos(
+      Array.from({ length: 8 }, (_, index) => ({
+        ...SEEDED_PHOTO,
+        id: `choice_${index}`,
+        downloadLocation: `https://api.unsplash.com/photos/choice_${index}/download`,
+      })),
     );
+    const response = await fetchWorker(
+      '/photo?category=nature&browse=1&orientation=landscape',
+    );
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body.photos).toHaveLength(6);
+    expect(body).not.toHaveProperty('tracking_token');
+    expect(body.category).toEqual({ id: 'nature', label: 'Nature' });
+  });
+  it('issues a grant for exactly the selected photo, not another random image', async () => {
+    await seedPhotos([
+      SEEDED_PHOTO,
+      {
+        ...SEEDED_PHOTO,
+        id: 'chosen',
+        downloadLocation: 'https://api.unsplash.com/photos/chosen/download',
+      },
+    ]);
+    const response = await fetchWorker('/photo?category=nature&id=chosen');
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body.photo).toMatchObject({
+      id: 'chosen',
+      links: {
+        download_location: 'https://api.unsplash.com/photos/chosen/download',
+      },
+    });
+    expect(body.tracking_token).toMatch(TRACKING_TOKEN_PATTERN);
+  });
+  it('does not substitute a missing photo or accept an arbitrary upstream location', async () => {
+    await seedPhoto();
+    expect(
+      (await fetchWorker('/photo?category=nature&id=missing')).status,
+    ).toBe(404);
+    expect(
+      (await fetchWorker('/photo?category=nature&id=https://other.example'))
+        .status,
+    ).toBe(400);
+    expect((await fetchWorker('/photo?id=seeded_photo')).status).toBe(400);
   });
 });

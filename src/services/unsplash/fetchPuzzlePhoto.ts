@@ -1,7 +1,4 @@
-import {
-  PUZZLE_CATEGORIES,
-  type PuzzleCategory,
-} from './puzzleCuration';
+import { PUZZLE_CATEGORIES, type PuzzleCategory } from './puzzleCuration';
 import {
   PhotoApiError,
   requestPhotoApi,
@@ -56,10 +53,7 @@ function isPositiveNumber(value: unknown): value is number {
 
 function hasSupportedPuzzleAspect(width: number, height: number): boolean {
   const aspect = width / height;
-  return (
-    aspect >= MIN_PUZZLE_PHOTO_ASPECT &&
-    aspect <= MAX_PUZZLE_PHOTO_ASPECT
-  );
+  return aspect >= MIN_PUZZLE_PHOTO_ASPECT && aspect <= MAX_PUZZLE_PHOTO_ASPECT;
 }
 
 /**
@@ -175,7 +169,10 @@ function parsePuzzlePhoto(value: unknown): PuzzlePhoto | null {
     ) ||
     !isRecord(value.urls) ||
     !isRecord(value.user) ||
-    !isHttpsUrl(value.urls.regular, ['images.unsplash.com', 'plus.unsplash.com']) ||
+    !isHttpsUrl(value.urls.regular, [
+      'images.unsplash.com',
+      'plus.unsplash.com',
+    ]) ||
     typeof value.user.name !== 'string' ||
     !value.user.name.trim() ||
     !isRecord(value.user.links) ||
@@ -232,7 +229,9 @@ function warmingRetryDelay(response: Response): number | null {
   if (response.status !== 503) {
     return null;
   }
-  const seconds = Number(response.headers.get('Retry-After'));
+  const retryAfter = response.headers.get('Retry-After');
+  if (retryAfter === null || !retryAfter.trim()) return null;
+  const seconds = Number(retryAfter);
   return Number.isFinite(seconds) &&
     seconds >= 0 &&
     seconds <= MAX_WARMING_RETRY_SECONDS
@@ -242,7 +241,9 @@ function warmingRetryDelay(response: Response): number | null {
 
 function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) {
-    return Promise.reject(signal.reason ?? new Error('Photo request cancelled'));
+    return Promise.reject(
+      signal.reason ?? new Error('Photo request cancelled'),
+    );
   }
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -265,61 +266,60 @@ function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
  * A new Durable Object pool may answer once with a short Retry-After while its
  * first refill completes; absorb that single warm-up response in the client.
  */
+async function requestReadyPhoto(
+  query: Readonly<Record<string, string | undefined>>,
+  signal: AbortSignal,
+): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await requestPhotoApi(
+      'photo',
+      { method: 'GET', headers: { Accept: 'application/json' }, signal },
+      query,
+    );
+    if (response.ok) return response;
+    const retryDelay = attempt === 0 ? warmingRetryDelay(response) : null;
+    if (retryDelay !== null) {
+      await waitForRetry(retryDelay, signal);
+      continue;
+    }
+    await throwPhotoApiResponseError(response);
+  }
+  throw new PhotoApiError(
+    'Photo service did not become ready',
+    'request_failed',
+  );
+}
+
+async function readPhotoJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new PhotoApiError(
+      'Photo service returned invalid JSON',
+      'invalid_response',
+      response.status,
+    );
+  }
+}
+
 export async function fetchPuzzlePhoto(
   categoryId?: string,
   signal?: AbortSignal,
   orientation?: PuzzlePhotoOrientation,
   targetAspect?: number,
+  photoId?: string,
 ): Promise<PuzzlePhotoResult> {
   return withPhotoApiRequestDeadline(async (requestSignal) => {
-    const serializedTargetAspect = serializeTargetAspect(
-      targetAspect,
-      orientation,
+    const response = await requestReadyPhoto(
+      {
+        category: categoryId,
+        id: photoId,
+        orientation,
+        aspect: serializeTargetAspect(targetAspect, orientation),
+      },
+      requestSignal,
     );
-    let response: Response | null = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      response = await requestPhotoApi(
-        'photo',
-        {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-          signal: requestSignal,
-        },
-        {
-          category: categoryId,
-          orientation,
-          aspect: serializedTargetAspect,
-        },
-      );
-
-      if (response.ok) {
-        break;
-      }
-      const retryDelay = attempt === 0 ? warmingRetryDelay(response) : null;
-      if (retryDelay !== null) {
-        await waitForRetry(retryDelay, requestSignal);
-        continue;
-      }
-      await throwPhotoApiResponseError(response);
-    }
-
-    if (!response?.ok) {
-      throw new PhotoApiError(
-        'Photo service did not become ready',
-        'request_failed',
-        response?.status,
-      );
-    }
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      throw new PhotoApiError(
-        'Photo service returned invalid JSON',
-        'invalid_response',
-        response.status,
-      );
-    }
+    const body = await readPhotoJson(response);
 
     const result = parsePhotoResponse(body);
     const matchesOrientation =
@@ -335,7 +335,13 @@ export async function fetchPuzzlePhoto(
         result.photo.height,
         targetAspect,
       );
-    if (!result || !matchesOrientation || !matchesAspect) {
+    if (
+      !result ||
+      (categoryId !== undefined && result.category.id !== categoryId) ||
+      (photoId !== undefined && result.photo.id !== photoId) ||
+      !matchesOrientation ||
+      !matchesAspect
+    ) {
       throw new PhotoApiError(
         'Photo service returned an invalid photo',
         'invalid_response',
@@ -344,5 +350,46 @@ export async function fetchPuzzlePhoto(
     }
 
     return result;
+  }, signal);
+}
+
+/** Browsing never issues photo-use grants. Only the photograph actually chosen does. */
+export async function browsePuzzlePhotos(
+  categoryId: string,
+  signal?: AbortSignal,
+  orientation?: PuzzlePhotoOrientation,
+  targetAspect?: number,
+): Promise<PuzzlePhoto[]> {
+  return withPhotoApiRequestDeadline(async (requestSignal) => {
+    const response = await requestReadyPhoto(
+      {
+        category: categoryId,
+        browse: '1',
+        orientation,
+        aspect: serializeTargetAspect(targetAspect, orientation),
+      },
+      requestSignal,
+    );
+    const body = await readPhotoJson(response);
+    if (
+      !isRecord(body) ||
+      !Array.isArray(body.photos) ||
+      body.photos.length < 1 ||
+      body.photos.length > 6 ||
+      parseCategory(body.category)?.id !== categoryId
+    )
+      throw new PhotoApiError('Invalid photo collection', 'invalid_response');
+    const photos = body.photos.map(parsePuzzlePhoto);
+    if (
+      photos.some(
+        (photo) =>
+          !photo ||
+          !matchesTargetAspect(photo.width, photo.height, targetAspect) ||
+          (orientation === 'portrait' && photo.height <= photo.width) ||
+          (orientation === 'landscape' && photo.width <= photo.height),
+      )
+    )
+      throw new PhotoApiError('Invalid photo collection', 'invalid_response');
+    return photos as PuzzlePhoto[];
   }, signal);
 }

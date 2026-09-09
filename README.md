@@ -9,7 +9,7 @@ target is iOS 16.0.
 ## Product contract
 
 - **Classic is free.** Every Classic difficulty is available without a
-  purchase.
+  purchase. A bundled Organic 4x4 study is also free to try in one tap.
 - **Premium Cuts is a one-time lifetime unlock.** Organic, Living, Living
   spectrum, Crystal, Crystal quartered, Amoeba, and Amoeba columnar are paid
   cut styles under the same entitlement.
@@ -18,7 +18,7 @@ target is iOS 16.0.
 - **Fractal is not advertised or selectable yet.** The cutter type remains an
   architectural extension point, but unfinished algorithms fail closed instead
   of silently falling back to Classic.
-- Photos are curated by theme. The app displays photographer attribution in
+- Photos are browsable in small collections by theme. The app displays photographer attribution in
   setup and puzzle options, and records each started Unsplash photo use through
   the server-side proxy.
 
@@ -29,18 +29,19 @@ target is iOS 16.0.
 - Seven deterministic Premium Cuts: Organic is generated on-device, while the
   six simulated styles use pre-baked, fail-closed geometry. Missing baked
   release assets never trigger a synchronous on-device solver.
-- Drag, snap, tray scrolling, guide, completion, haptics, and responsive
+- Drag connected groups, snap, tray scrolling, guide, completion, haptics, and responsive
   portrait/landscape layout, plus first-run gesture help and an explicit
   restart action.
 - Transactional local puzzle recovery across backgrounding and app restarts,
+  a shelf for four waiting puzzles, an album of 24 completed puzzles,
   a compact last-completion receipt, source-aware Next behavior, and redacted
   support diagnostics retained only on the device until the player shares
   them.
 - RevenueCat client integration for purchasing and restoring the
   `premium_cut_styles` entitlement; the store product and dashboard
   configuration remain release gates.
-- One curated photograph per selected theme, attribution in setup and puzzle
-  options, bounded offline use-event retry, and a Cloudflare Worker that keeps
+- Up to six selectable photographs per theme, attribution in browsing, setup,
+  the album and puzzle options, bounded offline use-event retry, and a Cloudflare Worker that keeps
   the Unsplash credential out of the app. Provider photographs are hotlinked
   and therefore need network access after relaunch; the app does not make
   persistent local copies of them.
@@ -56,6 +57,40 @@ target is iOS 16.0.
   queued and retried from the app lifecycle, and the whole feature is off in
   any build without both analytics environment values and switchable off in
   About & Support.
+
+## Discovery and collection rollout
+
+Home offers an offline Organic 4x4 study without setup or purchase. Only that
+bundled image, size and style bypass the premium gate. Setup previews the chosen
+cut over the actual photograph and initially shows a compact set of choices.
+Completing the study offers an optional Premium Cuts preview; the lifetime
+purchase remains explicit. Start/completion analytics distinguish `discovery`,
+`theme`, and `own_photo`; revisiting an album picture is not another completion.
+
+The new gallery requires the matching Worker: `/photo?category=…&browse=1`
+returns up to six attributed hotlinked photos without use grants. Choosing one
+requests `/photo?category=…&id=…`; an unavailable selection fails explicitly.
+Deploy and verify the Worker before releasing the client. Browsing itself does
+not count as using a photograph. Both browse and selection absorb at most one
+short server-directed warm-up delay; cancellation stops the retry. Selection
+validates the requested photo and category before proceeding. API photographs are never copied into the album.
+
+Completed pictures open in a separate album viewer without replacing the current
+game or requesting Premium access. The viewer keeps the full photograph visible
+and offers an explicit retry when its image cannot load.
+
+The shelf refuses to evict unfinished progress when full. Players can remove
+entries explicitly; the completed album keeps the 24 most recently saved entries.
+Own-photo cleanup retains every durable shelf/album owner. Existing current
+saves remain compatible, and invalid library data fails closed. Artwork source
+and icon generation are documented in `assets/discover/SOURCES.md` and
+`scripts/artwork/render-icon.swift`.
+
+Before release, verify the complete flow on an iPhone and iPad: free study,
+joined groups, restart/rotation, shelf exchange at capacity, completed album,
+selected provider photo, real purchase/restore, and relaunch. Measure first
+completion, second game, subsequent-day return and purchases from actual opted-in
+usage; code and local tests alone do not establish product impact.
 
 ## Architecture
 

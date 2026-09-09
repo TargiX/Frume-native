@@ -25,7 +25,7 @@ export const ANALYTICS_EVENT_NAMES = [
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
 
-export type AnalyticsPhotoSource = 'theme' | 'own_photo';
+export type AnalyticsPhotoSource = 'theme' | 'own_photo' | 'discovery';
 
 export type AnalyticsEventProperties = {
   app_opened: { cold_start: boolean };
@@ -42,6 +42,7 @@ export type AnalyticsEventProperties = {
     cut_id: string;
     piece_count: number;
     duration_s: number;
+    source?: AnalyticsPhotoSource;
   };
   puzzle_abandoned: {
     cut_id: string;
@@ -96,6 +97,7 @@ const EVENT_RULES: Readonly<Record<AnalyticsEventName, EventRule>> = {
     source: { kind: 'token' },
   },
   puzzle_completed: {
+    source: { kind: 'token' },
     cut_id: { kind: 'token' },
     piece_count: { kind: 'count', max: MAX_PIECE_COUNT },
     duration_s: { kind: 'count', max: MAX_DURATION_SECONDS },
@@ -197,10 +199,7 @@ export function sameAnalyticsEvent(
   left: AnalyticsEvent,
   right: AnalyticsEvent,
 ): boolean {
-  if (
-    left.name !== right.name ||
-    left.occurredAt !== right.occurredAt
-  ) {
+  if (left.name !== right.name || left.occurredAt !== right.occurredAt) {
     return false;
   }
   const leftKeys = Object.keys(left.properties).sort();
