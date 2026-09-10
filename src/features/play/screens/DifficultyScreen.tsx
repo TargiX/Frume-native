@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -13,30 +13,30 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
-} from '../../../accessibility';
-import { track } from '../../../analytics';
-import { Button } from '../../../components/Button';
-import { MAX_CONTENT_WIDTH, Screen } from '../../../components/Screen';
-import type { PlayStackParamList } from '../../../navigation/types';
+} from "../../../accessibility";
+import { track } from "../../../analytics";
+import { Button } from "../../../components/Button";
+import { MAX_CONTENT_WIDTH, Screen } from "../../../components/Screen";
+import type { PlayStackParamList } from "../../../navigation/types";
 import {
   createPremiumUnlockContinuation,
   isPremiumCutter,
   PREMIUM_CUT_CATALOG,
   type PremiumCutCatalogId,
   usePremiumAccess,
-} from '../../../premium';
-import { usePuzzleSessionContext } from '../../../puzzle/context';
+} from "../../../premium";
+import { usePuzzleSessionContext } from "../../../puzzle/context";
 import {
   PREMIUM_CUTS_REQUIRED_ERROR,
   type PuzzleSession,
   type StartPuzzleSessionParams,
-} from '../../../puzzle/hooks/usePuzzleSession';
+} from "../../../puzzle/hooks/usePuzzleSession";
 import {
   DIFFICULTY_GRID,
   pieceCount,
@@ -45,25 +45,25 @@ import {
   type PuzzleCutterId,
   type PuzzleDifficulty,
   type PuzzleGuideMode,
-} from '../../../puzzle/types';
+} from "../../../puzzle/types";
 import {
   enqueuePhotoUse,
   fetchPuzzlePhoto,
   resolvePuzzlePhotoTargetAspect,
-} from '../../../services/unsplash';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
-import { PhotoCutPreview } from '../components/PhotoCutPreview';
-import { CutStylePreview } from '../components/CutStylePreview';
-import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
-import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
+} from "../../../services/unsplash";
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from "../../../theme";
+import { PhotoCutPreview } from "../components/PhotoCutPreview";
+import { CutStylePreview } from "../components/CutStylePreview";
+import { PremiumCutsSheet } from "../components/PremiumCutsSheet";
+import { computeSafeAreaPlayLayout } from "../utils/boardLayout";
 import {
   availableSizes,
   nearestAvailableSize,
-} from '../../../puzzle/cutters/availableSizes';
+} from "../../../puzzle/cutters/availableSizes";
 import {
   resolveCutColumns,
   resolveDifficultyScreenLayout,
-} from '../utils/difficultyLayout';
+} from "../utils/difficultyLayout";
 import {
   beginNextPuzzleRequest,
   cancelNextPuzzleRequest,
@@ -72,18 +72,18 @@ import {
   finishNextPuzzleRequest,
   isNextPuzzleRequestCurrent,
   startTrackedNextPuzzle,
-} from '../utils/nextPuzzle';
+} from "../utils/nextPuzzle";
 import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
-} from '../utils/photoRequest';
-import { cancelPuzzlePreparationWhenAppLeavesActive } from '../utils/preparationLifecycle';
+} from "../utils/photoRequest";
+import { cancelPuzzlePreparationWhenAppLeavesActive } from "../utils/preparationLifecycle";
 import {
   commitManagedOwnPhotoCandidate,
   discardManagedOwnPhotoCandidate,
-} from '../utils/ownPhotoLibrary';
+} from "../utils/ownPhotoLibrary";
 
-type Props = NativeStackScreenProps<PlayStackParamList, 'Difficulty'>;
+type Props = NativeStackScreenProps<PlayStackParamList, "Difficulty">;
 
 /**
  * Sizes are named by their piece count, not by a level. Difficulty here is a
@@ -98,16 +98,16 @@ const SIZE_OPTIONS: { id: PuzzleDifficulty; label: string }[] =
 
 const GUIDE_ICONS: Record<
   PuzzleGuideMode,
-  React.ComponentProps<typeof Ionicons>['name']
+  React.ComponentProps<typeof Ionicons>["name"]
 > = {
-  none: 'eye-off-outline',
-  grid: 'grid-outline',
-  cuts: 'shapes-outline',
-  image: 'image-outline',
+  none: "eye-off-outline",
+  grid: "grid-outline",
+  cuts: "shapes-outline",
+  image: "image-outline",
 };
 
 const PHOTO_LOAD_ERROR =
-  'The photograph could not be loaded. Try another photo.';
+  "The photograph could not be loaded. Try another photo.";
 
 const ATTRIBUTION_HIT_SLOP = {
   top: spacing.xs,
@@ -116,16 +116,16 @@ const ATTRIBUTION_HIT_SLOP = {
   left: spacing.xs,
 } as const;
 
-type PlayableCutterId = Exclude<PuzzleCutterId, 'fractal'>;
+type PlayableCutterId = Exclude<PuzzleCutterId, "fractal">;
 
 const PREMIUM_CUT_DETAILS: Record<PremiumCutCatalogId, string> = {
-  organic: 'Flowing, irregular seams',
-  biomorphic: 'An even fringe of fine teeth',
-  'living-spectrum': 'Teeth on five scales, seams varied',
-  crystal: 'Six-fold tips, each piece its own way',
-  'crystal-quartered': 'Four headings, blockier and mineral',
-  amoeba: 'Blobby, pseudopod interlocks',
-  'amoeba-columnar': 'Tall banded lobes over stretched sites',
+  organic: "Flowing, irregular seams",
+  biomorphic: "An even fringe of fine teeth",
+  "living-spectrum": "Teeth on five scales, seams varied",
+  crystal: "Six-fold tips, each piece its own way",
+  "crystal-quartered": "Four headings, blockier and mineral",
+  amoeba: "Blobby, pseudopod interlocks",
+  "amoeba-columnar": "Tall banded lobes over stretched sites",
 };
 
 const CUT_STYLES: {
@@ -134,9 +134,9 @@ const CUT_STYLES: {
   detail: string;
 }[] = [
   {
-    id: 'classic',
-    label: 'Classic',
-    detail: 'Familiar interlocking tabs',
+    id: "classic",
+    label: "Classic",
+    detail: "Familiar interlocking tabs",
   },
   ...PREMIUM_CUT_CATALOG.map((option) => ({
     ...option,
@@ -211,11 +211,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const [showAllCuts, setShowAllCuts] = useState(false);
   const [showAllSizes, setShowAllSizes] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] =
-    useState<PuzzleDifficulty>('4x4');
+    useState<PuzzleDifficulty>("4x4");
   const [selectedCutter, setSelectedCutter] =
-    useState<PlayableCutterId>('classic');
+    useState<PlayableCutterId>("classic");
   const [selectedGuideMode, setSelectedGuideMode] =
-    useState<PuzzleGuideMode>('cuts');
+    useState<PuzzleGuideMode>("cuts");
   const sizesForCut = availableSizes(selectedCutter);
   /**
    * The cuts are a contact sheet: samples laid out to be compared, each with
@@ -287,7 +287,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     ],
   );
   // Matches what the gallery asked for, so a swapped photo fits the same board.
-  const photoOrientation = height >= width ? 'portrait' : 'landscape';
+  const photoOrientation = height >= width ? "portrait" : "landscape";
   const targetPhotoAspect = resolvePuzzlePhotoTargetAspect(
     width - insets.left - insets.right,
     height - insets.top - insets.bottom,
@@ -304,10 +304,10 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const openPremiumCuts = () => {
     const pending = premiumStartContinuationRef.current.peek();
     const cutterId = pending?.sessionParams.cutterId ?? selectedCutter;
-    if (cutterId !== 'fractal') {
+    if (cutterId !== "fractal") {
       premiumReturnFocusRef.current = cutOptionRefs.current[cutterId] ?? null;
     }
-    track('paywall_shown', { trigger_cut_id: cutterId });
+    track("paywall_shown", { trigger_cut_id: cutterId });
     setShowPremium(true);
   };
 
@@ -345,10 +345,10 @@ export function DifficultyScreen({ navigation, route }: Props) {
   }, [ownPhotoCandidateUri]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
       const previousState = appStateRef.current;
       appStateRef.current = nextState;
-      if (nextState === 'active' && premiumUnlockedPendingRef.current) {
+      if (nextState === "active" && premiumUnlockedPendingRef.current) {
         queueMicrotask(() => resumePremiumIntentRef.current());
       }
       cancelPuzzlePreparationWhenAppLeavesActive(previousState, nextState, {
@@ -363,7 +363,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
           const photoRequest = photoRequestRef.current;
           photoRequestRef.current = null;
           photoRequest?.controller.abort(
-            new Error('App left the active state'),
+            new Error("App left the active state"),
           );
           if (mountedRef.current) {
             setSwapping(false);
@@ -380,7 +380,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
    * the use is only enqueued once a session actually starts.
    */
   const onAnotherPhoto = async () => {
-    if (appStateRef.current !== 'active') {
+    if (appStateRef.current !== "active") {
       return;
     }
     if (ownPhotoCandidateUri) {
@@ -388,7 +388,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       return;
     }
     photoRequestRef.current?.controller.abort(
-      new Error('Replaced by a newer photo selection'),
+      new Error("Replaced by a newer photo selection"),
     );
     const requestId = ++nextPhotoRequestIdRef.current;
     const controller = new AbortController();
@@ -405,7 +405,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       );
       if (
         !mountedRef.current ||
-        appStateRef.current !== 'active' ||
+        appStateRef.current !== "active" ||
         photoRequestRef.current?.id !== requestId ||
         controller.signal.aborted
       ) {
@@ -417,7 +417,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     } catch (requestError) {
       if (
         mountedRef.current &&
-        appStateRef.current === 'active' &&
+        appStateRef.current === "active" &&
         photoRequestRef.current?.id === requestId &&
         !controller.signal.aborted
       ) {
@@ -440,7 +440,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     }
     if (
       error === PREMIUM_CUTS_REQUIRED_ERROR &&
-      isPremiumCutter(pending.sessionParams.cutterId ?? 'classic')
+      isPremiumCutter(pending.sessionParams.cutterId ?? "classic")
     ) {
       openPremiumCuts();
       return;
@@ -475,21 +475,21 @@ export function DifficultyScreen({ navigation, route }: Props) {
           photoDescription ??
           (categoryLabel
             ? `${categoryLabel} puzzle photograph`
-            : 'Puzzle photograph'),
+            : "Puzzle photograph"),
         attribution:
           photographerName && photographerUrl
             ? {
                 photographerName,
                 photographerUrl,
-                sourceName: 'Unsplash',
+                sourceName: "Unsplash",
                 sourceUrl:
-                  'https://unsplash.com/?utm_source=frume&utm_medium=referral',
+                  "https://unsplash.com/?utm_source=frume&utm_medium=referral",
               }
             : undefined,
         contentSource:
           downloadLocation && trackingToken
             ? createUnsplashContentSource(categoryId, categoryLabel)
-            : { kind: 'own' as const },
+            : { kind: "own" as const },
       },
       cutterId: selectedCutter,
       difficulty: selectedDifficulty,
@@ -508,10 +508,10 @@ export function DifficultyScreen({ navigation, route }: Props) {
   });
 
   const startPuzzleIntent = async (intent: PuzzleStartIntent) => {
-    if (startingRef.current || appStateRef.current !== 'active') {
+    if (startingRef.current || appStateRef.current !== "active") {
       return;
     }
-    if (isPremiumCutter(intent.sessionParams.cutterId ?? 'classic')) {
+    if (isPremiumCutter(intent.sessionParams.cutterId ?? "classic")) {
       premiumStartContinuationRef.current.stage(intent);
     } else {
       premiumStartContinuationRef.current.discard();
@@ -520,7 +520,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     const startRequest = beginNextPuzzleRequest(startRequestStateRef.current);
     const isStartCurrent = () =>
       mountedRef.current &&
-      appStateRef.current === 'active' &&
+      appStateRef.current === "active" &&
       isNextPuzzleRequestCurrent(startRequestStateRef.current, startRequest);
     setStarting(true);
     setTrackingError(null);
@@ -571,47 +571,47 @@ export function DifficultyScreen({ navigation, route }: Props) {
         },
         isStartCurrent,
       );
-      const started = startResult === 'started';
+      const started = startResult === "started";
       if (started) {
-        track('puzzle_started', {
-          cut_id: intent.sessionParams.cutterId ?? 'classic',
+        track("puzzle_started", {
+          cut_id: intent.sessionParams.cutterId ?? "classic",
           piece_count: pieceCount(intent.sessionParams.difficulty),
           // Only an imported photograph carries the `own` content source; a
           // curated one always carries the provider's.
           source:
-            intent.sessionParams.image.contentSource?.kind === 'own'
-              ? 'own_photo'
-              : 'theme',
+            intent.sessionParams.image.contentSource?.kind === "own"
+              ? "own_photo"
+              : "theme",
         });
       }
       if (
         ownPhotoCandidateUri &&
-        startResult !== 'started' &&
-        startResult !== 'rollback_failed'
+        startResult !== "started" &&
+        startResult !== "rollback_failed"
       ) {
         ownPhotoCandidateCommittedRef.current = false;
       }
-      if (startResult === 'tracking_failed' && isStartCurrent()) {
+      if (startResult === "tracking_failed" && isStartCurrent()) {
         premiumUnlockedPendingRef.current = false;
         premiumStartContinuationRef.current.discard();
         setTrackingError(
-          'This photo could not be prepared for play. Check your connection or device storage, then try again.',
+          "This photo could not be prepared for play. Check your connection or device storage, then try again.",
         );
       } else if (
-        (startResult === 'commit_failed' ||
-          startResult === 'rollback_failed') &&
+        (startResult === "commit_failed" ||
+          startResult === "rollback_failed") &&
         isStartCurrent()
       ) {
         premiumUnlockedPendingRef.current = false;
         premiumStartContinuationRef.current.discard();
         setTrackingError(
-          startResult === 'rollback_failed'
-            ? 'The prior puzzle could not be restored safely. Keep Frume open and retry after freeing device storage.'
-            : 'The puzzle could not be saved on this device. Free some storage, then try again.',
+          startResult === "rollback_failed"
+            ? "The prior puzzle could not be restored safely. Keep Frume open and retry after freeing device storage."
+            : "The puzzle could not be saved on this device. Free some storage, then try again.",
         );
       }
       if (!started) {
-        if (startResult === 'cancelled') {
+        if (startResult === "cancelled") {
           // StoreKit may temporarily make the app inactive. The exact unlocked
           // intent remains staged and resumes when AppState returns active.
           premiumUnlockedPendingRef.current = true;
@@ -624,13 +624,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
       premiumStartContinuationRef.current.discard();
       premiumUnlockedPendingRef.current = false;
       ownPhotoCandidateCommittedRef.current = true;
-      navigation.navigate('Game', { difficulty: intent.difficulty });
+      navigation.navigate("Game", { difficulty: intent.difficulty });
     } catch {
       premiumUnlockedPendingRef.current = false;
       premiumStartContinuationRef.current.discard();
       if (isStartCurrent()) {
         setTrackingError(
-          'This photo could not be prepared for play. Check your connection or device storage, then try again.',
+          "This photo could not be prepared for play. Check your connection or device storage, then try again.",
         );
       }
     } finally {
@@ -654,7 +654,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const continueAfterPremiumUnlock = () => {
     premiumUnlockedPendingRef.current = true;
     const intent = premiumStartContinuationRef.current.peek();
-    if (intent && appStateRef.current === 'active') {
+    if (intent && appStateRef.current === "active") {
       void startPuzzleIntent(intent);
     }
   };
@@ -668,7 +668,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
 
   const openUnsplash = () => {
     void Linking.openURL(
-      'https://unsplash.com/?utm_source=frume&utm_medium=referral',
+      "https://unsplash.com/?utm_source=frume&utm_medium=referral",
     ).catch(() => undefined);
   };
 
@@ -697,7 +697,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
             photoDescription ??
             (categoryLabel
               ? `${categoryLabel} puzzle photograph`
-              : 'Puzzle photograph')
+              : "Puzzle photograph")
           }
           onLoadStart={() => {
             setImageLoading(true);
@@ -723,10 +723,10 @@ export function DifficultyScreen({ navigation, route }: Props) {
           accessibilityLabel="Another photo"
           accessibilityHint={
             ownPhotoCandidateUri
-              ? 'Returns to the photo picker to choose a different photograph'
+              ? "Returns to the photo picker to choose a different photograph"
               : categoryLabel
                 ? `Replaces this photograph with another ${categoryLabel} one`
-                : 'Replaces this photograph with another one'
+                : "Replaces this photograph with another one"
           }
           accessibilityState={{
             busy: swapping,
@@ -808,18 +808,18 @@ export function DifficultyScreen({ navigation, route }: Props) {
         {CUT_STYLES.filter(
           (option) =>
             showAllCuts ||
-            ['classic', 'organic', 'biomorphic'].includes(option.id) ||
+            ["classic", "organic", "biomorphic"].includes(option.id) ||
             selectedCutter === option.id,
         ).map((option) => {
           const active = selectedCutter === option.id;
           const locked = isPremiumCutter(option.id) && !isPremium;
           const status = locked
             ? active
-              ? 'Premium · Unlock to play'
-              : 'Premium'
-            : option.id === 'classic'
-              ? 'Free'
-              : 'Premium unlocked';
+              ? "Premium · Unlock to play"
+              : "Premium"
+            : option.id === "classic"
+              ? "Free"
+              : "Premium unlocked";
 
           return (
             <Pressable
@@ -909,15 +909,15 @@ export function DifficultyScreen({ navigation, route }: Props) {
         <Text style={styles.cutSummary}>
           {selectedCut.detail}
           {selectedCutLocked
-            ? ' · Premium · Unlock to play'
-            : selectedCutter === 'classic'
-              ? ' · Free'
-              : ' · Premium unlocked'}
+            ? " · Premium · Unlock to play"
+            : selectedCutter === "classic"
+              ? " · Free"
+              : " · Premium unlocked"}
         </Text>
       ) : null}
 
       <Button
-        label={showAllCuts ? 'Fewer cut styles' : 'Explore all cut styles'}
+        label={showAllCuts ? "Fewer cut styles" : "Explore all cut styles"}
         variant="ghost"
         onPress={() => setShowAllCuts((value) => !value)}
       />
@@ -927,12 +927,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
       <Text style={styles.sectionHint}>
         {sizesForCut.length < SIZE_OPTIONS.length
           ? `Every size is free. ${selectedCut.label} has its own selection of sizes.`
-          : 'Every size is free. Pick what feels comfortable.'}
+          : "Every size is free. Pick what feels comfortable."}
       </Text>
       {sizeAdjustmentMessage ? (
         <Text
           style={styles.sizeAdjustmentNotice}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+          accessibilityLiveRegion={androidAccessibilityLiveRegion("polite")}
         >
           {sizeAdjustmentMessage}
         </Text>
@@ -943,7 +943,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
           (option) =>
             sizesForCut.includes(option.id) &&
             (showAllSizes ||
-              ['4x4', '7x7', '10x10'].includes(option.id) ||
+              ["4x4", "7x7", "10x10"].includes(option.id) ||
               selectedDifficulty === option.id),
         ).map((option) => {
           const active = selectedDifficulty === option.id;
@@ -987,12 +987,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
                 ) : null}
               </View>
               <Text style={styles.optionDetail}>
-                {option.id === '4x4'
-                  ? 'A little pause'
-                  : option.id === '7x7'
-                    ? 'Settle in'
-                    : option.id === '10x10'
-                      ? 'Take your time'
+                {option.id === "4x4"
+                  ? "A little pause"
+                  : option.id === "7x7"
+                    ? "Settle in"
+                    : option.id === "10x10"
+                      ? "Take your time"
                       : `${rows} × ${columns}`}
               </Text>
             </Pressable>
@@ -1001,7 +1001,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       </View>
 
       <Button
-        label={showAllSizes ? 'Fewer sizes' : 'See every size'}
+        label={showAllSizes ? "Fewer sizes" : "See every size"}
         variant="ghost"
         onPress={() => setShowAllSizes((value) => !value)}
       />
@@ -1018,12 +1018,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
           // Every phase-field cut ignores the rectangular grid, so "Grid" is a
           // zone hint rather than the outline of a piece.
           const livingZones =
-            selectedCutter !== 'classic' &&
-            selectedCutter !== 'organic' &&
-            option.id === 'grid';
-          const label = livingZones ? 'Zones' : option.label;
+            selectedCutter !== "classic" &&
+            selectedCutter !== "organic" &&
+            option.id === "grid";
+          const label = livingZones ? "Zones" : option.label;
           const detail = livingZones
-            ? 'Approximate placement zones'
+            ? "Approximate placement zones"
             : option.detail;
           return (
             <Pressable
@@ -1082,13 +1082,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
 
   const actionPanel = (
     <View style={[styles.actionPanel, twoPane && styles.actionPanelLandscape]}>
-      {photoError || trackingError || error ? (
+      {photoError || persistenceError || trackingError || error ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion="assertive"
           numberOfLines={twoPane ? 2 : undefined}
         >
-          {photoError ?? trackingError ?? error}
+          {photoError ?? persistenceError ?? trackingError ?? error}
         </Text>
       ) : null}
 
@@ -1097,8 +1097,8 @@ export function DifficultyScreen({ navigation, route }: Props) {
           selectedCutLocked
             ? `Unlock ${selectedCut.label} cuts`
             : loading || starting
-              ? 'Preparing…'
-              : 'Start puzzle'
+              ? "Preparing…"
+              : "Start puzzle"
         }
         onPress={onPlay}
         disabled={loading || starting || swapping || imageError}
@@ -1165,7 +1165,7 @@ const styles = StyleSheet.create({
   landscapeColumns: {
     flex: 1,
     minHeight: 0,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   landscapePhotoColumn: {
     flex: 0.84,
@@ -1188,9 +1188,9 @@ const styles = StyleSheet.create({
   previewCard: {
     height: 220,
     borderRadius: radius.lg,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.surface,
   },
   previewCardLandscape: {
@@ -1201,35 +1201,35 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   preview: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   previewHidden: {
     opacity: 0,
   },
   previewStatus: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 1,
   },
   previewError: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 1,
     color: colors.danger,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 21,
     paddingHorizontal: spacing.xl,
   },
   swapButton: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 2,
     top: spacing.sm,
     right: spacing.sm,
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
     borderRadius: MIN_TOUCH_TARGET / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(12, 10, 8, 0.62)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(12, 10, 8, 0.62)",
   },
   swapButtonPressed: {
     opacity: 0.78,
@@ -1246,14 +1246,14 @@ const styles = StyleSheet.create({
   category: {
     color: colors.accent,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   credit: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     columnGap: spacing.xs,
     marginTop: spacing.xs,
   },
@@ -1265,14 +1265,14 @@ const styles = StyleSheet.create({
   creditLinkTarget: {
     minWidth: MIN_TOUCH_TARGET,
     minHeight: MIN_TOUCH_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   creditLink: {
     color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   creditLinkPressed: {
     opacity: 0.72,
@@ -1281,7 +1281,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 22,
     lineHeight: 27,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: -0.2,
     marginTop: spacing.xl,
     marginBottom: spacing.md,
@@ -1304,8 +1304,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   cutOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
   },
   cutOption: {
@@ -1322,17 +1322,17 @@ const styles = StyleSheet.create({
    */
   cutOptionHalf: {
     flexGrow: 1,
-    flexBasis: '46%',
+    flexBasis: "46%",
     minWidth: 140,
     gap: spacing.sm,
     padding: spacing.sm,
   },
   cutOptionWide: {
     flexGrow: 1,
-    flexBasis: '100%',
+    flexBasis: "100%",
     minHeight: 86,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
   cutCopy: {
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
   },
   cutTileCopy: {
     minWidth: 0,
-    width: '100%',
+    width: "100%",
   },
   cutTileLabel: {
     fontSize: 14,
@@ -1356,9 +1356,9 @@ const styles = StyleSheet.create({
   },
   cutTitleRow: {
     minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
   cutStatusIcon: {
@@ -1378,22 +1378,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   premiumBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     color: colors.accent,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: spacing.sm,
   },
   freeBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: spacing.sm,
   },
   difficultyOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
@@ -1402,7 +1402,7 @@ const styles = StyleSheet.create({
     flexBasis: 108,
     minWidth: 88,
     minHeight: 138,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
@@ -1411,18 +1411,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   guideOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
   guideOption: {
     flexGrow: 1,
-    flexBasis: '46%',
+    flexBasis: "46%",
     minWidth: 142,
     minHeight: MIN_TOUCH_TARGET * 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,
@@ -1434,8 +1434,8 @@ const styles = StyleSheet.create({
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
     borderRadius: MIN_TOUCH_TARGET / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.surfaceRaised,
   },
   guideCopy: {
@@ -1457,7 +1457,7 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 2,
   },
   gridCell: {
@@ -1470,8 +1470,8 @@ const styles = StyleSheet.create({
   },
   optionTitleRow: {
     minHeight: MIN_TOUCH_TARGET / 2,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   optionLabel: {
@@ -1479,7 +1479,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: colors.textSecondary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   optionLabelActive: {
     color: colors.textPrimary,
@@ -1491,7 +1491,7 @@ const styles = StyleSheet.create({
   },
   actionPanel: {},
   actionPanelLandscape: {
-    marginTop: 'auto',
+    marginTop: "auto",
     paddingTop: spacing.md,
   },
   error: {

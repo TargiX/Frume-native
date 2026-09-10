@@ -1,6 +1,6 @@
-import { useIsFocused } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useRef, useState } from 'react';
+import { useIsFocused } from "@react-navigation/native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,42 +8,42 @@ import {
   Text,
   View,
   useWindowDimensions,
-} from 'react-native';
+} from "react-native";
 
 import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
-} from '../../../accessibility';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "../../../accessibility";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   DISCOVERY_IMAGE,
   DISCOVERY_DIFFICULTY,
   isDiscoveryPuzzle,
-} from '../../../puzzle/discovery';
+} from "../../../puzzle/discovery";
 import {
   DISCOVERY_ASSET,
   displayImageUri,
-} from '../../../puzzle/discoveryAsset';
-import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
-import { puzzleLibrary } from '../../../puzzle/persistence/PuzzleLibrary';
-import { track } from '../../../analytics';
-import { Button } from '../../../components/Button';
-import { Screen } from '../../../components/Screen';
-import type { PlayStackParamList } from '../../../navigation/types';
-import { isPremiumCutter, usePremiumAccess } from '../../../premium';
-import { usePuzzleSessionContext } from '../../../puzzle/context';
-import { usePuzzleEngine } from '../../../puzzle/hooks';
-import { colors, spacing } from '../../../theme';
-import { puzzleCutStyleLabel } from '../cutStylePresentation';
-import { HomeBackdrop } from '../components/HomeBackdrop';
-import { HomePhotoCard } from '../components/HomePhotoCard';
-import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
+} from "../../../puzzle/discoveryAsset";
+import { computeSafeAreaPlayLayout } from "../utils/boardLayout";
+import { puzzleLibrary } from "../../../puzzle/persistence/PuzzleLibrary";
+import { track } from "../../../analytics";
+import { Button } from "../../../components/Button";
+import { Screen } from "../../../components/Screen";
+import type { PlayStackParamList } from "../../../navigation/types";
+import { isPremiumCutter, usePremiumAccess } from "../../../premium";
+import { usePuzzleSessionContext } from "../../../puzzle/context";
+import { usePuzzleEngine } from "../../../puzzle/hooks";
+import { colors, spacing } from "../../../theme";
+import { puzzleCutStyleLabel } from "../cutStylePresentation";
+import { HomeBackdrop } from "../components/HomeBackdrop";
+import { HomePhotoCard } from "../components/HomePhotoCard";
+import { PremiumCutsSheet } from "../components/PremiumCutsSheet";
 import {
   createPlayHomeActionGuard,
   resolvePremiumResume,
-} from './playHomeActionGuard';
+} from "./playHomeActionGuard";
 
-type Props = NativeStackScreenProps<PlayStackParamList, 'PlayHome'>;
+type Props = NativeStackScreenProps<PlayStackParamList, "PlayHome">;
 
 export function PlayHomeScreen({ navigation }: Props) {
   const isFocused = useIsFocused();
@@ -98,18 +98,18 @@ export function PlayHomeScreen({ navigation }: Props) {
     [actionGuard],
   );
 
-  const restoringMessage = restoring ? 'Checking saved puzzle…' : null;
+  const restoringMessage = restoring ? "Checking saved puzzle…" : null;
   useAccessibilityAnnouncement(isFocused ? restoringMessage : null);
   useAccessibilityAnnouncement(isFocused ? persistenceError : null);
 
-  const completed = engineState?.status === 'completed';
+  const completed = engineState?.status === "completed";
   const placed = engineState
     ? Object.values(engineState.pieces).filter((piece) => piece.locked).length
     : 0;
   const total = engineState?.layout.pieces.length ?? 0;
   const savedPremiumCutLabel = session
     ? puzzleCutStyleLabel(session.cutterId)
-    : 'Premium';
+    : "Premium";
 
   const supersedePendingAction = () => {
     actionGuard.beginAction();
@@ -121,12 +121,12 @@ export function PlayHomeScreen({ navigation }: Props) {
 
   const navigateToGame = (targetSession: NonNullable<typeof session>) => {
     supersedePendingAction();
-    navigation.navigate('Game', { difficulty: targetSession.difficulty });
+    navigation.navigate("Game", { difficulty: targetSession.difficulty });
   };
 
   const navigateToGallery = () => {
     supersedePendingAction();
-    navigation.navigate('Gallery');
+    navigation.navigate("Gallery");
   };
 
   const chooseNewPhotograph = navigateToGallery;
@@ -144,12 +144,13 @@ export function PlayHomeScreen({ navigation }: Props) {
       return;
     }
     discoveryStartingRef.current = true;
+    setDiscoveryError(null);
     const requestId = actionGuard.beginAction();
     const layout = computeSafeAreaPlayLayout(width, height, insets, 2 / 3, 16);
     try {
       const waiting = (await puzzleLibrary.load()).find(
         (entry) =>
-          entry.snapshot.engine.status !== 'completed' &&
+          entry.snapshot.engine.status !== "completed" &&
           isDiscoveryPuzzle(
             entry.snapshot.engine.layout.image,
             entry.snapshot.cutterId,
@@ -165,25 +166,25 @@ export function PlayHomeScreen({ navigation }: Props) {
       }
       const started = await startSession({
         image: DISCOVERY_IMAGE,
-        cutterId: 'organic',
+        cutterId: "organic",
         difficulty: DISCOVERY_DIFFICULTY,
-        guideMode: 'image',
+        guideMode: "image",
         boardMaxWidth: layout.boardWidth,
         boardMaxHeight: layout.boardHeight,
         traySurfaceExtent: layout.trayRunExtent,
         trayPlacement: layout.trayPlacement,
       });
       if (started && actionGuard.isCurrent(requestId)) {
-        track('puzzle_started', {
-          cut_id: 'organic',
+        track("puzzle_started", {
+          cut_id: "organic",
           piece_count: 16,
-          source: 'discovery',
+          source: "discovery",
         });
-        navigation.navigate('Game', { difficulty: DISCOVERY_DIFFICULTY });
+        navigation.navigate("Game", { difficulty: DISCOVERY_DIFFICULTY });
       }
     } catch {
       setDiscoveryError(
-        'The sample could not be opened. Your saved puzzles have been kept.',
+        "The sample could not be opened. Your saved puzzles have been kept.",
       );
     } finally {
       discoveryStartingRef.current = false;
@@ -192,7 +193,7 @@ export function PlayHomeScreen({ navigation }: Props) {
 
   const navigateToAbout = () => {
     supersedePendingAction();
-    navigation.navigate('AboutSupport');
+    navigation.navigate("AboutSupport");
   };
 
   const continuePuzzle = async () => {
@@ -220,7 +221,7 @@ export function PlayHomeScreen({ navigation }: Props) {
         verifyPremiumCuts,
       );
 
-      if (resolution === 'stale') {
+      if (resolution === "stale") {
         return;
       }
 
@@ -233,7 +234,7 @@ export function PlayHomeScreen({ navigation }: Props) {
 
       checkingAccessRef.current = false;
       setCheckingAccess(false);
-      if (resolution === 'premium') {
+      if (resolution === "premium") {
         premiumResumeRef.current = { requestId, session: requestedSession };
         setShowPremium(true);
         return;
@@ -279,23 +280,23 @@ export function PlayHomeScreen({ navigation }: Props) {
         completion.elapsedMs / 60_000,
       )}:${Math.floor((completion.elapsedMs % 60_000) / 1_000)
         .toString()
-        .padStart(2, '0')}`
+        .padStart(2, "0")}`
     : undefined;
   const primaryLabel = checkingAccess
-    ? 'Checking access…'
+    ? "Checking access…"
     : sessionAccessBlocked && !premiumLoading
       ? `Unlock to continue ${savedPremiumCutLabel}`
       : !session
         ? completion
-          ? 'Your album'
-          : 'Try a quiet puzzle'
+          ? "Your album"
+          : "Try a quiet puzzle"
         : completed
-          ? 'Look at it again'
-          : 'Continue';
+          ? "Look at it again"
+          : "Continue";
   const openPrimary = session
     ? () => void continuePuzzle()
     : completion
-      ? () => navigation.navigate('Library')
+      ? () => navigation.navigate("Library")
       : () => void startDiscovery();
 
   return (
@@ -316,7 +317,7 @@ export function PlayHomeScreen({ navigation }: Props) {
       {restoring ? (
         <View
           style={styles.restoring}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+          accessibilityLiveRegion={androidAccessibilityLiveRegion("polite")}
         >
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.restoringText}>{restoringMessage}</Text>
@@ -329,17 +330,17 @@ export function PlayHomeScreen({ navigation }: Props) {
             onPress={openPrimary}
             accessibilityLabel={
               session
-                ? `${completed ? 'Completed puzzle' : 'Puzzle in progress'}, ${placed} of ${total} pieces placed`
+                ? `${completed ? "Completed puzzle" : "Puzzle in progress"}, ${placed} of ${total} pieces placed`
                 : completion
                   ? `${completionCaption} puzzle`
-                  : 'Try Coastal morning, a free 16-piece Organic puzzle'
+                  : "Try Coastal morning, a free 16-piece Organic puzzle"
             }
             accessibilityHint={
               session
-                ? 'Opens the table with this photograph'
+                ? "Opens the table with this photograph"
                 : completion
-                  ? 'Opens your album of completed photographs'
-                  : 'Starts the free Organic sample'
+                  ? "Opens your album of completed photographs"
+                  : "Starts the free Organic sample"
             }
             disabled={checkingAccess || loading}
             progress={session && !completed ? { placed, total } : undefined}
@@ -347,7 +348,7 @@ export function PlayHomeScreen({ navigation }: Props) {
               session
                 ? undefined
                 : (completionCaption ??
-                  'Coastal morning · 16 flowing pieces · Free sample')
+                  "Coastal morning · 16 flowing pieces · Free sample")
             }
           />
 
@@ -383,7 +384,7 @@ export function PlayHomeScreen({ navigation }: Props) {
           <Button
             label="Shelf & album"
             variant="secondary"
-            onPress={() => navigation.navigate('Library')}
+            onPress={() => navigation.navigate("Library")}
             disabled={loading}
           />
           {session ? (
@@ -411,7 +412,7 @@ export function PlayHomeScreen({ navigation }: Props) {
       {persistenceError || error || discoveryError ? (
         <Text
           style={styles.error}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+          accessibilityLiveRegion={androidAccessibilityLiveRegion("polite")}
         >
           {persistenceError ?? error ?? discoveryError}
         </Text>
@@ -439,36 +440,36 @@ export function PlayHomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   content: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.xl,
   },
   centered: {
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   masthead: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.sm,
   },
   wordmark: {
     color: colors.textPrimary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     // Positive tracking: small caps-only type needs the air to stay legible,
     // and the spacing is what makes it read as a mark rather than a word.
     letterSpacing: 7,
-    textAlign: 'center',
+    textAlign: "center",
   },
   tagline: {
     color: colors.textMuted,
     fontSize: 14,
     letterSpacing: 0.2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   restoring: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
   restoringText: {
@@ -477,15 +478,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   actions: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
+    alignSelf: "stretch",
+    alignItems: "center",
     gap: spacing.sm,
   },
   savedPremiumNotice: {
     color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
-    textAlign: 'center',
+    textAlign: "center",
   },
   error: {
     color: colors.danger,

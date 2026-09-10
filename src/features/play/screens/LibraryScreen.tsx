@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -7,34 +7,36 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useIsFocused } from '@react-navigation/native';
-import { Screen } from '../../../components/Screen';
-import { Button } from '../../../components/Button';
-import type { PlayStackParamList } from '../../../navigation/types';
-import { usePuzzleSessionContext } from '../../../puzzle/context';
+} from "react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useIsFocused } from "@react-navigation/native";
+import { Screen } from "../../../components/Screen";
+import { Button } from "../../../components/Button";
+import type { PlayStackParamList } from "../../../navigation/types";
+import { usePuzzleSessionContext } from "../../../puzzle/context";
 import {
   puzzleLibrary,
   libraryPuzzleId,
   type LibraryPuzzle,
-} from '../../../puzzle/persistence/PuzzleLibrary';
-import { displayImageUri } from '../../../puzzle/discoveryAsset';
-import { colors, spacing, radius } from '../../../theme';
-import { puzzleCutStyleLabel } from '../cutStylePresentation';
-import { reconcileOwnPhotoOwnership } from '../utils/ownPhotoLibrary';
-import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
-import { isPremiumCutter, usePremiumAccess } from '../../../premium';
-import { isDiscoveryPuzzle } from '../../../puzzle/discovery';
-import type { PuzzleImageSource } from '../../../puzzle/types';
-import { AlbumViewer } from '../components/AlbumViewer';
-import { openLibraryEntry } from '../utils/openLibraryEntry';
+} from "../../../puzzle/persistence/PuzzleLibrary";
+import { displayImageUri } from "../../../puzzle/discoveryAsset";
+import { colors, spacing, radius } from "../../../theme";
+import { puzzleCutStyleLabel } from "../cutStylePresentation";
+import { reconcileOwnPhotoOwnership } from "../utils/ownPhotoLibrary";
+import { PremiumCutsSheet } from "../components/PremiumCutsSheet";
+import { isPremiumCutter, usePremiumAccess } from "../../../premium";
+import { isDiscoveryPuzzle } from "../../../puzzle/discovery";
+import type { PuzzleImageSource } from "../../../puzzle/types";
+import { AlbumViewer } from "../components/AlbumViewer";
+import { openLibraryEntry } from "../utils/openLibraryEntry";
 
-type Props = NativeStackScreenProps<PlayStackParamList, 'Library'>;
+type Props = NativeStackScreenProps<PlayStackParamList, "Library">;
 export function LibraryScreen({ navigation }: Props) {
   const focused = useIsFocused();
   const focusedRef = useRef(focused);
-  focusedRef.current = focused;
+  useEffect(() => {
+    focusedRef.current = focused;
+  }, [focused]);
   const unlockTarget = useRef<string | null>(null);
   const {
     session,
@@ -44,8 +46,12 @@ export function LibraryScreen({ navigation }: Props) {
     clearSession,
     clearCompletion,
   } = usePuzzleSessionContext();
-  const ownersRef = useRef({ session, completion });
-  ownersRef.current = { session, completion };
+  const sessionRef = useRef(session);
+  const completionRef = useRef(completion);
+  useEffect(() => {
+    sessionRef.current = session;
+    completionRef.current = completion;
+  }, [session, completion]);
   const { isPremium } = usePremiumAccess();
   const [entries, setEntries] = useState<LibraryPuzzle[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +82,7 @@ export function LibraryScreen({ navigation }: Props) {
         .catch(() => {
           if (current)
             setError(
-              'Your shelf could not be loaded. Try again by reopening this screen.',
+              "Your shelf could not be loaded. Try again by reopening this screen.",
             );
         });
     };
@@ -124,16 +130,16 @@ export function LibraryScreen({ navigation }: Props) {
             ? Promise.resolve(session)
             : openLibraryPuzzle(id),
       });
-      if (result.kind === 'opened')
-        navigation.navigate('Game', { difficulty: result.session.difficulty });
-      if (result.kind === 'failed')
+      if (result.kind === "opened")
+        navigation.navigate("Game", { difficulty: result.session.difficulty });
+      if (result.kind === "failed")
         setError(
-          'This puzzle could not be opened. Your progress is still saved.',
+          "This puzzle could not be opened. Your progress is still saved.",
         );
     } catch {
       if (focusedRef.current)
         setError(
-          'This puzzle could not be opened. Your progress is still saved.',
+          "This puzzle could not be opened. Your progress is still saved.",
         );
     } finally {
       openingRef.current = false;
@@ -142,37 +148,44 @@ export function LibraryScreen({ navigation }: Props) {
   };
   const remove = (entry: LibraryPuzzle) =>
     Alert.alert(
-      'Remove this puzzle?',
-      'Its saved progress and album entry will be removed from this device.',
+      "Remove this puzzle?",
+      "Its saved progress and album entry will be removed from this device.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: () => {
             setPending(entry.id);
             void (async () => {
-              if (entry.id === activeId) clearSession();
+              if (entry.id === activeId) {
+                clearSession();
+                sessionRef.current = null;
+              }
               const image = entry.snapshot.engine.layout.image;
               const removesLastResult =
                 completion?.image.uri === image.uri &&
                 completion?.cutterId === entry.snapshot.cutterId &&
                 completion?.difficulty === entry.snapshot.difficulty &&
-                entry.snapshot.engine.status === 'completed';
-              if (removesLastResult && !(await clearCompletion()))
-                throw new Error('Last result could not be removed');
+                entry.snapshot.engine.status === "completed";
+              if (removesLastResult) {
+                if (!(await clearCompletion()))
+                  throw new Error("Last result could not be removed");
+                completionRef.current = null;
+              }
               await puzzleLibrary.remove(entry.id);
-              const owners = ownersRef.current;
+              const ownedSession = sessionRef.current;
+              const ownedCompletion = completionRef.current;
               await reconcileOwnPhotoOwnership(
-                [
-                  owners.session?.layout.image.uri,
-                  owners.completion?.image.uri,
-                ],
-                () => focusedRef.current && ownersRef.current === owners,
+                [ownedSession?.layout.image.uri, ownedCompletion?.image.uri],
+                () =>
+                  focusedRef.current &&
+                  sessionRef.current === ownedSession &&
+                  completionRef.current === ownedCompletion,
               );
             })()
               .catch(() =>
-                setError('The puzzle could not be removed. Try again.'),
+                setError("The puzzle could not be removed. Try again."),
               )
               .finally(() => setPending(null));
           },
@@ -183,7 +196,7 @@ export function LibraryScreen({ navigation }: Props) {
     completion &&
     !entries.some(
       (entry) =>
-        entry.snapshot.engine.status === 'completed' &&
+        entry.snapshot.engine.status === "completed" &&
         entry.snapshot.engine.layout.image.uri === completion.image.uri &&
         entry.snapshot.cutterId === completion.cutterId &&
         entry.snapshot.difficulty === completion.difficulty,
@@ -193,7 +206,7 @@ export function LibraryScreen({ navigation }: Props) {
   const renderGroup = (title: string, complete: boolean) => {
     const items = entries.filter(
       (entry) =>
-        (entry.snapshot.engine.status === 'completed') === complete &&
+        (entry.snapshot.engine.status === "completed") === complete &&
         (complete || entry.id !== activeId),
     );
     return (
@@ -204,8 +217,8 @@ export function LibraryScreen({ navigation }: Props) {
         {!items.length && !(complete && legacyCompletion) ? (
           <Text style={styles.detail}>
             {complete
-              ? 'Your 24 most recently saved completed photographs will gather here.'
-              : 'Start another puzzle whenever you like. Up to four can wait here while you play.'}
+              ? "Your 24 most recently saved completed photographs will gather here."
+              : "Start another puzzle whenever you like. Up to four can wait here while you play."}
           </Text>
         ) : null}
         {complete && legacyCompletion ? (
@@ -221,14 +234,14 @@ export function LibraryScreen({ navigation }: Props) {
                 resizeMode="contain"
                 accessibilityLabel={
                   legacyCompletion.image.accessibilityLabel ??
-                  'Your last completed puzzle'
+                  "Your last completed puzzle"
                 }
               />
             </Pressable>
             <View style={styles.caption}>
               <Text style={styles.name}>Last completed</Text>
               <Text style={styles.detail}>
-                {puzzleCutStyleLabel(legacyCompletion.cutterId)} ·{' '}
+                {puzzleCutStyleLabel(legacyCompletion.cutterId)} ·{" "}
                 {legacyCompletion.pieceCount} pieces
               </Text>
             </View>
@@ -242,12 +255,12 @@ export function LibraryScreen({ navigation }: Props) {
                 }
                 style={{
                   minHeight: 44,
-                  justifyContent: 'center',
+                  justifyContent: "center",
                   paddingHorizontal: spacing.md,
                 }}
               >
                 <Text style={styles.detail}>
-                  Photo by {legacyCompletion.image.attribution.photographerName}{' '}
+                  Photo by {legacyCompletion.image.attribution.photographerName}{" "}
                   on Unsplash
                 </Text>
               </Pressable>
@@ -257,18 +270,18 @@ export function LibraryScreen({ navigation }: Props) {
               variant="ghost"
               onPress={() =>
                 Alert.alert(
-                  'Remove your last result?',
-                  'This removes the saved result from this device.',
+                  "Remove your last result?",
+                  "This removes the saved result from this device.",
                   [
-                    { text: 'Cancel', style: 'cancel' },
+                    { text: "Cancel", style: "cancel" },
                     {
-                      text: 'Remove',
-                      style: 'destructive',
+                      text: "Remove",
+                      style: "destructive",
                       onPress: () => {
                         void clearCompletion().then((removed) => {
                           if (!removed)
                             setError(
-                              'The last result could not be removed. Try again.',
+                              "The last result could not be removed. Try again.",
                             );
                         });
                       },
@@ -290,7 +303,7 @@ export function LibraryScreen({ navigation }: Props) {
               <Pressable
                 disabled={!!pending || loading}
                 accessibilityRole="button"
-                accessibilityLabel={`${image.accessibilityLabel ?? 'Saved puzzle'}, ${count} of ${snapshot.engine.layout.pieces.length} pieces. ${complete ? 'View completed image' : 'Continue'}`}
+                accessibilityLabel={`${image.accessibilityLabel ?? "Saved puzzle"}, ${count} of ${snapshot.engine.layout.pieces.length} pieces. ${complete ? "View completed image" : "Continue"}`}
                 onPress={() => void open(entry)}
                 style={styles.open}
               >
@@ -300,17 +313,17 @@ export function LibraryScreen({ navigation }: Props) {
                 />
                 <View style={styles.caption}>
                   <Text style={styles.name}>
-                    {image.contentSource?.kind === 'bundled'
-                      ? 'Coastal morning'
-                      : image.contentSource?.kind === 'own'
-                        ? 'Your photograph'
+                    {image.contentSource?.kind === "bundled"
+                      ? "Coastal morning"
+                      : image.contentSource?.kind === "own"
+                        ? "Your photograph"
                         : (image.contentSource?.categoryLabel ??
-                          'A quiet moment')}
+                          "A quiet moment")}
                   </Text>
                   <Text style={styles.detail}>
                     {puzzleCutStyleLabel(snapshot.cutterId)} · {count}/
                     {snapshot.engine.layout.pieces.length} pieces
-                    {pending === entry.id ? ' · Opening…' : ''}
+                    {pending === entry.id ? " · Opening…" : ""}
                   </Text>
                 </View>
               </Pressable>
@@ -325,12 +338,12 @@ export function LibraryScreen({ navigation }: Props) {
                   }
                   style={{
                     minHeight: 44,
-                    justifyContent: 'center',
+                    justifyContent: "center",
                     paddingHorizontal: spacing.md,
                   }}
                 >
                   <Text style={styles.detail}>
-                    Photo by {image.attribution.photographerName} on{' '}
+                    Photo by {image.attribution.photographerName} on{" "}
                     {image.attribution.sourceName}
                   </Text>
                 </Pressable>
@@ -355,7 +368,7 @@ export function LibraryScreen({ navigation }: Props) {
       {session ? (
         <Button
           label="Back to your current puzzle"
-          onPress={() => navigation.navigate('PlayHome')}
+          onPress={() => navigation.navigate("PlayHome")}
           variant="secondary"
         />
       ) : null}
@@ -364,8 +377,8 @@ export function LibraryScreen({ navigation }: Props) {
           {error}
         </Text>
       ) : null}
-      {renderGroup('On your shelf', false)}
-      {renderGroup('Your album', true)}
+      {renderGroup("On your shelf", false)}
+      {renderGroup("Your album", true)}
       <AlbumViewer image={viewedImage} onClose={() => setViewedImage(null)} />
       <PremiumCutsSheet
         visible={premiumId !== null}
@@ -383,7 +396,7 @@ export function LibraryScreen({ navigation }: Props) {
 }
 const styles = StyleSheet.create({
   section: { gap: spacing.md, marginTop: spacing.xl },
-  title: { color: colors.textPrimary, fontSize: 25, fontWeight: '600' },
+  title: { color: colors.textPrimary, fontSize: 25, fontWeight: "600" },
   intro: {
     color: colors.textSecondary,
     fontSize: 17,
@@ -393,12 +406,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   open: { gap: spacing.md },
-  image: { width: '100%', aspectRatio: 1.5 },
+  image: { width: "100%", aspectRatio: 1.5 },
   caption: { paddingHorizontal: spacing.md, gap: spacing.xs },
-  name: { color: colors.textPrimary, fontSize: 19, fontWeight: '600' },
+  name: { color: colors.textPrimary, fontSize: 19, fontWeight: "600" },
   detail: { color: colors.textSecondary, fontSize: 15, lineHeight: 23 },
   error: { color: colors.textSecondary, marginTop: spacing.md },
 });
