@@ -1385,7 +1385,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       }
       if (
         !mountedRef.current ||
-        sessionRef.current !== current ||
+        sessionRef.current?.engine !== current.engine ||
         completionRef.current !== completionReceipt
       )
         return false;
@@ -1400,7 +1400,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         }
         if (
           !mountedRef.current ||
-          sessionRef.current !== current ||
+          sessionRef.current?.engine !== current.engine ||
           completionRef.current !== completionReceipt
         )
           return false;

@@ -34,7 +34,9 @@ type Props = NativeStackScreenProps<PlayStackParamList, 'Library'>;
 export function LibraryScreen({ navigation }: Props) {
   const focused = useIsFocused();
   const focusedRef = useRef(focused);
-  focusedRef.current = focused;
+  useEffect(() => {
+    focusedRef.current = focused;
+  }, [focused]);
   const unlockTarget = useRef<string | null>(null);
   const {
     session,
@@ -44,8 +46,12 @@ export function LibraryScreen({ navigation }: Props) {
     clearSession,
     clearCompletion,
   } = usePuzzleSessionContext();
-  const ownersRef = useRef({ session, completion });
-  ownersRef.current = { session, completion };
+  const sessionRef = useRef(session);
+  const completionRef = useRef(completion);
+  useEffect(() => {
+    sessionRef.current = session;
+    completionRef.current = completion;
+  }, [session, completion]);
   const { isPremium } = usePremiumAccess();
   const [entries, setEntries] = useState<LibraryPuzzle[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -152,23 +158,33 @@ export function LibraryScreen({ navigation }: Props) {
           onPress: () => {
             setPending(entry.id);
             void (async () => {
-              if (entry.id === activeId) clearSession();
+              if (entry.id === activeId) {
+                clearSession();
+                sessionRef.current = null;
+              }
               const image = entry.snapshot.engine.layout.image;
               const removesLastResult =
                 completion?.image.uri === image.uri &&
                 completion?.cutterId === entry.snapshot.cutterId &&
                 completion?.difficulty === entry.snapshot.difficulty &&
                 entry.snapshot.engine.status === 'completed';
-              if (removesLastResult && !(await clearCompletion()))
-                throw new Error('Last result could not be removed');
+              if (removesLastResult) {
+                if (!(await clearCompletion()))
+                  throw new Error('Last result could not be removed');
+                completionRef.current = null;
+              }
               await puzzleLibrary.remove(entry.id);
-              const owners = ownersRef.current;
+              const ownedSession = sessionRef.current;
+              const ownedCompletion = completionRef.current;
               await reconcileOwnPhotoOwnership(
                 [
-                  owners.session?.layout.image.uri,
-                  owners.completion?.image.uri,
+                  ownedSession?.layout.image.uri,
+                  ownedCompletion?.image.uri,
                 ],
-                () => focusedRef.current && ownersRef.current === owners,
+                () =>
+                  focusedRef.current &&
+                  sessionRef.current === ownedSession &&
+                  completionRef.current === ownedCompletion,
               );
             })()
               .catch(() =>

@@ -113,6 +113,31 @@ describe('connected loose pieces', () => {
       b.correctPosition.y - a.correctPosition.y,
     );
   });
+  it('recovers an off-board group as part of relayout', async () => {
+    const { engine, a, b, layout } = await setup();
+    engine.releasePiece(b.id);
+    engine.movePiece(a.id, { x: -1_000, y: 1_000 });
+    const resized = await ClassicCutter.generate(layout.image, {
+      difficulty: '3x3',
+      boardMaxWidth: 450,
+      boardMaxHeight: 450,
+    });
+
+    engine.relayout(resized);
+
+    for (const id of [a.id, b.id]) {
+      const piece = engine.getState().pieces[id];
+      const definition = resized.pieces.find((item) => item.id === id)!;
+      expect(piece.position.x).toBeGreaterThanOrEqual(-definition.bounds.width / 2);
+      expect(piece.position.x).toBeLessThanOrEqual(
+        resized.boardSize.width - definition.bounds.width / 2,
+      );
+      expect(piece.position.y).toBeGreaterThanOrEqual(-definition.bounds.height / 2);
+      expect(piece.position.y).toBeLessThanOrEqual(
+        resized.boardSize.height - definition.bounds.height / 2,
+      );
+    }
+  });
   it('returns a group to separate permanent tray slots', async () => {
     const { engine, a, b } = await setup();
     engine.releasePiece(b.id);

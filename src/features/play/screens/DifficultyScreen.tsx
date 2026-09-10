@@ -1082,13 +1082,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
 
   const actionPanel = (
     <View style={[styles.actionPanel, twoPane && styles.actionPanelLandscape]}>
-      {photoError || trackingError || error ? (
+      {photoError || persistenceError || trackingError || error ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion="assertive"
           numberOfLines={twoPane ? 2 : undefined}
         >
-          {photoError ?? trackingError ?? error}
+          {photoError ?? persistenceError ?? trackingError ?? error}
         </Text>
       ) : null}
 

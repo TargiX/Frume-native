@@ -144,6 +144,7 @@ export function PlayHomeScreen({ navigation }: Props) {
       return;
     }
     discoveryStartingRef.current = true;
+    setDiscoveryError(null);
     const requestId = actionGuard.beginAction();
     const layout = computeSafeAreaPlayLayout(width, height, insets, 2 / 3, 16);
     try {

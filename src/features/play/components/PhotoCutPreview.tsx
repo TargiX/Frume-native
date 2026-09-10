@@ -28,14 +28,16 @@ export function PhotoCutPreview({
     let current = true;
     setPreview(null);
     if (!frame.width || !frame.height) return;
-    void getCutter(cutterId)
-      .generate(
-        { uri, width: imageWidth, height: imageHeight },
-        {
-          difficulty,
-          boardMaxWidth: frame.width,
-          boardMaxHeight: frame.height,
-        },
+    void Promise.resolve()
+      .then(() =>
+        getCutter(cutterId).generate(
+          { uri, width: imageWidth, height: imageHeight },
+          {
+            difficulty,
+            boardMaxWidth: frame.width,
+            boardMaxHeight: frame.height,
+          },
+        ),
       )
       .then((layout) => {
         if (current)

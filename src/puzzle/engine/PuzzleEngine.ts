@@ -565,6 +565,7 @@ export class PuzzleEngine {
       snapFeedback: null,
     };
     this.emit();
+    this.recoverLoosePieces();
   }
 
   isComplete(): boolean {
