@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, type AppStateStatus } from "react-native";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
-import { isPremiumCutter, usePremiumAccess } from "../../premium";
-import { reconcileOwnPhotoOwnership } from "../../features/play/utils/ownPhotoLibrary";
-import { getCutter } from "../cutters";
-import { PuzzleEngine } from "../engine";
-import { isDiscoveryPuzzle } from "../discovery";
-import { puzzleLibrary, libraryPuzzleId } from "../persistence/PuzzleLibrary";
-import { DEFAULT_PUZZLE_GUIDE_MODE } from "../types";
+import { isPremiumCutter, usePremiumAccess } from '../../premium';
+import { reconcileOwnPhotoOwnership } from '../../features/play/utils/ownPhotoLibrary';
+import { getCutter } from '../cutters';
+import { PuzzleEngine } from '../engine';
+import { isDiscoveryPuzzle } from '../discovery';
+import { puzzleLibrary, libraryPuzzleId } from '../persistence/PuzzleLibrary';
+import { DEFAULT_PUZZLE_GUIDE_MODE } from '../types';
 import {
   ExpoPuzzleImageFileStore,
   PuzzleCompletionPersistence,
@@ -17,7 +17,7 @@ import {
   type PuzzleCompletionReceipt,
   type PuzzleSessionLoadResult,
   type PuzzleSessionSnapshot,
-} from "../persistence";
+} from '../persistence';
 import type {
   CutOptions,
   PuzzleCutterId,
@@ -26,7 +26,7 @@ import type {
   PuzzleImageSource,
   PuzzleLayout,
   PuzzleTrayPlacement,
-} from "../types";
+} from '../types';
 
 export type PuzzleSession = {
   layout: PuzzleLayout;
@@ -122,7 +122,7 @@ export type UsePuzzleSessionResult = {
 };
 
 export const PREMIUM_CUTS_REQUIRED_ERROR =
-  "Premium Cuts access is required for this cut style.";
+  'Premium Cuts access is required for this cut style.';
 
 function sessionSnapshot(session: PuzzleSession): PuzzleSessionSnapshot {
   return {
@@ -189,13 +189,13 @@ function haveSameCutDescriptor(
 export async function preparePuzzleSession(
   {
     image,
-    cutterId = "classic",
+    cutterId = 'classic',
     difficulty,
     guideMode = DEFAULT_PUZZLE_GUIDE_MODE,
     boardMaxWidth,
     boardMaxHeight,
     traySurfaceExtent,
-    trayPlacement = "bottom",
+    trayPlacement = 'bottom',
   }: StartPuzzleSessionParams,
   resolveCutter = getCutter,
   premiumCutsUnlocked = false,
@@ -230,14 +230,14 @@ export async function preparePuzzleSession(
     return {
       success: false,
       error:
-        caught instanceof Error ? caught.message : "Failed to create puzzle",
+        caught instanceof Error ? caught.message : 'Failed to create puzzle',
     };
   }
 }
 
 export async function recoverAndFlushPuzzleSession(
   session: PuzzleSession | null,
-  persistence: Pick<PuzzleSessionPersistence, "flush">,
+  persistence: Pick<PuzzleSessionPersistence, 'flush'>,
   now = Date.now(),
 ): Promise<boolean> {
   session?.engine.pause(now);
@@ -246,12 +246,12 @@ export async function recoverAndFlushPuzzleSession(
 }
 
 export async function loadPuzzleSessionForRestore(
-  persistence: Pick<PuzzleSessionPersistence, "load">,
-  imageCache: Pick<PuzzleImageCache, "clear">,
+  persistence: Pick<PuzzleSessionPersistence, 'load'>,
+  imageCache: Pick<PuzzleImageCache, 'clear'>,
   isCurrent = () => true,
 ): Promise<PuzzleSessionLoadResult> {
   const result = await persistence.load();
-  if (result.status === "empty" && isCurrent()) {
+  if (result.status === 'empty' && isCurrent()) {
     await imageCache.clear().catch(() => undefined);
   }
   return result;
@@ -264,8 +264,8 @@ export async function loadPuzzleSessionForRestore(
  */
 export async function finalizePuzzleSessionStart(
   imageUri: string,
-  persistence: Pick<PuzzleSessionPersistence, "flush">,
-  imageCache: Pick<PuzzleImageCache, "retainOnly">,
+  persistence: Pick<PuzzleSessionPersistence, 'flush'>,
+  imageCache: Pick<PuzzleImageCache, 'retainOnly'>,
   isCurrent: () => boolean,
 ): Promise<{ current: boolean; saved: boolean }> {
   const saved = await persistence.flush();
@@ -286,9 +286,9 @@ export async function finalizePuzzleSessionStart(
  */
 export async function promoteRestoredCompletion(
   receipt: PuzzleCompletionReceipt,
-  completionPersistence: Pick<PuzzleCompletionPersistence, "save">,
-  persistence: Pick<PuzzleSessionPersistence, "clear">,
-  imageCache: Pick<PuzzleImageCache, "clearAfter">,
+  completionPersistence: Pick<PuzzleCompletionPersistence, 'save'>,
+  persistence: Pick<PuzzleSessionPersistence, 'clear'>,
+  imageCache: Pick<PuzzleImageCache, 'clearAfter'>,
 ): Promise<{ completionSaved: boolean; activeCleared: boolean }> {
   const completionSaved = await completionPersistence.save(receipt);
   if (!completionSaved) {
@@ -309,8 +309,8 @@ export async function promoteRestoredCompletion(
 export async function persistLiveCompletion(
   snapshot: PuzzleSessionSnapshot,
   receipt: PuzzleCompletionReceipt,
-  persistence: Pick<PuzzleSessionPersistence, "schedule" | "flush">,
-  completionPersistence: Pick<PuzzleCompletionPersistence, "save">,
+  persistence: Pick<PuzzleSessionPersistence, 'schedule' | 'flush'>,
+  completionPersistence: Pick<PuzzleCompletionPersistence, 'save'>,
   isCurrentCompletion = () => true,
 ): Promise<{ progressSaved: boolean; completionSaved: boolean }> {
   persistence.schedule(snapshot);
@@ -341,7 +341,7 @@ export function syncPuzzleSessionActivity(
   appState: AppStateStatus,
   now = Date.now(),
 ): void {
-  if (gameFocused && appState === "active") {
+  if (gameFocused && appState === 'active') {
     session?.engine.resume(now);
     return;
   }
@@ -398,7 +398,7 @@ export function retainFailedPromotedCompletionClear(
 }
 
 export type CompletionRemovalResult =
-  "cleared" | "snapshot_failed" | "receipt_failed" | "stale";
+  'cleared' | 'snapshot_failed' | 'receipt_failed' | 'stale';
 
 /** Clears the active completed snapshot before its receipt can be removed. */
 export async function removeCompletionDurably(
@@ -407,15 +407,15 @@ export async function removeCompletionDurably(
   isCurrentReceipt: () => boolean,
 ): Promise<CompletionRemovalResult> {
   if (clearActiveSnapshot && !(await clearActiveSnapshot())) {
-    return "snapshot_failed";
+    return 'snapshot_failed';
   }
   if (!isCurrentReceipt()) {
-    return "stale";
+    return 'stale';
   }
   if (!(await clearReceipt())) {
-    return "receipt_failed";
+    return 'receipt_failed';
   }
-  return isCurrentReceipt() ? "cleared" : "stale";
+  return isCurrentReceipt() ? 'cleared' : 'stale';
 }
 
 export function usePuzzleSession(): UsePuzzleSessionResult {
@@ -458,7 +458,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     persistenceRef.current = new PuzzleSessionPersistence(undefined, {
       onError: () => {
         if (mountedRef.current) {
-          setPersistenceError("Progress could not be saved on this device");
+          setPersistenceError('Progress could not be saved on this device');
         }
       },
     });
@@ -470,7 +470,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       {
         onError: () => {
           if (mountedRef.current) {
-            setPersistenceError("Completed puzzle could not be saved");
+            setPersistenceError('Completed puzzle could not be saved');
           }
         },
       },
@@ -510,8 +510,8 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           return;
         }
         const status = current.engine.getState().status;
-        if (status === "completed") {
-          if (previousStatus !== "completed") {
+        if (status === 'completed') {
+          if (previousStatus !== 'completed') {
             const receipt = completionReceiptFromSnapshot(
               current.engine.getSnapshot(),
               current.cutterId,
@@ -532,7 +532,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
               if (!progressSaved || !completionSaved) {
                 if (stillCurrentCompletion && mountedRef.current) {
                   setCompletionSaving(false);
-                  setPersistenceError("Completed puzzle could not be saved");
+                  setPersistenceError('Completed puzzle could not be saved');
                 }
                 return;
               }
@@ -542,7 +542,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
                 if (mountedRef.current) {
                   setCompletionSaving(false);
                   setPersistenceError(
-                    "Your result could not be added to the album. Retry saving before leaving.",
+                    'Your result could not be added to the album. Retry saving before leaving.',
                   );
                 }
                 return;
@@ -592,20 +592,20 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         if (cancelled || requestId !== sessionRequestId.current) {
           return;
         }
-        if (completionLoadResult.status === "loaded") {
+        if (completionLoadResult.status === 'loaded') {
           completionRef.current = completionLoadResult.receipt;
           durableCompletionRef.current = completionLoadResult.receipt;
           setCompletion(completionLoadResult.receipt);
           setCompletionDurable(true);
           setCompletionSaving(false);
-        } else if (completionLoadResult.status === "error") {
-          setPersistenceError("Completed puzzle could not be restored");
+        } else if (completionLoadResult.status === 'error') {
+          setPersistenceError('Completed puzzle could not be restored');
         }
-        if (loadResult.status === "error") {
-          setPersistenceError("Saved puzzle could not be restored");
+        if (loadResult.status === 'error') {
+          setPersistenceError('Saved puzzle could not be restored');
           return;
         }
-        if (loadResult.status === "corrupt") {
+        if (loadResult.status === 'corrupt') {
           imageDurableRef.current = true;
           await imageCache.clear().catch(() => undefined);
           await reconcileOwnPhotoOwnership([
@@ -615,11 +615,11 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             completedSnapshotClearRetentionRef.current?.imageUri,
           ]).catch(() => undefined);
           setPersistenceError(
-            "Saved puzzle was damaged and could not be restored. You can start a new one.",
+            'Saved puzzle was damaged and could not be restored. You can start a new one.',
           );
           return;
         }
-        if (loadResult.status === "empty") {
+        if (loadResult.status === 'empty') {
           imageDurableRef.current = true;
           await reconcileOwnPhotoOwnership([
             completionRef.current?.image.uri,
@@ -630,7 +630,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           return;
         }
         const restored = loadResult.session;
-        if (restored.engine.status === "completed") {
+        if (restored.engine.status === 'completed') {
           imageDurableRef.current = true;
           const resolved = await imageCache.resolveForRestore(
             restored.engine.layout.image,
@@ -669,7 +669,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             });
             setCompletionSaving(false);
             setPersistenceError(
-              "Your completed puzzle could not be added to the album. Retry saving.",
+              'Your completed puzzle could not be added to the album. Retry saving.',
             );
             return;
           }
@@ -721,10 +721,10 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             installSession(restoredSession);
           }
           if (!promotion.completionSaved && mountedRef.current) {
-            setPersistenceError("Completed puzzle could not be saved");
+            setPersistenceError('Completed puzzle could not be saved');
           } else if (!promotion.activeCleared && mountedRef.current) {
             setPersistenceError(
-              "Completed puzzle was saved, but old progress could not be cleared",
+              'Completed puzzle was saved, but old progress could not be cleared',
             );
           }
           await reconcileOwnPhotoOwnership([
@@ -796,13 +796,13 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         ]).catch(() => undefined);
         if (!resolvedImage.durable && mountedRef.current) {
           setPersistenceError(
-            "Saved photo is available online only until it can be cached again",
+            'Saved photo is available online only until it can be cached again',
           );
         }
       })
       .catch(() => {
         if (!cancelled && requestId === sessionRequestId.current) {
-          setPersistenceError("Saved puzzle could not be restored");
+          setPersistenceError('Saved puzzle could not be restored');
         }
       })
       .finally(() => {
@@ -825,9 +825,9 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
   }, [completionPersistence, imageCache, installSession, persistence]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
       appStateRef.current = nextState;
-      if (nextState === "active") {
+      if (nextState === 'active') {
         syncPuzzleSessionActivity(
           sessionRef.current,
           gameFocusedRef.current,
@@ -835,7 +835,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         );
         return;
       }
-      if (nextState === "inactive" || nextState === "background") {
+      if (nextState === 'inactive' || nextState === 'background') {
         const current = sessionRef.current;
         void recoverAndFlushPuzzleSession(current, persistence).then(
           (saved) => {
@@ -864,7 +864,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     (focused: boolean) => {
       gameFocusedRef.current = focused;
       const current = sessionRef.current;
-      if (focused && appStateRef.current === "active") {
+      if (focused && appStateRef.current === 'active') {
         syncPuzzleSessionActivity(current, focused, appStateRef.current);
         return;
       }
@@ -887,13 +887,13 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     async (
       {
         image,
-        cutterId = "classic",
+        cutterId = 'classic',
         difficulty,
         guideMode = DEFAULT_PUZZLE_GUIDE_MODE,
         boardMaxWidth,
         boardMaxHeight,
         traySurfaceExtent,
-        trayPlacement = "bottom",
+        trayPlacement = 'bottom',
       }: StartPuzzleSessionParams,
       expectedSession: PuzzleSession | null,
       isRequestCurrent: () => boolean,
@@ -975,7 +975,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Failed to create puzzle",
+              : 'Failed to create puzzle',
           );
         }
         return null;
@@ -1014,7 +1014,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           setPersistenceError(
             caught instanceof Error
               ? caught.message
-              : "Your puzzle could not be saved to the shelf.",
+              : 'Your puzzle could not be saved to the shelf.',
           );
           return false;
         }
@@ -1032,14 +1032,14 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         isCurrent,
       );
       replacement.durableReplaced =
-        replaceResult === "committed" || replaceResult === "rollback_failed";
-      if (replaceResult !== "committed" || !isCurrent()) {
+        replaceResult === 'committed' || replaceResult === 'rollback_failed';
+      if (replaceResult !== 'committed' || !isCurrent()) {
         if (mountedRef.current) {
           if (
-            replaceResult === "failed" ||
-            replaceResult === "rollback_failed"
+            replaceResult === 'failed' ||
+            replaceResult === 'rollback_failed'
           ) {
-            setPersistenceError("Progress could not be saved on this device");
+            setPersistenceError('Progress could not be saved on this device');
           }
         }
         return false;
@@ -1066,7 +1066,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       ]).catch(() => undefined);
       if (!replacement.nextImageDurable && mountedRef.current) {
         setPersistenceError(
-          "Photo could not be cached for offline play; progress still saves",
+          'Photo could not be cached for offline play; progress still saves',
         );
       } else if (mountedRef.current) {
         setPersistenceError(null);
@@ -1123,7 +1123,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         setLoading(false);
         setError(null);
         if (!durableRestored) {
-          setPersistenceError("Progress could not be saved on this device");
+          setPersistenceError('Progress could not be saved on this device');
         }
       }
       return durableRestored;
@@ -1153,7 +1153,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           !(await verifyPremiumCuts())
         ) {
           setPersistenceError(
-            "Restore or unlock Premium Cuts to open this puzzle.",
+            'Restore or unlock Premium Cuts to open this puzzle.',
           );
           return null;
         }
@@ -1213,7 +1213,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         return nextSession;
       } catch {
         setPersistenceError(
-          "The saved puzzle could not be opened. Your shelf has been kept.",
+          'The saved puzzle could not be opened. Your shelf has been kept.',
         );
         return null;
       } finally {
@@ -1279,7 +1279,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         Math.abs(
           (current.layout.traySurfaceExtent ?? 0) - (traySurfaceExtent ?? 0),
         ) < 0.5 &&
-        (current.layout.trayPlacement ?? "bottom") === trayPlacement
+        (current.layout.trayPlacement ?? 'bottom') === trayPlacement
       ) {
         return;
       }
@@ -1309,7 +1309,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           !haveSamePieceIds(current.layout, layout) ||
           !haveSameCutDescriptor(current.layout, layout)
         ) {
-          throw new Error("Puzzle cutter changed its stable cut during resize");
+          throw new Error('Puzzle cutter changed its stable cut during resize');
         }
 
         latest.engine.relayout(layout);
@@ -1322,7 +1322,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Failed to resize puzzle",
+              : 'Failed to resize puzzle',
           );
         }
       }
@@ -1357,7 +1357,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     }
 
     if (!saved) {
-      setPersistenceError("Progress could not be saved on this device");
+      setPersistenceError('Progress could not be saved on this device');
       return false;
     }
     const completionReceipt = current.engine.isComplete()
@@ -1380,12 +1380,12 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         mountedRef.current &&
         completionRef.current === completionReceipt
       ) {
-        setPersistenceError("Completed puzzle could not be saved");
+        setPersistenceError('Completed puzzle could not be saved');
         return false;
       }
       if (
         !mountedRef.current ||
-        sessionRef.current?.engine !== current.engine ||
+        sessionRef.current !== current ||
         completionRef.current !== completionReceipt
       )
         return false;
@@ -1394,13 +1394,13 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           await puzzleLibrary.remember(sessionSnapshot(current));
         } catch {
           setPersistenceError(
-            "Your completed puzzle could not be added to the album. Retry saving.",
+            'Your completed puzzle could not be added to the album. Retry saving.',
           );
           return false;
         }
         if (
           !mountedRef.current ||
-          sessionRef.current?.engine !== current.engine ||
+          sessionRef.current !== current ||
           completionRef.current !== completionReceipt
         )
           return false;
@@ -1410,7 +1410,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
     }
     if (!imageDurableRef.current) {
       setPersistenceError(
-        "Photo could not be cached for offline play; progress still saves",
+        'Photo could not be cached for offline play; progress still saves',
       );
       return true;
     }
@@ -1469,7 +1469,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
               completedSnapshotClearRetentionRef.current === retention)
           ) {
             setPersistenceError(
-              "Progress could not be removed from this device",
+              'Progress could not be removed from this device',
             );
           }
           if (
@@ -1490,7 +1490,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
               completedSnapshotClearRetentionRef.current === retention)
           ) {
             setPersistenceError(
-              "Progress could not be removed from this device",
+              'Progress could not be removed from this device',
             );
           }
           return false;
@@ -1585,14 +1585,14 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       () => completionPersistence.clear(),
       () => completionRef.current === receipt,
     );
-    if (result !== "cleared") {
+    if (result !== 'cleared') {
       if (mountedRef.current) {
-        if (result === "snapshot_failed") {
+        if (result === 'snapshot_failed') {
           setPersistenceError(
-            "Last result could not be removed until saved progress is cleared",
+            'Last result could not be removed until saved progress is cleared',
           );
-        } else if (result === "receipt_failed") {
-          setPersistenceError("Completed puzzle could not be removed");
+        } else if (result === 'receipt_failed') {
+          setPersistenceError('Completed puzzle could not be removed');
         }
       }
       return false;

@@ -4,12 +4,12 @@ import type {
   PuzzleEngineSnapshot,
   PuzzleEngineState,
   SnapResult,
-} from "../types/engine";
-import type { Point } from "../types/geometry";
-import type { PuzzleLayout, PuzzlePieceDefinition } from "../types/layout";
-import { shouldSnap } from "./snap";
-import { buildShuffledPieceStates } from "./shuffle";
-import { getTraySlotPosition } from "./tray";
+} from '../types/engine';
+import type { Point } from '../types/geometry';
+import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
+import { shouldSnap } from './snap';
+import { buildShuffledPieceStates } from './shuffle';
+import { getTraySlotPosition } from './tray';
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -72,7 +72,7 @@ export class PuzzleEngine {
       : freshPieces;
 
     this.state = {
-      status: snapshot?.status ?? "ready",
+      status: snapshot?.status ?? 'ready',
       layout,
       pieces,
       selectedPieceId: null,
@@ -120,11 +120,11 @@ export class PuzzleEngine {
   }
 
   start(now = Date.now()): void {
-    if (this.state.status !== "ready") {
+    if (this.state.status !== 'ready') {
       return;
     }
     this.patch({
-      status: "playing",
+      status: 'playing',
       startedAt: now,
       activeStartedAt: now,
     });
@@ -133,7 +133,7 @@ export class PuzzleEngine {
   /** Stops active-time accounting without changing puzzle progress. */
   pause(now = Date.now()): void {
     if (
-      this.state.status !== "playing" ||
+      this.state.status !== 'playing' ||
       this.state.activeStartedAt === null
     ) {
       return;
@@ -149,7 +149,7 @@ export class PuzzleEngine {
   /** Continues active-time accounting when a paused game returns foreground. */
   resume(now = Date.now()): void {
     if (
-      this.state.status !== "playing" ||
+      this.state.status !== 'playing' ||
       this.state.activeStartedAt !== null
     ) {
       return;
@@ -161,14 +161,14 @@ export class PuzzleEngine {
   getElapsedMs(now = Date.now()): number {
     return (
       this.state.activeElapsedMs +
-      (this.state.status === "playing" && this.state.activeStartedAt !== null
+      (this.state.status === 'playing' && this.state.activeStartedAt !== null
         ? Math.max(0, now - this.state.activeStartedAt)
         : 0)
     );
   }
 
   selectPiece(pieceId: string | null): void {
-    if (this.state.status === "completed") {
+    if (this.state.status === 'completed') {
       return;
     }
     this.patch({ selectedPieceId: pieceId });
@@ -185,7 +185,7 @@ export class PuzzleEngine {
       return;
     }
 
-    if (this.state.status === "ready") {
+    if (this.state.status === 'ready') {
       this.start();
     }
 
@@ -263,7 +263,7 @@ export class PuzzleEngine {
    * puzzle menu place the next loose piece in stable cut order.
    */
   assistPiece(pieceId?: string): SnapResult | null {
-    if (this.state.status === "completed") {
+    if (this.state.status === 'completed') {
       return null;
     }
 
@@ -309,7 +309,7 @@ export class PuzzleEngine {
       return;
     }
 
-    if (this.state.status === "ready") {
+    if (this.state.status === 'ready') {
       this.start();
     }
 
@@ -449,13 +449,13 @@ export class PuzzleEngine {
       selectedPieceId: null,
       snapFeedback:
         snapped || joined
-          ? { pieceId, kind: connectedWithNeighbor ? "connect" : "seat" }
+          ? { pieceId, kind: connectedWithNeighbor ? 'connect' : 'seat' }
           : null,
     });
     if (snapped) this.checkCompletion();
     else this.recoverLoosePieces();
     // Recovery clears stale feedback; the connection itself remains meaningful.
-    if (joined) this.patch({ snapFeedback: { pieceId, kind: "connect" } });
+    if (joined) this.patch({ snapFeedback: { pieceId, kind: 'connect' } });
     return {
       pieceId,
       snapped: snapped || joined,
@@ -479,7 +479,7 @@ export class PuzzleEngine {
 
   reset(): void {
     this.state = {
-      status: "ready",
+      status: 'ready',
       layout: this.state.layout,
       pieces: buildShuffledPieceStates(this.state.layout),
       selectedPieceId: null,
@@ -565,11 +565,10 @@ export class PuzzleEngine {
       snapFeedback: null,
     };
     this.emit();
-    this.recoverLoosePieces();
   }
 
   isComplete(): boolean {
-    return this.state.status === "completed";
+    return this.state.status === 'completed';
   }
 
   /**
@@ -699,7 +698,7 @@ export class PuzzleEngine {
     if (allLocked) {
       const completedAt = Date.now();
       this.patch({
-        status: "completed",
+        status: 'completed',
         completedAt,
         activeElapsedMs: this.getElapsedMs(completedAt),
         activeStartedAt: null,

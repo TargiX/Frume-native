@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { View } from "react-native";
-import { Canvas, Group, Path, Skia } from "@shopify/react-native-skia";
-import { getCutter } from "../../../puzzle/cutters";
-import type { PuzzleCutterId, PuzzleDifficulty } from "../../../puzzle/types";
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { Canvas, Group, Path, Skia } from '@shopify/react-native-skia';
+import { getCutter } from '../../../puzzle/cutters';
+import type { PuzzleCutterId, PuzzleDifficulty } from '../../../puzzle/types';
 
 /** Seams use the selected image aspect and size, matching the playable cut. */
 export function PhotoCutPreview({
@@ -28,16 +28,14 @@ export function PhotoCutPreview({
     let current = true;
     setPreview(null);
     if (!frame.width || !frame.height) return;
-    void Promise.resolve()
-      .then(() =>
-        getCutter(cutterId).generate(
-          { uri, width: imageWidth, height: imageHeight },
-          {
-            difficulty,
-            boardMaxWidth: frame.width,
-            boardMaxHeight: frame.height,
-          },
-        ),
+    void getCutter(cutterId)
+      .generate(
+        { uri, width: imageWidth, height: imageHeight },
+        {
+          difficulty,
+          boardMaxWidth: frame.width,
+          boardMaxHeight: frame.height,
+        },
       )
       .then((layout) => {
         if (current)
@@ -68,7 +66,7 @@ export function PhotoCutPreview({
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
       onLayout={(event) => setFrame(event.nativeEvent.layout)}
     >
       {preview ? (

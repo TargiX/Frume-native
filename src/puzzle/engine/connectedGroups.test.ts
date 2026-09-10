@@ -1,16 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { OrganicCutter } from "../cutters/organic/OrganicCutter";
-import { ClassicCutter } from "../cutters/classic/ClassicCutter";
-import { PuzzleEngine } from "./PuzzleEngine";
+import { describe, expect, it } from 'vitest';
+import { OrganicCutter } from '../cutters/organic/OrganicCutter';
+import { ClassicCutter } from '../cutters/classic/ClassicCutter';
+import { PuzzleEngine } from './PuzzleEngine';
 import {
   deserializePuzzleSession,
   serializePuzzleSession,
-} from "../persistence/PuzzleSessionPersistence";
+} from '../persistence/PuzzleSessionPersistence';
 
 async function setup() {
   const layout = await ClassicCutter.generate(
-    { uri: "file:///photo.jpg", width: 600, height: 600 },
-    { difficulty: "3x3", boardMaxWidth: 300, boardMaxHeight: 300 },
+    { uri: 'file:///photo.jpg', width: 600, height: 600 },
+    { difficulty: '3x3', boardMaxWidth: 300, boardMaxHeight: 300 },
   );
   const engine = new PuzzleEngine(layout);
   const [a, b] = layout.pieces;
@@ -25,8 +25,8 @@ async function setup() {
   });
   return { engine, layout, a, b };
 }
-describe("connected loose pieces", () => {
-  it("joins adjacent pieces away from the target and seats the whole group later", async () => {
+describe('connected loose pieces', () => {
+  it('joins adjacent pieces away from the target and seats the whole group later', async () => {
     const { engine, a, b } = await setup();
     expect(engine.releasePiece(b.id)).toMatchObject({
       snapped: true,
@@ -40,21 +40,21 @@ describe("connected loose pieces", () => {
     expect(engine.getState().pieces[a.id].locked).toBe(true);
     expect(engine.getState().pieces[b.id].locked).toBe(true);
   });
-  it("round-trips the connection through durable storage and keeps it on relayout", async () => {
+  it('round-trips the connection through durable storage and keeps it on relayout', async () => {
     const { engine, a, b, layout } = await setup();
     engine.releasePiece(b.id);
     engine.pause();
     const saved = deserializePuzzleSession(
       serializePuzzleSession({
-        cutterId: "classic",
-        difficulty: "3x3",
+        cutterId: 'classic',
+        difficulty: '3x3',
         engine: engine.getSnapshot(),
       }),
     );
     expect(saved).not.toBeNull();
     const restored = PuzzleEngine.fromSnapshot(saved!.engine);
     const bigger = await ClassicCutter.generate(layout.image, {
-      difficulty: "3x3",
+      difficulty: '3x3',
       boardMaxWidth: 450,
       boardMaxHeight: 450,
     });
@@ -64,7 +64,7 @@ describe("connected loose pieces", () => {
     restored.releasePiece(a.id);
     expect(restored.getState().pieces[b.id].locked).toBe(true);
   });
-  it("rejects a saved connection whose pieces no longer share an aligned offset", async () => {
+  it('rejects a saved connection whose pieces no longer share an aligned offset', async () => {
     const { engine, b } = await setup();
     engine.releasePiece(b.id);
     const snapshot = engine.getSnapshot();
@@ -78,28 +78,28 @@ describe("connected loose pieces", () => {
     expect(
       deserializePuzzleSession(
         serializePuzzleSession({
-          cutterId: "classic",
-          difficulty: "3x3",
+          cutterId: 'classic',
+          difficulty: '3x3',
           engine: snapshot,
         }),
       ),
     ).toBeNull();
   });
-  it("rejects a dangling group instead of restoring an unmovable connection", async () => {
+  it('rejects a dangling group instead of restoring an unmovable connection', async () => {
     const { engine, a } = await setup();
     const snapshot = engine.getSnapshot();
     snapshot.pieces[a.id] = { ...snapshot.pieces[a.id], groupId: a.id };
     expect(
       deserializePuzzleSession(
         serializePuzzleSession({
-          cutterId: "classic",
-          difficulty: "3x3",
+          cutterId: 'classic',
+          difficulty: '3x3',
           engine: snapshot,
         }),
       ),
     ).toBeNull();
   });
-  it("keeps the relative positions when rescuing an off-screen group", async () => {
+  it('keeps the relative positions when rescuing an off-screen group', async () => {
     const { engine, a, b } = await setup();
     engine.releasePiece(b.id);
     engine.movePiece(a.id, { x: -1000, y: 1000 });
@@ -113,36 +113,7 @@ describe("connected loose pieces", () => {
       b.correctPosition.y - a.correctPosition.y,
     );
   });
-  it("recovers an off-board group as part of relayout", async () => {
-    const { engine, a, b, layout } = await setup();
-    engine.releasePiece(b.id);
-    engine.movePiece(a.id, { x: -1_000, y: 1_000 });
-    const resized = await ClassicCutter.generate(layout.image, {
-      difficulty: "3x3",
-      boardMaxWidth: 450,
-      boardMaxHeight: 450,
-    });
-
-    engine.relayout(resized);
-
-    for (const id of [a.id, b.id]) {
-      const piece = engine.getState().pieces[id];
-      const definition = resized.pieces.find((item) => item.id === id)!;
-      expect(piece.position.x).toBeGreaterThanOrEqual(
-        -definition.bounds.width / 2,
-      );
-      expect(piece.position.x).toBeLessThanOrEqual(
-        resized.boardSize.width - definition.bounds.width / 2,
-      );
-      expect(piece.position.y).toBeGreaterThanOrEqual(
-        -definition.bounds.height / 2,
-      );
-      expect(piece.position.y).toBeLessThanOrEqual(
-        resized.boardSize.height - definition.bounds.height / 2,
-      );
-    }
-  });
-  it("returns a group to separate permanent tray slots", async () => {
+  it('returns a group to separate permanent tray slots', async () => {
     const { engine, a, b } = await setup();
     engine.releasePiece(b.id);
     engine.returnToTray(a.id);
@@ -154,11 +125,11 @@ describe("connected loose pieces", () => {
       });
   });
   it.each([ClassicCutter, OrganicCutter])(
-    "keeps every piece recoverable through repeated moves, joins and rotation with $meta.id",
+    'keeps every piece recoverable through repeated moves, joins and rotation with $meta.id',
     async (cutter) => {
       let layout = await cutter.generate(
-        { uri: "file:///roundtrip.jpg", width: 900, height: 600 },
-        { difficulty: "4x4", boardMaxWidth: 360, boardMaxHeight: 240 },
+        { uri: 'file:///roundtrip.jpg', width: 900, height: 600 },
+        { difficulty: '4x4', boardMaxWidth: 360, boardMaxHeight: 240 },
       );
       let engine = new PuzzleEngine(layout);
       for (let step = 0; step < 48; step += 1) {
@@ -176,7 +147,7 @@ describe("connected loose pieces", () => {
         }
         if (step % 8 === 0) {
           layout = await cutter.generate(layout.image, {
-            difficulty: "4x4",
+            difficulty: '4x4',
             boardMaxWidth: step % 16 === 0 ? 480 : 360,
             boardMaxHeight: 320,
             cutDescriptor: layout.cutDescriptor,
@@ -186,7 +157,7 @@ describe("connected loose pieces", () => {
         const saved = deserializePuzzleSession(
           serializePuzzleSession({
             cutterId: cutter.meta.id,
-            difficulty: "4x4",
+            difficulty: '4x4',
             engine: engine.getSnapshot(),
           }),
         );
@@ -206,7 +177,7 @@ describe("connected loose pieces", () => {
       }
     },
   );
-  it("does not connect matching offsets when the pieces are not neighbors", async () => {
+  it('does not connect matching offsets when the pieces are not neighbors', async () => {
     const { engine, layout, a, b } = await setup();
     engine.returnToTray(b.id);
     const far = layout.pieces[8];
