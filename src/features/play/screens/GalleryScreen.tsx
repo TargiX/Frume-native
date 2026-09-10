@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
+  Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -27,15 +29,17 @@ import {
   resolvePuzzlePhotoTargetAspect,
 } from '../../../services/unsplash';
 import { colors, radius, spacing } from '../../../theme';
-import {
-  resolveGalleryLayout,
-} from '../utils/galleryLayout';
+import { resolveGalleryLayout } from '../utils/galleryLayout';
 import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
 } from '../utils/photoRequest';
 import { pickOwnPhoto } from '../utils/pickOwnPhoto';
 import { discardManagedOwnPhotoCandidate } from '../utils/ownPhotoLibrary';
+import {
+  browsePuzzlePhotos,
+  type PuzzlePhoto,
+} from '../../../services/unsplash/fetchPuzzlePhoto';
 import { CATEGORY_COVERS } from './categoryCovers';
 import {
   galleryRetryAccessibilityHint,
@@ -53,6 +57,12 @@ export function GalleryScreen({ navigation }: Props) {
   const { session } = usePuzzleSessionContext();
   // The saved puzzle's photograph must survive the cleanup an import runs.
   const sessionImageUri = session?.layout.image.uri;
+  const [collection, setCollection] = useState<{
+    categoryId: string;
+    photos: PuzzlePhoto[];
+  } | null>(null);
+  const collectionsRef = useRef(new Map<string, PuzzlePhoto[]>());
+  const retryActionRef = useRef<(() => void) | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -98,7 +108,7 @@ export function GalleryScreen({ navigation }: Props) {
     };
   }, []);
 
-  const pickPhoto = async (categoryId?: string) => {
+  const pickPhoto = async (categoryId?: string, photoId?: string) => {
     requestRef.current?.controller.abort(
       new Error('Replaced by a newer photo selection'),
     );
@@ -106,14 +116,26 @@ export function GalleryScreen({ navigation }: Props) {
     const controller = new AbortController();
     requestRef.current = { id: requestId, controller };
     lastAttemptRef.current = { source: 'remote', categoryId };
+    retryActionRef.current = () => void pickPhoto(categoryId, photoId);
     setPending(categoryId ?? 'surprise');
     setError(null);
     try {
+      const chosenPhoto = photoId
+        ? collection?.photos.find((photo) => photo.id === photoId)
+        : undefined;
+      const chosenOrientation = chosenPhoto
+        ? chosenPhoto.height > chosenPhoto.width
+          ? 'portrait'
+          : 'landscape'
+        : photoOrientation;
       const result = await fetchPuzzlePhoto(
         categoryId,
         controller.signal,
-        photoOrientation,
-        targetPhotoAspect ?? undefined,
+        chosenOrientation,
+        chosenPhoto
+          ? chosenPhoto.width / chosenPhoto.height
+          : (targetPhotoAspect ?? undefined),
+        photoId,
       );
       if (
         !mountedRef.current ||
@@ -161,6 +183,7 @@ export function GalleryScreen({ navigation }: Props) {
     requestRef.current = null;
     nextRequestIdRef.current += 1;
     lastAttemptRef.current = { source: 'own' };
+    retryActionRef.current = () => void useOwnPhoto();
     setPending(null);
     setError(null);
 
@@ -189,7 +212,54 @@ export function GalleryScreen({ navigation }: Props) {
     });
   };
 
+  const browseCollection = async (categoryId: string) => {
+    requestRef.current?.controller.abort();
+    const id = ++nextRequestIdRef.current;
+    const controller = new AbortController();
+    requestRef.current = { id, controller };
+    lastAttemptRef.current = { source: 'remote', categoryId };
+    retryActionRef.current = () => void browseCollection(categoryId);
+    setPending(categoryId);
+    setError(null);
+    setCollection(null);
+    const cacheKey = `${categoryId}:${photoOrientation}:${targetPhotoAspect}`;
+    try {
+      const photos =
+        collectionsRef.current.get(cacheKey) ??
+        (await browsePuzzlePhotos(
+          categoryId,
+          controller.signal,
+          photoOrientation,
+          targetPhotoAspect ?? undefined,
+        ));
+      if (
+        !mountedRef.current ||
+        requestRef.current?.id !== id ||
+        controller.signal.aborted
+      )
+        return;
+      collectionsRef.current.set(cacheKey, photos);
+      setCollection({ categoryId, photos });
+    } catch (caught) {
+      if (
+        mountedRef.current &&
+        requestRef.current?.id === id &&
+        !controller.signal.aborted
+      )
+        setError(describePhotoRequestError(caught));
+    } finally {
+      if (requestRef.current?.id === id) {
+        requestRef.current = null;
+        if (mountedRef.current) setPending(null);
+      }
+    }
+  };
+
   const retryLastPhoto = () => {
+    if (retryActionRef.current) {
+      retryActionRef.current();
+      return;
+    }
     retryGalleryPhoto(lastAttemptRef.current, {
       searchPhoto: (categoryId) => void pickPhoto(categoryId),
       pickOwnPhoto: () => void useOwnPhoto(),
@@ -204,7 +274,7 @@ export function GalleryScreen({ navigation }: Props) {
       <View style={compactLandscape ? styles.landscapeHeader : undefined}>
         <View style={styles.titleGroup}>
           <Text style={styles.title} accessibilityRole="header">
-            Choose a photo theme
+            Find your next quiet moment
           </Text>
           {compactLandscape && error ? (
             <View style={styles.landscapeErrorRow}>
@@ -234,8 +304,8 @@ export function GalleryScreen({ navigation }: Props) {
                 compactLandscape && styles.subtitleLandscape,
               ]}
             >
-              Each theme finds one curated photograph. Use Surprise for a
-              random theme or choose a photo from your library.
+              Browse a small collection, then choose the picture you want to
+              spend time with. Your own photos are always welcome.
             </Text>
           )}
         </View>
@@ -253,6 +323,69 @@ export function GalleryScreen({ navigation }: Props) {
         ) : null}
       </View>
 
+      {collection ? (
+        <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+          <Button
+            label="Refresh photographs"
+            variant="ghost"
+            disabled={loading}
+            onPress={() => {
+              collectionsRef.current.clear();
+              void browseCollection(collection.categoryId);
+            }}
+          />
+          <Button
+            label="Browse other themes"
+            variant="ghost"
+            onPress={() => setCollection(null)}
+          />
+          <Text style={styles.title} accessibilityRole="header">
+            {
+              PUZZLE_CATEGORIES.find(
+                (item) => item.id === collection.categoryId,
+              )?.label
+            }{' '}
+            · Choose your photograph
+          </Text>
+          {collection.photos.map((photo) => (
+            <View key={photo.id} style={{ gap: spacing.xs }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  photo.alt_description ?? 'Choose this photograph'
+                }
+                disabled={loading}
+                onPress={() => void pickPhoto(collection.categoryId, photo.id)}
+              >
+                <Image
+                  source={{ uri: photo.urls.regular }}
+                  style={{
+                    width: '100%',
+                    aspectRatio: photo.width / photo.height,
+                    maxHeight: 320,
+                    borderRadius: radius.lg,
+                  }}
+                  resizeMode="contain"
+                />
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Photo by ${photo.user.name} on Unsplash`}
+                onPress={() =>
+                  void Linking.openURL(photo.user.links.html).catch(
+                    () => undefined,
+                  )
+                }
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={styles.subtitle}>
+                  Photo by {photo.user.name} on Unsplash
+                </Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
       <View style={[styles.grid, compactLandscape && styles.gridLandscape]}>
         {PUZZLE_CATEGORIES.map((category) => {
           const isPending = pending === category.id;
@@ -288,7 +421,7 @@ export function GalleryScreen({ navigation }: Props) {
                 useSingleColumnCards && styles.cardSingleColumn,
                 pressed && styles.cardPressed,
               ]}
-              onPress={() => pickPhoto(category.id)}
+              onPress={() => void browseCollection(category.id)}
             >
               <ImageBackground
                 source={CATEGORY_COVERS[category.id]}

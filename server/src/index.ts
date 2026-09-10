@@ -185,15 +185,12 @@ const MAX_PROVIDER_REQUESTS_PER_HOUR = 1_000_000;
 const DEFAULT_MAX_RETAINED_TRACKING_GRANTS = 10_000;
 const DEFAULT_TRACKING_GRANT_ISSUES_PER_MINUTE = 5;
 const MAX_TRACKING_GRANT_CONFIGURATION = 100_000;
-const PHOTO_API_DEPLOYMENT_ID_PATTERN =
-  /^[A-Za-z0-9][A-Za-z0-9._-]{11,127}$/;
+const PHOTO_API_DEPLOYMENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{11,127}$/;
 // Include two boundary buckets so a burst across minute boundaries cannot
 // reach the storage backstop before the oldest retained row becomes eligible
 // for cleanup.
 const TRACKING_GRANT_RETENTION_BUCKETS =
-  Math.ceil(
-    (TRACKING_GRANT_TTL_MS + TRACKING_GRANT_RETENTION_MS) / 60_000,
-  ) + 2;
+  Math.ceil((TRACKING_GRANT_TTL_MS + TRACKING_GRANT_RETENTION_MS) / 60_000) + 2;
 
 type OperationalEvent =
   | 'photo_issued'
@@ -349,7 +346,10 @@ function hasSupportedPuzzleAspect(width: number, height: number): boolean {
   return aspect >= MIN_PUZZLE_ASPECT && aspect <= MAX_PUZZLE_ASPECT;
 }
 
-function parseHttpsUrl(value: unknown, allowedHosts: ReadonlySet<string>): URL | null {
+function parseHttpsUrl(
+  value: unknown,
+  allowedHosts: ReadonlySet<string>,
+): URL | null {
   if (typeof value !== 'string') {
     return null;
   }
@@ -453,8 +453,11 @@ function parseUnsplashPhoto(value: unknown): UnsplashPhoto | null {
 }
 
 function isGoodPuzzlePhoto(photo: UnsplashPhoto): boolean {
-  const text = `${photo.alt_description ?? ''} ${photo.description ?? ''}`.toLowerCase();
-  return !text.trim() || !PATTERN_KEYWORDS.some((keyword) => text.includes(keyword));
+  const text =
+    `${photo.alt_description ?? ''} ${photo.description ?? ''}`.toLowerCase();
+  return (
+    !text.trim() || !PATTERN_KEYWORDS.some((keyword) => text.includes(keyword))
+  );
 }
 
 function toPoolPhoto(photo: UnsplashPhoto): PoolPhoto {
@@ -565,7 +568,10 @@ function parseBoundedInteger(
     throw new ConfigurationError(`${name} must be a positive integer`);
   }
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed > MAX_PROVIDER_REQUESTS_PER_HOUR) {
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed > MAX_PROVIDER_REQUESTS_PER_HOUR
+  ) {
     throw new ConfigurationError(`${name} is outside the supported range`);
   }
   return parsed;
@@ -615,10 +621,7 @@ export function trackingGrantConfiguration(env: Env): {
       'Tracking grant configuration is outside the supported range',
     );
   }
-  if (
-    maxRetained <
-    maxIssuesPerMinute * TRACKING_GRANT_RETENTION_BUCKETS
-  ) {
+  if (maxRetained < maxIssuesPerMinute * TRACKING_GRANT_RETENTION_BUCKETS) {
     throw new ConfigurationError(
       'MAX_RETAINED_TRACKING_GRANTS cannot safely retain the configured issuance rate',
     );
@@ -852,10 +855,10 @@ export class CategoryPhotoPool extends DurableObject<Env> {
     }
   }
 
-  private selectPhoto(
+  private selectPhotos(
     orientation?: PhotoOrientation,
     targetAspect?: number,
-  ): PoolPhoto | null {
+  ): PoolPhoto[] {
     const orientationClause =
       orientation === 'portrait'
         ? 'height > width'
@@ -880,15 +883,47 @@ export class CategoryPhotoPool extends DurableObject<Env> {
     // Ranking by closeness to the target instead made selection deterministic:
     // one device asking the same category always got back the single
     // nearest-aspect photo in the pool, puzzle after puzzle.
-    const row = this.ctx.storage.sql
+    const rows = this.ctx.storage.sql
       .exec<PoolRow>(
         `SELECT id, width, height, alt_description, url, photographer_name,
                 photographer_url, download_location
          FROM photos
          ${whereClause}
          ORDER BY random()
-         LIMIT 1`,
+         LIMIT 6`,
         ...queryParameters,
+      )
+      .toArray();
+    return rows.map(rowToPoolPhoto);
+  }
+
+  private selectPhoto(
+    orientation?: PhotoOrientation,
+    targetAspect?: number,
+  ): PoolPhoto | null {
+    return this.selectPhotos(orientation, targetAspect)[0] ?? null;
+  }
+
+  async browsePhotos(
+    category: CategoryDescriptor,
+    orientation?: PhotoOrientation,
+    targetAspect?: number,
+  ) {
+    const ready = await this.getPhoto(category, orientation, targetAspect);
+    return ready.kind === 'ready'
+      ? {
+          kind: 'ready' as const,
+          photos: this.selectPhotos(orientation, targetAspect),
+        }
+      : ready;
+  }
+
+  selectedPhoto(category: CategoryDescriptor, id: string): PoolPhoto | null {
+    this.ensureCategory(category);
+    const row = this.ctx.storage.sql
+      .exec<PoolRow>(
+        `SELECT id, width, height, alt_description, url, photographer_name, photographer_url, download_location FROM photos WHERE id = ?`,
+        id,
       )
       .toArray()[0];
     return row ? rowToPoolPhoto(row) : null;
@@ -932,10 +967,16 @@ export class CategoryPhotoPool extends DurableObject<Env> {
     try {
       body = await response.json();
     } catch {
-      throw new UpstreamError('Unsplash returned invalid JSON', response.status);
+      throw new UpstreamError(
+        'Unsplash returned invalid JSON',
+        response.status,
+      );
     }
     if (!isRecord(body) || !Array.isArray(body.results)) {
-      throw new UpstreamError('Unsplash returned an invalid photo list', response.status);
+      throw new UpstreamError(
+        'Unsplash returned an invalid photo list',
+        response.status,
+      );
     }
 
     const fresh = body.results
@@ -944,7 +985,10 @@ export class CategoryPhotoPool extends DurableObject<Env> {
       .filter(isGoodPuzzlePhoto)
       .map(toPoolPhoto);
     if (fresh.length === 0) {
-      throw new UpstreamError('Unsplash returned no usable photos', response.status);
+      throw new UpstreamError(
+        'Unsplash returned no usable photos',
+        response.status,
+      );
     }
     return fresh;
   }
@@ -1013,7 +1057,10 @@ export class CategoryPhotoPool extends DurableObject<Env> {
 
     try {
       const photos = await this.fetchFreshPhotos(category, orientation);
-      return { kind: 'refilled', photoCount: this.persistPhotos(photos, owner) };
+      return {
+        kind: 'refilled',
+        photoCount: this.persistPhotos(photos, owner),
+      };
     } catch (error) {
       this.releaseRefillLease(owner);
       return { kind: 'error', failure: serializeFailure(error) };
@@ -1043,7 +1090,10 @@ export class CategoryPhotoPool extends DurableObject<Env> {
       ? { kind: 'ready', photo }
       : {
           kind: 'error',
-          failure: { kind: 'upstream', message: 'Unsplash returned no usable photos' },
+          failure: {
+            kind: 'upstream',
+            message: 'Unsplash returned no usable photos',
+          },
         };
   }
 
@@ -1135,8 +1185,7 @@ export class ProviderBudget extends DurableObject<Env> {
     return {
       minuteStartedAt,
       requestCount: usage.request_count,
-      resetAt:
-        (usage.earliest_minute ?? minuteStartedAt) + 61 * minuteMs,
+      resetAt: (usage.earliest_minute ?? minuteStartedAt) + 61 * minuteMs,
     };
   }
 
@@ -1294,7 +1343,9 @@ export class TrackingGrant extends DurableObject<Env> {
     maxIssuesPerMinute: number,
     now = Date.now(),
   ): Promise<TrackingGrantIssueResult> {
-    const normalized = parseDownloadLocation(expectedDownloadLocation)?.toString();
+    const normalized = parseDownloadLocation(
+      expectedDownloadLocation,
+    )?.toString();
     if (
       !TRACKING_TOKEN_ID_PATTERN.test(tokenId) ||
       !normalized ||
@@ -1332,9 +1383,7 @@ export class TrackingGrant extends DurableObject<Env> {
       )
       .one();
     const retainedRows = this.ctx.storage.sql
-      .exec<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM tracking_grants',
-      )
+      .exec<{ count: number }>('SELECT COUNT(*) AS count FROM tracking_grants')
       .one().count;
     if (
       window.issue_count >= maxIssuesPerMinute ||
@@ -1417,7 +1466,10 @@ export class TrackingGrant extends DurableObject<Env> {
       return { kind: 'already_consumed' };
     }
     if (grant.status === 'permanent') {
-      return { kind: 'permanent', upstreamStatus: grant.permanent_status ?? 404 };
+      return {
+        kind: 'permanent',
+        upstreamStatus: grant.permanent_status ?? 404,
+      };
     }
     if (grant.expires_at <= now) {
       return { kind: 'invalid_or_expired' };
@@ -1515,7 +1567,10 @@ export class TrackingGrant extends DurableObject<Env> {
   }
 }
 
-async function readBoundedBody(request: Request, maxBytes: number): Promise<string> {
+async function readBoundedBody(
+  request: Request,
+  maxBytes: number,
+): Promise<string> {
   const contentLength = request.headers.get('Content-Length');
   if (contentLength !== null) {
     if (!/^\d+$/.test(contentLength)) {
@@ -1556,16 +1611,16 @@ async function readBoundedBody(request: Request, maxBytes: number): Promise<stri
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
+  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(
+    bytes,
+  );
 }
 
 function photoRateLimitKey(request: Request): string {
   return request.headers.get('CF-Connecting-IP')?.trim() || 'unknown-client';
 }
 
-type TargetAspectParseResult =
-  | { ok: true; value?: number }
-  | { ok: false };
+type TargetAspectParseResult = { ok: true; value?: number } | { ok: false };
 
 function parseTargetAspect(
   searchParams: URLSearchParams,
@@ -1590,6 +1645,20 @@ async function handlePhoto(request: Request, env: Env): Promise<Response> {
   const searchParams = new URL(request.url).searchParams;
   const requested = searchParams.get('category');
   const requestedOrientation = searchParams.get('orientation');
+  const browse = searchParams.get('browse') === '1';
+  const photoId = searchParams.get('id');
+  if (
+    (photoId !== null &&
+      (!/^[A-Za-z0-9_-]{1,128}$/.test(photoId) || !requested || browse)) ||
+    (searchParams.has('browse') && !browse)
+  ) {
+    return json<ErrorBody>(
+      { error: 'Invalid photo selection' },
+      request,
+      env,
+      400,
+    );
+  }
   if (
     requestedOrientation !== null &&
     requestedOrientation !== 'portrait' &&
@@ -1633,7 +1702,11 @@ async function handlePhoto(request: Request, env: Env): Promise<Response> {
     env.PHOTO_ISSUE_RATE_LIMITER,
     'PHOTO_ISSUE_RATE_LIMITER',
   );
-  const issueLimit = await issueLimiter.limit({ key: photoRateLimitKey(request) });
+  const issueLimit = await issueLimiter.limit({
+    key: browse
+      ? `browse:${category.id}:${photoRateLimitKey(request)}`
+      : photoRateLimitKey(request),
+  });
   if (!issueLimit.success) {
     recordOperationalEvent('photo_rejected', { reason: 'source_limit' });
     return json<ErrorBody>(
@@ -1646,9 +1719,51 @@ async function handlePhoto(request: Request, env: Env): Promise<Response> {
   }
 
   const pools = requireBinding(env.CATEGORY_POOLS, 'CATEGORY_POOLS');
-  const result = await pools
-    .getByName(category.id)
-    .getPhoto(categoryDescriptor(category), orientation, targetAspect);
+  const pool = pools.getByName(category.id);
+  if (browse) {
+    const selection = await pool.browsePhotos(
+      categoryDescriptor(category),
+      orientation,
+      targetAspect,
+    );
+    if (selection.kind === 'warming')
+      return json<ErrorBody>(
+        { error: 'Photo pool is warming' },
+        request,
+        env,
+        503,
+        { 'Retry-After': String(selection.retryAfterSeconds) },
+      );
+    if (selection.kind === 'error') throwFailure(selection.failure);
+    return json(
+      {
+        photos: selection.photos.map(toPublicPhoto),
+        category: { id: category.id, label: category.label },
+      },
+      request,
+      env,
+    );
+  }
+  const selected = photoId
+    ? await pool.selectedPhoto(categoryDescriptor(category), photoId)
+    : null;
+  if (photoId && !selected)
+    return json<ErrorBody>(
+      {
+        error:
+          'This photograph is no longer available. Choose another from the collection.',
+      },
+      request,
+      env,
+      404,
+    );
+  const result: CategoryPhotoResult = selected
+    ? { kind: 'ready', photo: selected }
+    : await pool.getPhoto(
+        categoryDescriptor(category),
+        orientation,
+        targetAspect,
+      );
   if (result.kind === 'warming') {
     return json<ErrorBody>(
       { error: 'Photo pool is warming' },
@@ -1713,12 +1828,27 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
     rawBody = await readBoundedBody(request, MAX_TRACK_BODY_BYTES);
   } catch (error) {
     if (error instanceof BodyTooLargeError) {
-      return json<ErrorBody>({ error: 'Request body is too large' }, request, env, 413);
+      return json<ErrorBody>(
+        { error: 'Request body is too large' },
+        request,
+        env,
+        413,
+      );
     }
     if (error instanceof InvalidContentLengthError) {
-      return json<ErrorBody>({ error: 'Invalid Content-Length' }, request, env, 400);
+      return json<ErrorBody>(
+        { error: 'Invalid Content-Length' },
+        request,
+        env,
+        400,
+      );
     }
-    return json<ErrorBody>({ error: 'Invalid request body' }, request, env, 400);
+    return json<ErrorBody>(
+      { error: 'Invalid request body' },
+      request,
+      env,
+      400,
+    );
   }
 
   let body: unknown;
@@ -1753,7 +1883,10 @@ async function handleTrack(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  const limiter = requireBinding(env.TRACKING_RATE_LIMITER, 'TRACKING_RATE_LIMITER');
+  const limiter = requireBinding(
+    env.TRACKING_RATE_LIMITER,
+    'TRACKING_RATE_LIMITER',
+  );
   const sourceLimit = await limiter.limit({
     key: `source:${photoRateLimitKey(request)}`,
   });
@@ -1823,13 +1956,9 @@ function errorResponse(error: unknown, request: Request, env: Env): Response {
     return json<ErrorBody>({ error: error.message }, request, env, 503);
   }
   if (error instanceof ProviderCapacityError) {
-    return json<ErrorBody>(
-      { error: error.message },
-      request,
-      env,
-      503,
-      { 'Retry-After': String(error.retryAfterSeconds) },
-    );
+    return json<ErrorBody>({ error: error.message }, request, env, 503, {
+      'Retry-After': String(error.retryAfterSeconds),
+    });
   }
   if (error instanceof PermanentTrackingError) {
     return json<ErrorBody>(
@@ -1841,7 +1970,10 @@ function errorResponse(error: unknown, request: Request, env: Env): Response {
   }
   if (error instanceof UpstreamError) {
     return json<ErrorBody>(
-      { error: error.message, ...(error.status ? { upstreamStatus: error.status } : {}) },
+      {
+        error: error.message,
+        ...(error.status ? { upstreamStatus: error.status } : {}),
+      },
       request,
       env,
       502,
@@ -1851,13 +1983,9 @@ function errorResponse(error: unknown, request: Request, env: Env): Response {
 }
 
 function methodNotAllowed(request: Request, env: Env, allow: string): Response {
-  return json<ErrorBody>(
-    { error: 'Method not allowed' },
-    request,
-    env,
-    405,
-    { Allow: allow },
-  );
+  return json<ErrorBody>({ error: 'Method not allowed' }, request, env, 405, {
+    Allow: allow,
+  });
 }
 
 function readiness(env: Env): {
@@ -1908,12 +2036,20 @@ function readiness(env: Env): {
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (!isOriginAllowed(request, env)) {
-      return json<ErrorBody>({ error: 'Origin not allowed' }, request, env, 403);
+      return json<ErrorBody>(
+        { error: 'Origin not allowed' },
+        request,
+        env,
+        403,
+      );
     }
 
     const { pathname } = new URL(request.url);
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(request, env),
+      });
     }
 
     try {
@@ -1973,9 +2109,9 @@ const worker = {
     }
     const results = await Promise.all(
       CATEGORIES.map((category) =>
-        env.CATEGORY_POOLS
-          .getByName(category.id)
-          .refill(categoryDescriptor(category)),
+        env.CATEGORY_POOLS.getByName(category.id).refill(
+          categoryDescriptor(category),
+        ),
       ),
     );
     const failure = results.find((result) => result.kind === 'error');

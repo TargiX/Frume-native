@@ -51,6 +51,7 @@ type UsePieceGestureParams = {
   surfaceOriginY: number;
   positionX: SharedValue<number>;
   positionY: SharedValue<number>;
+  companions?: { x: SharedValue<number>; y: SharedValue<number> }[];
   hapticsEnabled: boolean;
 };
 
@@ -78,6 +79,7 @@ export function usePieceGesture({
   positionX,
   positionY,
   hapticsEnabled,
+  companions = [],
 }: UsePieceGestureParams) {
   const reduceMotion = useReducedMotion();
   const originX = useSharedValue(0);
@@ -85,6 +87,7 @@ export function usePieceGesture({
   const fixedOriginX = useSharedValue(0);
   const fixedOriginY = useSharedValue(0);
   const dragActive = useSharedValue(false);
+  const companionOrigins = useSharedValue<{ x: number; y: number }[]>([]);
 
   const beginDrag = useCallback(() => {
     beginPieceDrag(engine, pieceId);
@@ -127,6 +130,10 @@ export function usePieceGesture({
       .enabled(!locked)
       .onStart(() => {
         dragActive.value = true;
+        companionOrigins.value = companions.map((item) => ({
+          x: item.x.value,
+          y: item.y.value,
+        }));
         // A tray piece is drawn at its slot plus the tray's scroll. Fold the
         // scroll into its position and detach both shared values in the same
         // UI-thread event. The tray is fixed in viewport space, so convert the
@@ -169,6 +176,13 @@ export function usePieceGesture({
         const scale = cameraScale.value || 1;
         positionX.value = originX.value + event.translationX / scale;
         positionY.value = originY.value + event.translationY / scale;
+        companions.forEach((item, index) => {
+          const start = companionOrigins.value[index];
+          if (start) {
+            item.x.value = start.x + event.translationX / scale;
+            item.y.value = start.y + event.translationY / scale;
+          }
+        });
       })
       .onFinalize(() => {
         if (dragActive.value) {
@@ -280,8 +294,7 @@ export function usePieceGesture({
         ])
         .failOffsetY([-CROSS_AXIS_TOLERANCE, CROSS_AXIS_TOLERANCE]);
     }
-    const scrollTray = Gesture.Pan()
-      .enabled(!locked);
+    const scrollTray = Gesture.Pan().enabled(!locked);
     if (trayPlacement === 'bottom') {
       scrollTray
         .activeOffsetX([
@@ -297,46 +310,46 @@ export function usePieceGesture({
         ])
         .failOffsetX([-CROSS_AXIS_TOLERANCE, CROSS_AXIS_TOLERANCE]);
     }
-    scrollTray
-      .onChange((event) => {
-        const change =
-          trayPlacement === 'bottom' ? event.changeX : event.changeY;
-        trayScroll.value = Math.min(
-          maxTrayScroll,
-          Math.max(minTrayScroll, trayScroll.value + change),
-        );
-      });
+    scrollTray.onChange((event) => {
+      const change = trayPlacement === 'bottom' ? event.changeX : event.changeY;
+      trayScroll.value = Math.min(
+        maxTrayScroll,
+        Math.max(minTrayScroll, trayScroll.value + change),
+      );
+    });
     return Gesture.Race(scrollTray, pieceDrag);
   }, [
-      beginDrag,
-      cameraScale,
-      cameraX,
-      cameraY,
-      dragActive,
-      endDrag,
-      fixedOriginX,
-      fixedOriginY,
-      inTray,
-      locked,
-      maxTrayScroll,
-      minTrayScroll,
-      originX,
-      originY,
-      positionX,
-      positionY,
-      reduceMotion,
-      trayAttached,
-      trayFactor,
-      trayLeft,
-      trayPlacement,
-      trayScale,
-      trayScroll,
-      trayTop,
-      surfaceOriginX,
-      surfaceOriginY,
-      pieceHeight,
-      pieceWidth,
-    ]);
+    beginDrag,
+    companions,
+    companionOrigins,
+    cameraScale,
+    cameraX,
+    cameraY,
+    dragActive,
+    endDrag,
+    fixedOriginX,
+    fixedOriginY,
+    inTray,
+    locked,
+    maxTrayScroll,
+    minTrayScroll,
+    originX,
+    originY,
+    positionX,
+    positionY,
+    reduceMotion,
+    trayAttached,
+    trayFactor,
+    trayLeft,
+    trayPlacement,
+    trayScale,
+    trayScroll,
+    trayTop,
+    surfaceOriginX,
+    surfaceOriginY,
+    pieceHeight,
+    pieceWidth,
+  ]);
 
   return { gesture };
 }

@@ -18,6 +18,7 @@ import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { CutStylePreview } from './CutStylePreview';
 import { Button } from '../../../components/Button';
 import {
   completePremiumUnlockOnce,
@@ -253,11 +254,7 @@ export function PremiumCutsSheet({
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              <Ionicons
-                name="shapes-outline"
-                size={28}
-                color={colors.accent}
-              />
+              <Ionicons name="shapes-outline" size={28} color={colors.accent} />
             </View>
             <Text style={styles.eyebrow}>Premium Cuts</Text>
             <Text
@@ -270,10 +267,34 @@ export function PremiumCutsSheet({
               Cuts that feel alive
             </Text>
             <Text style={styles.body}>
-              Unlock all {PREMIUM_CUT_CATALOG_COUNT} premium cuts:{' '}
-              {PREMIUM_CUT_CATALOG_LIST}. Every puzzle size stays free.
+              Discover new ways to piece together your favourite photographs.
+              Flowing curves, living edges and crystalline shapes — yours with
+              one purchase.
             </Text>
 
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: spacing.md,
+                marginVertical: spacing.lg,
+              }}
+            >
+              {(['organic', 'biomorphic', 'crystal'] as const).map(
+                (cutterId) => (
+                  <CutStylePreview
+                    key={cutterId}
+                    cutterId={cutterId}
+                    active
+                    width={82}
+                    height={72}
+                  />
+                ),
+              )}
+            </View>
+            <Text style={styles.body}>
+              {PREMIUM_CUT_CATALOG_LIST}. Every Classic size stays free.
+            </Text>
             <View style={styles.feature}>
               <Ionicons
                 name="checkmark-circle"
@@ -319,9 +340,7 @@ export function PremiumCutsSheet({
                 )}
               >
                 <ActivityIndicator color={colors.accent} accessible={false} />
-                <Text style={styles.loaderText}>
-                  Loading purchase options…
-                </Text>
+                <Text style={styles.loaderText}>Loading purchase options…</Text>
               </View>
             ) : (
               <View style={styles.actions}>

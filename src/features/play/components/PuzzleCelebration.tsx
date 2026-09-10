@@ -40,6 +40,7 @@ type PuzzleCelebrationProps = {
   nextActionLabel?: string;
   hapticsEnabled?: boolean;
   hapticsPreferenceLoaded?: boolean;
+  onExploreCuts?: () => void;
   onNext: () => void;
   onPlayAgain: () => void;
   onHome: () => void;
@@ -60,6 +61,7 @@ function formatElapsed(milliseconds: number): string {
  */
 export function PuzzleCelebration({
   elapsedMs,
+  onExploreCuts,
   nextLoading = false,
   nextError,
   persistenceError,
@@ -118,8 +120,7 @@ export function PuzzleCelebration({
   const [firstAppearance, setFirstAppearance] = useState(true);
   const panelEntering = reduceMotion
     ? FadeIn.duration(CELEBRATION_MOTION.reducedDurationMs)
-    : SlideInDown
-        .delay(firstAppearance ? CELEBRATION_MOTION.panelDelayMs : 0)
+    : SlideInDown.delay(firstAppearance ? CELEBRATION_MOTION.panelDelayMs : 0)
         .duration(CELEBRATION_MOTION.panelDurationMs)
         .easing(Easing.out(Easing.cubic));
   const panelExiting = reduceMotion
@@ -127,48 +128,47 @@ export function PuzzleCelebration({
     : SlideOutDown.duration(CELEBRATION_MOTION.panelDurationMs);
   const particleAnimations = useMemo(
     () =>
-      CONFETTI_PARTICLES.map(
-        (particle) =>
-          new Keyframe({
-            0: {
-              opacity: 0,
-              transform: [
-                { translateX: 0 },
-                { translateY: 0 },
-                { rotate: '0deg' },
-                { scale: 0.4 },
-              ],
-            },
-            18: {
-              opacity: 1,
-              transform: [
-                { translateX: particle.driftX * 0.35 },
-                { translateY: -28 },
-                { rotate: `${particle.rotation * 0.25}deg` },
-                { scale: 1 },
-              ],
-            },
-            72: {
-              opacity: 1,
-              transform: [
-                { translateX: particle.driftX * 0.8 },
-                { translateY: particle.fallY * 0.45 },
-                { rotate: `${particle.rotation * 0.7}deg` },
-                { scale: 1 },
-              ],
-            },
-            100: {
-              opacity: 0,
-              transform: [
-                { translateX: particle.driftX },
-                { translateY: particle.fallY },
-                { rotate: `${particle.rotation}deg` },
-                { scale: 0.85 },
-              ],
-            },
-          })
-            .delay(particle.delay)
-            .duration(CELEBRATION_MOTION.confettiDurationMs),
+      CONFETTI_PARTICLES.map((particle) =>
+        new Keyframe({
+          0: {
+            opacity: 0,
+            transform: [
+              { translateX: 0 },
+              { translateY: 0 },
+              { rotate: '0deg' },
+              { scale: 0.4 },
+            ],
+          },
+          18: {
+            opacity: 1,
+            transform: [
+              { translateX: particle.driftX * 0.35 },
+              { translateY: -28 },
+              { rotate: `${particle.rotation * 0.25}deg` },
+              { scale: 1 },
+            ],
+          },
+          72: {
+            opacity: 1,
+            transform: [
+              { translateX: particle.driftX * 0.8 },
+              { translateY: particle.fallY * 0.45 },
+              { rotate: `${particle.rotation * 0.7}deg` },
+              { scale: 1 },
+            ],
+          },
+          100: {
+            opacity: 0,
+            transform: [
+              { translateX: particle.driftX },
+              { translateY: particle.fallY },
+              { rotate: `${particle.rotation}deg` },
+              { scale: 0.85 },
+            ],
+          },
+        })
+          .delay(particle.delay)
+          .duration(CELEBRATION_MOTION.confettiDurationMs),
       ),
     [],
   );
@@ -257,7 +257,8 @@ export function PuzzleCelebration({
           {persistenceError ? (
             <View style={styles.persistenceErrorGroup}>
               <Text style={styles.error} accessibilityLiveRegion="assertive">
-                {persistenceError}. Your completed board stays recoverable until saving succeeds.
+                {persistenceError}. Your completed board stays recoverable until
+                saving succeeds.
               </Text>
               {onRetrySave ? (
                 <Button
@@ -276,12 +277,24 @@ export function PuzzleCelebration({
             </Text>
           ) : null}
 
+          {onExploreCuts ? (
+            <View style={{ gap: 8, marginBottom: 16 }}>
+              <Text style={styles.elapsed}>
+                Enjoyed these flowing pieces? Try them with your own
+                photographs.
+              </Text>
+              <Button
+                label="Explore Premium Cuts"
+                variant="secondary"
+                onPress={onExploreCuts}
+                disabled={completionActionBlocked}
+              />
+            </View>
+          ) : null}
           <View style={styles.actions}>
             <View style={styles.primarySlot}>
               <Button
-                label={
-                  nextLoading ? 'Finding next puzzle…' : nextActionLabel
-                }
+                label={nextLoading ? 'Finding next puzzle…' : nextActionLabel}
                 onPress={onNext}
                 disabled={nextLoading || completionActionBlocked}
                 block

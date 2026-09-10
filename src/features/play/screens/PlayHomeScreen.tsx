@@ -3,17 +3,30 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import {
   androidAccessibilityLiveRegion,
   useAccessibilityAnnouncement,
 } from '../../../accessibility';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  DISCOVERY_IMAGE,
+  DISCOVERY_DIFFICULTY,
+  isDiscoveryPuzzle,
+} from '../../../puzzle/discovery';
+import {
+  DISCOVERY_ASSET,
+  displayImageUri,
+} from '../../../puzzle/discoveryAsset';
+import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
+import { puzzleLibrary } from '../../../puzzle/persistence/PuzzleLibrary';
+import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
@@ -24,43 +37,36 @@ import { colors, spacing } from '../../../theme';
 import { puzzleCutStyleLabel } from '../cutStylePresentation';
 import { HomeBackdrop } from '../components/HomeBackdrop';
 import { HomePhotoCard } from '../components/HomePhotoCard';
-import {
-  assetAspectRatio,
-  HOME_FALLBACK_PHOTOS,
-} from '../components/homePhotoSources';
 import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import {
   createPlayHomeActionGuard,
   resolvePremiumResume,
 } from './playHomeActionGuard';
-import {
-  NEW_PHOTO_REPLACEMENT_MESSAGE,
-  NEW_PHOTO_REPLACEMENT_TITLE,
-  requestNewPhotograph,
-} from './playHomeNavigation';
 
 type Props = NativeStackScreenProps<PlayStackParamList, 'PlayHome'>;
 
 export function PlayHomeScreen({ navigation }: Props) {
   const isFocused = useIsFocused();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const discoveryStartingRef = useRef(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const {
     session,
     completion,
     sessionAccessBlocked,
     restoring,
     persistenceError,
-    clearCompletion,
+    startSession,
+    openLibraryPuzzle,
+    loading,
+    error,
   } = usePuzzleSessionContext();
-  const {
-    loading: premiumLoading,
-    verifyPremiumCuts,
-  } = usePremiumAccess();
+  const { loading: premiumLoading, verifyPremiumCuts } = usePremiumAccess();
   const [checkingAccess, setCheckingAccess] = useState(false);
   const [showPremium, setShowPremium] = useState(false);
   const { state: engineState } = usePuzzleEngine(session?.engine ?? null);
-  const actionGuardRef = useRef(
-    createPlayHomeActionGuard(isFocused),
-  );
+  const actionGuardRef = useRef(createPlayHomeActionGuard(isFocused));
   const actionGuard = actionGuardRef.current;
   const checkingAccessRef = useRef(false);
   const premiumTriggerRef = useRef<React.ElementRef<typeof Pressable> | null>(
@@ -123,24 +129,66 @@ export function PlayHomeScreen({ navigation }: Props) {
     navigation.navigate('Gallery');
   };
 
-  const chooseNewPhotograph = () => {
-    requestNewPhotograph(Boolean(session), {
-      confirmReplacement: (onConfirm) => {
-        Alert.alert(
-          NEW_PHOTO_REPLACEMENT_TITLE,
-          NEW_PHOTO_REPLACEMENT_MESSAGE,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Choose new',
-              style: 'destructive',
-              onPress: onConfirm,
-            },
-          ],
-        );
-      },
-      navigateToGallery,
-    });
+  const chooseNewPhotograph = navigateToGallery;
+  const startDiscovery = async () => {
+    if (discoveryStartingRef.current || loading || restoring) return;
+    if (
+      session &&
+      isDiscoveryPuzzle(
+        session.layout.image,
+        session.cutterId,
+        session.difficulty,
+      )
+    ) {
+      navigateToGame(session);
+      return;
+    }
+    discoveryStartingRef.current = true;
+    setDiscoveryError(null);
+    const requestId = actionGuard.beginAction();
+    const layout = computeSafeAreaPlayLayout(width, height, insets, 2 / 3, 16);
+    try {
+      const waiting = (await puzzleLibrary.load()).find(
+        (entry) =>
+          entry.snapshot.engine.status !== 'completed' &&
+          isDiscoveryPuzzle(
+            entry.snapshot.engine.layout.image,
+            entry.snapshot.cutterId,
+            entry.snapshot.difficulty,
+          ),
+      );
+      if (!actionGuard.isCurrent(requestId)) return;
+      if (waiting) {
+        const resumed = await openLibraryPuzzle(waiting.id);
+        if (resumed && actionGuard.isCurrent(requestId))
+          navigateToGame(resumed);
+        return;
+      }
+      const started = await startSession({
+        image: DISCOVERY_IMAGE,
+        cutterId: 'organic',
+        difficulty: DISCOVERY_DIFFICULTY,
+        guideMode: 'image',
+        boardMaxWidth: layout.boardWidth,
+        boardMaxHeight: layout.boardHeight,
+        traySurfaceExtent: layout.trayRunExtent,
+        trayPlacement: layout.trayPlacement,
+      });
+      if (started && actionGuard.isCurrent(requestId)) {
+        track('puzzle_started', {
+          cut_id: 'organic',
+          piece_count: 16,
+          source: 'discovery',
+        });
+        navigation.navigate('Game', { difficulty: DISCOVERY_DIFFICULTY });
+      }
+    } catch {
+      setDiscoveryError(
+        'The sample could not be opened. Your saved puzzles have been kept.',
+      );
+    } finally {
+      discoveryStartingRef.current = false;
+    }
   };
 
   const navigateToAbout = () => {
@@ -157,7 +205,14 @@ export function PlayHomeScreen({ navigation }: Props) {
     const requestId = actionGuard.beginAction();
     premiumResumeRef.current = null;
 
-    if (isPremiumCutter(requestedSession.cutterId)) {
+    if (
+      isPremiumCutter(requestedSession.cutterId) &&
+      !isDiscoveryPuzzle(
+        requestedSession.layout.image,
+        requestedSession.cutterId,
+        requestedSession.difficulty,
+      )
+    ) {
       checkingAccessRef.current = true;
       setCheckingAccess(true);
       const resolution = await resolvePremiumResume(
@@ -212,21 +267,14 @@ export function PlayHomeScreen({ navigation }: Props) {
     navigateToGame(pendingResume.session);
   };
 
-  // Home is about one photograph: the print shows it sharp, the backdrop shows
-  // the same frame out of focus. Before a first puzzle it stands in with a
-  // bundled cover, chosen once per mount so it cannot swap while being read.
-  const [fallbackIndex] = useState(() =>
-    Math.floor(Math.random() * HOME_FALLBACK_PHOTOS.length),
-  );
-  const fallbackPhoto = HOME_FALLBACK_PHOTOS[fallbackIndex];
   const sessionImage = session?.layout.image ?? completion?.image;
   const heroSource = sessionImage
-    ? { uri: sessionImage.uri }
-    : fallbackPhoto;
+    ? { uri: displayImageUri(sessionImage.uri) }
+    : DISCOVERY_ASSET;
   const heroAspectRatio =
     sessionImage && sessionImage.width > 0 && sessionImage.height > 0
       ? sessionImage.width / sessionImage.height
-      : assetAspectRatio(fallbackPhoto);
+      : 2 / 3;
   const completionCaption = completion
     ? `Last completed · ${completion.pieceCount} pieces · ${Math.floor(
         completion.elapsedMs / 60_000,
@@ -239,13 +287,17 @@ export function PlayHomeScreen({ navigation }: Props) {
     : sessionAccessBlocked && !premiumLoading
       ? `Unlock to continue ${savedPremiumCutLabel}`
       : !session
-        ? 'Choose a photograph'
+        ? completion
+          ? 'Your album'
+          : 'Try a quiet puzzle'
         : completed
           ? 'Look at it again'
           : 'Continue';
   const openPrimary = session
     ? () => void continuePuzzle()
-    : navigateToGallery;
+    : completion
+      ? () => navigation.navigate('Library')
+      : () => void startDiscovery();
 
   return (
     <Screen
@@ -281,24 +333,22 @@ export function PlayHomeScreen({ navigation }: Props) {
                 ? `${completed ? 'Completed puzzle' : 'Puzzle in progress'}, ${placed} of ${total} pieces placed`
                 : completion
                   ? `${completionCaption} puzzle`
-                : 'Choose a photograph to cut'
+                  : 'Try Coastal morning, a free 16-piece Organic puzzle'
             }
             accessibilityHint={
               session
                 ? 'Opens the table with this photograph'
                 : completion
-                  ? 'Opens the photograph themes to start another puzzle'
-                : 'Opens the photograph themes'
+                  ? 'Opens your album of completed photographs'
+                  : 'Starts the free Organic sample'
             }
-            disabled={checkingAccess}
-            progress={
-              session && !completed ? { placed, total } : undefined
-            }
+            disabled={checkingAccess || loading}
+            progress={session && !completed ? { placed, total } : undefined}
             caption={
               session
                 ? undefined
-                : completionCaption ??
-                  'A photograph from the library, ready to cut'
+                : (completionCaption ??
+                  'Coastal morning · 16 flowing pieces · Free sample')
             }
           />
 
@@ -307,7 +357,7 @@ export function PlayHomeScreen({ navigation }: Props) {
               ref={premiumTriggerRef}
               label={primaryLabel}
               onPress={openPrimary}
-              disabled={checkingAccess}
+              disabled={checkingAccess || loading}
               block
             />
             {session ? (
@@ -316,22 +366,40 @@ export function PlayHomeScreen({ navigation }: Props) {
                   label="New photograph"
                   variant="ghost"
                   onPress={chooseNewPhotograph}
-                  disabled={checkingAccess}
-                  accessibilityHint="Asks before replacing the saved puzzle and its progress"
-                />
-              </View>
-            ) : completion ? (
-              <View style={styles.centered}>
-                <Button
-                  label="Remove last result"
-                  variant="ghost"
-                  onPress={() => void clearCompletion()}
-                  accessibilityHint="Removes the saved completion and releases its photograph"
+                  disabled={checkingAccess || loading}
+                  accessibilityHint="Choose another photograph; this puzzle will wait on your shelf"
                 />
               </View>
             ) : null}
           </View>
 
+          {!session ? (
+            <Button
+              label="Choose a photograph"
+              variant="ghost"
+              onPress={navigateToGallery}
+              disabled={loading}
+            />
+          ) : null}
+          <Button
+            label="Shelf & album"
+            variant="secondary"
+            onPress={() => navigation.navigate('Library')}
+            disabled={loading}
+          />
+          {session ? (
+            <Button
+              label="Try the free Organic sample"
+              variant="ghost"
+              onPress={() => void startDiscovery()}
+              disabled={loading}
+            />
+          ) : (
+            <Text style={styles.savedPremiumNotice}>
+              A Frume study. No account, no timer to beat. Your photographs stay
+              yours.
+            </Text>
+          )}
           {sessionAccessBlocked && !premiumLoading ? (
             <Text style={styles.savedPremiumNotice}>
               Your {savedPremiumCutLabel} puzzle is still saved. Restore or
@@ -341,12 +409,12 @@ export function PlayHomeScreen({ navigation }: Props) {
         </>
       )}
 
-      {persistenceError ? (
+      {persistenceError || error || discoveryError ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
         >
-          {persistenceError}
+          {persistenceError ?? error ?? discoveryError}
         </Text>
       ) : null}
 
@@ -355,7 +423,7 @@ export function PlayHomeScreen({ navigation }: Props) {
           label="About & Support"
           variant="ghost"
           onPress={navigateToAbout}
-          disabled={checkingAccess}
+          disabled={checkingAccess || loading}
           accessibilityHint="Opens privacy, support, purchase restore, and app version information"
           style={styles.aboutButton}
         />

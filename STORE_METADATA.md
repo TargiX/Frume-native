@@ -378,7 +378,9 @@ These are pending edits, not saved dashboard state:
   `EXPO_PUBLIC_ANALYTICS_API_KEY`. Confirm the following against the final
   binary before answering, because each one is load-bearing for the answer:
   - The complete set of events and their permitted properties is the allowlist
-    in `src/analytics/analyticsEvents.ts`. Values outside it are dropped before
+    in `src/analytics/analyticsEvents.ts`. Start and completion may include a
+    source enum (`theme`, `own_photo`, or the bundled `discovery` sample).
+    Values outside it are dropped before
     storage, so no photograph, filename, URL, photographer name, or free text
     can be transmitted. A build that adds an event there changes this answer.
   - The identifier is a random value Frume generates and stores on the device.

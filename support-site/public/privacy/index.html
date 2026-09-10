@@ -95,10 +95,11 @@
 
             <div class="policy-cards">
               <div class="policy-card">
-                <h3>Your current puzzle and last result</h3>
+                <h3>Your puzzles and album</h3>
                 <p>
-                  Frume stores one current puzzle in local app storage so you
-                  can continue later. The save includes a photo reference and
+                  Frume stores a current puzzle, up to four waiting puzzles,
+                  and the 24 most recently saved completed puzzles in local app
+                  storage so you can continue later or revisit your album. The save includes a photo reference and
                   attribution, cut style, difficulty, piece positions,
                   progress, moves, and elapsed play time. Frume also keeps one
                   compact last-completion receipt with the photo reference,
@@ -131,7 +132,7 @@
                   valid large image is downsampled on device to a derivative of
                   at most about 16 megapixels, and Frume marks its photo folders
                   as excluded from iCloud Backup. The derivative is deleted when
-                  neither the current puzzle nor last result uses it, or when
+                  no current puzzle, shelf or album entry, or last result uses it, or when
                   you delete the app. It is never uploaded: it is not sent to
                   Frume’s photo service, to Unsplash, or anywhere else, and no
                   photo-use receipt is created for it.
@@ -343,12 +344,16 @@
             <ul class="plain-list">
               <li>
                 <strong>Current puzzle:</strong> kept on your device until a
-                confirmed replacement, app-data removal, or deletion of Frume.
+                replacement, app-data removal, or deletion of Frume. Replacing
+                unfinished progress keeps it on your shelf. Shelf entries stay
+                until you remove them or resume them; a full shelf blocks adding
+                another unfinished puzzle. The album retains up to 24 completed
+                puzzles, removing the oldest when another is saved.
               </li>
               <li>
                 <strong>A photograph you chose yourself:</strong> kept in
-                Frume’s private storage while the current puzzle or last result
-                uses it, and removed after both release it or when you delete
+                Frume’s private storage while a current puzzle, shelf or album entry, or last result
+                uses it, and removed after all release it or when you delete
                 Frume. It is never uploaded or included in iCloud Backup.
               </li>
               <li>

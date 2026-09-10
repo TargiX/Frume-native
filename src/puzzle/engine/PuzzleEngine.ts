@@ -7,7 +7,7 @@ import type {
 } from '../types/engine';
 import type { Point } from '../types/geometry';
 import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
-import { resolveSnapPosition, shouldSnap } from './snap';
+import { shouldSnap } from './snap';
 import { buildShuffledPieceStates } from './shuffle';
 import { getTraySlotPosition } from './tray';
 
@@ -34,7 +34,11 @@ function recoverablePosition(
   const halfHeight = Math.max(0, definition.bounds.height) / 2;
 
   return {
-    x: clamp(x, -halfWidth, Math.max(-halfWidth, layout.boardSize.width - halfWidth)),
+    x: clamp(
+      x,
+      -halfWidth,
+      Math.max(-halfWidth, layout.boardSize.width - halfWidth),
+    ),
     y: clamp(
       y,
       -halfHeight,
@@ -157,8 +161,7 @@ export class PuzzleEngine {
   getElapsedMs(now = Date.now()): number {
     return (
       this.state.activeElapsedMs +
-      (this.state.status === 'playing' &&
-      this.state.activeStartedAt !== null
+      (this.state.status === 'playing' && this.state.activeStartedAt !== null
         ? Math.max(0, now - this.state.activeStartedAt)
         : 0)
     );
@@ -197,23 +200,19 @@ export class PuzzleEngine {
       return;
     }
 
-    this.patch({
-      pieces: {
-        ...this.state.pieces,
-        [pieceId]: {
-          ...pieceState,
-          inTray: true,
-          position: getTraySlotPosition(
-            this.state.layout,
-            pieceState.traySlot,
-            definition,
-          ),
-          rotation: pieceState.traySlot % 2 === 0 ? 1.6 : -1.6,
-        },
-      },
-      selectedPieceId: null,
-      snapFeedback: null,
-    });
+    const pieces = { ...this.state.pieces };
+    for (const id of this.getConnectedPieceIds(pieceId)) {
+      const current = pieces[id];
+      const def = this.getPieceDefinition(id)!;
+      pieces[id] = {
+        ...current,
+        groupId: undefined,
+        inTray: true,
+        position: getTraySlotPosition(this.state.layout, current.traySlot, def),
+        rotation: current.traySlot % 2 === 0 ? 1.6 : -1.6,
+      };
+    }
+    this.patch({ pieces, selectedPieceId: null, snapFeedback: null });
   }
 
   /**
@@ -238,6 +237,7 @@ export class PuzzleEngine {
       pieces[definition.id] = {
         ...current,
         inTray: true,
+        groupId: undefined,
         position,
         rotation: current.traySlot % 2 === 0 ? 1.6 : -1.6,
       };
@@ -292,8 +292,14 @@ export class PuzzleEngine {
   }
 
   bringToFront(pieceId: string): void {
-    const maxZ = Math.max(...Object.values(this.state.pieces).map((p) => p.zIndex));
-    this.updatePiece(pieceId, { zIndex: maxZ + 1 });
+    const maxZ = Math.max(
+      ...Object.values(this.state.pieces).map((p) => p.zIndex),
+    );
+    const pieces = { ...this.state.pieces };
+    this.getConnectedPieceIds(pieceId).forEach((id, index) => {
+      pieces[id] = { ...pieces[id], zIndex: maxZ + index + 1 };
+    });
+    this.patch({ pieces });
   }
 
   movePiece(pieceId: string, position: Point): void {
@@ -307,7 +313,23 @@ export class PuzzleEngine {
       this.start();
     }
 
-    this.updatePiece(pieceId, { position });
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
+    const delta = {
+      x: position.x - pieceState.position.x,
+      y: position.y - pieceState.position.y,
+    };
+    const pieces = { ...this.state.pieces };
+    for (const id of this.getConnectedPieceIds(pieceId)) {
+      const current = pieces[id];
+      pieces[id] = {
+        ...current,
+        position: {
+          x: current.position.x + delta.x,
+          y: current.position.y + delta.y,
+        },
+      };
+    }
+    this.patch({ pieces });
   }
 
   releasePiece(pieceId: string): SnapResult {
@@ -333,45 +355,126 @@ export class PuzzleEngine {
       };
     }
 
-    const snapped = shouldSnap(definition, pieceState.position);
-    const position = snapped
-      ? resolveSnapPosition(definition, pieceState.position)
-      : recoverablePosition(this.state.layout, definition, pieceState.position);
-    const connectedWithNeighbor =
-      snapped && definition.neighborIds.some((id) => this.state.pieces[id]?.locked === true);
-
-    this.updatePiece(pieceId, {
-      position,
-      rotation: snapped ? definition.correctRotation : pieceState.rotation,
-      locked: snapped ? true : pieceState.locked,
-      zIndex: snapped ? definition.index + 1 : pieceState.zIndex,
-    });
-
+    const ids = this.getConnectedPieceIds(pieceId);
+    const members = new Set(ids);
+    const snapped = ids.some((id) =>
+      shouldSnap(this.getPieceDefinition(id)!, this.state.pieces[id].position),
+    );
+    const pieces = { ...this.state.pieces };
+    let connectedWithNeighbor = false;
+    let joined = false;
     if (snapped) {
-      // Nothing else moves when a piece is seated. Re-packing the remaining
-      // pieces to close the gap makes every other piece jump mid-game, which
-      // is disorienting and makes a piece you were about to reach for vanish.
-      this.patch({
-        moveCount: this.state.moveCount + 1,
-        snapFeedback: {
-          pieceId,
-          kind: connectedWithNeighbor ? 'connect' : 'seat',
-        },
-      });
-      this.checkCompletion();
+      connectedWithNeighbor =
+        ids.length > 1 ||
+        ids.some((id) =>
+          this.getPieceDefinition(id)!.neighborIds.some(
+            (neighbor) => pieces[neighbor]?.locked,
+          ),
+        );
+      for (const id of ids) {
+        const def = this.getPieceDefinition(id)!;
+        pieces[id] = {
+          ...pieces[id],
+          groupId: undefined,
+          position: { ...def.correctPosition },
+          rotation: def.correctRotation,
+          locked: true,
+          inTray: false,
+          zIndex: def.index + 1,
+        };
+      }
     } else {
-      this.patch({ moveCount: this.state.moveCount + 1, snapFeedback: null });
+      // Align a whole group with a nearby, correctly adjacent loose piece.
+      let match: {
+        neighborId: string;
+        dx: number;
+        dy: number;
+        distance: number;
+      } | null = null;
+      for (const id of ids) {
+        const def = this.getPieceDefinition(id)!;
+        const current = pieces[id];
+        for (const neighborId of def.neighborIds) {
+          const neighbor = pieces[neighborId];
+          const neighborDef = this.getPieceDefinition(neighborId);
+          if (
+            !neighbor ||
+            !neighborDef ||
+            neighbor.inTray ||
+            neighbor.locked ||
+            members.has(neighborId)
+          )
+            continue;
+          const dx =
+            neighbor.position.x -
+            neighborDef.correctPosition.x -
+            (current.position.x - def.correctPosition.x);
+          const dy =
+            neighbor.position.y -
+            neighborDef.correctPosition.y -
+            (current.position.y - def.correctPosition.y);
+          const distance = Math.hypot(dx, dy);
+          if (
+            shouldSnap(def, {
+              x: def.correctPosition.x + dx,
+              y: def.correctPosition.y + dy,
+            }) &&
+            (!match || distance < match.distance)
+          )
+            match = { neighborId, dx, dy, distance };
+        }
+      }
+      if (match) {
+        const otherIds = this.getConnectedPieceIds(match.neighborId);
+        const groupId = [...ids, ...otherIds].sort()[0];
+        for (const id of ids)
+          pieces[id] = {
+            ...pieces[id],
+            groupId,
+            rotation: 0,
+            position: {
+              x: pieces[id].position.x + match.dx,
+              y: pieces[id].position.y + match.dy,
+            },
+          };
+        for (const id of otherIds)
+          pieces[id] = { ...pieces[id], groupId, rotation: 0 };
+        joined = true;
+        connectedWithNeighbor = true;
+      }
     }
-
-    this.patch({ selectedPieceId: null });
-
+    this.patch({
+      pieces,
+      moveCount: this.state.moveCount + 1,
+      selectedPieceId: null,
+      snapFeedback:
+        snapped || joined
+          ? { pieceId, kind: connectedWithNeighbor ? 'connect' : 'seat' }
+          : null,
+    });
+    if (snapped) this.checkCompletion();
+    else this.recoverLoosePieces();
+    // Recovery clears stale feedback; the connection itself remains meaningful.
+    if (joined) this.patch({ snapFeedback: { pieceId, kind: 'connect' } });
     return {
       pieceId,
-      snapped,
+      snapped: snapped || joined,
       locked: snapped,
-      position,
+      position: this.state.pieces[pieceId].position,
       connectedWithNeighbor,
     };
+  }
+
+  getConnectedPieceIds(pieceId: string): string[] {
+    const piece = this.state.pieces[pieceId];
+    if (!piece || !piece.groupId || piece.inTray || piece.locked)
+      return piece ? [pieceId] : [];
+    return Object.values(this.state.pieces)
+      .filter(
+        (other) =>
+          other.groupId === piece.groupId && !other.inTray && !other.locked,
+      )
+      .map((other) => other.pieceId);
   }
 
   reset(): void {
@@ -432,10 +535,25 @@ export class PuzzleEngine {
           }
         : {
             ...current,
-            position: recoverablePosition(layout, definition, {
-              x: current.position.x * scaleX,
-              y: current.position.y * scaleY,
-            }),
+            position: current.groupId
+              ? {
+                  x:
+                    definition.correctPosition.x +
+                    (current.position.x -
+                      this.getPieceDefinition(definition.id)!.correctPosition
+                        .x) *
+                      scaleX,
+                  y:
+                    definition.correctPosition.y +
+                    (current.position.y -
+                      this.getPieceDefinition(definition.id)!.correctPosition
+                        .y) *
+                      scaleY,
+                }
+              : recoverablePosition(layout, definition, {
+                  x: current.position.x * scaleX,
+                  y: current.position.y * scaleY,
+                }),
           };
     });
 
@@ -447,6 +565,7 @@ export class PuzzleEngine {
       snapFeedback: null,
     };
     this.emit();
+    this.recoverLoosePieces();
   }
 
   isComplete(): boolean {
@@ -462,8 +581,46 @@ export class PuzzleEngine {
     let changed = false;
     const pieces = { ...this.state.pieces };
 
+    const recoveredGroups = new Set<string>();
     this.state.layout.pieces.forEach((definition) => {
       const current = pieces[definition.id];
+      if (current?.groupId && !current.inTray && !current.locked) {
+        if (recoveredGroups.has(current.groupId)) return;
+        recoveredGroups.add(current.groupId);
+        const ids = this.getConnectedPieceIds(definition.id);
+        let minX = -Infinity,
+          maxX = Infinity,
+          minY = -Infinity,
+          maxY = Infinity;
+        for (const id of ids) {
+          const def = this.getPieceDefinition(id)!;
+          const pos = pieces[id].position;
+          minX = Math.max(minX, -def.bounds.width / 2 - pos.x);
+          maxX = Math.min(
+            maxX,
+            this.state.layout.boardSize.width - def.bounds.width / 2 - pos.x,
+          );
+          minY = Math.max(minY, -def.bounds.height / 2 - pos.y);
+          maxY = Math.min(
+            maxY,
+            this.state.layout.boardSize.height - def.bounds.height / 2 - pos.y,
+          );
+        }
+        const dx = clamp(0, minX, maxX),
+          dy = clamp(0, minY, maxY);
+        if (dx || dy)
+          for (const id of ids) {
+            pieces[id] = {
+              ...pieces[id],
+              position: {
+                x: pieces[id].position.x + dx,
+                y: pieces[id].position.y + dy,
+              },
+            };
+            changed = true;
+          }
+        return;
+      }
       if (!current || current.locked) {
         return;
       }
@@ -522,7 +679,9 @@ export class PuzzleEngine {
         pieceId: definition.id,
         position: current.inTray
           ? getTraySlotPosition(layout, current.traySlot, definition)
-          : recoverablePosition(layout, definition, current.position),
+          : current.groupId
+            ? { ...current.position }
+            : recoverablePosition(layout, definition, current.position),
       };
     });
 
@@ -549,7 +708,10 @@ export class PuzzleEngine {
     }
   }
 
-  private updatePiece(pieceId: string, patch: Partial<PieceRuntimeState>): void {
+  private updatePiece(
+    pieceId: string,
+    patch: Partial<PieceRuntimeState>,
+  ): void {
     const current = this.state.pieces[pieceId];
     if (!current) {
       return;

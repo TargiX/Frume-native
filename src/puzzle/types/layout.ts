@@ -53,6 +53,7 @@ export type PuzzleImageAttribution = {
  * unrelated network photograph.
  */
 export type PuzzleImageContentSource =
+  | { kind: 'bundled'; id: 'coastal-morning' }
   | {
       kind: 'own';
     }

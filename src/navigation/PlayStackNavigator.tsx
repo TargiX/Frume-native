@@ -11,6 +11,8 @@ import {
 import { colors } from '../theme';
 import type { PlayStackParamList } from './types';
 
+import { LibraryScreen } from '../features/play/screens/LibraryScreen';
+
 const Stack = createNativeStackNavigator<PlayStackParamList>();
 
 export function PlayStackNavigator() {
@@ -40,6 +42,11 @@ export function PlayStackNavigator() {
         name="Gallery"
         component={GalleryScreen}
         options={{ title: 'Choose a photo' }}
+      />
+      <Stack.Screen
+        name="Library"
+        component={LibraryScreen}
+        options={{ title: 'Shelf & album' }}
       />
       <Stack.Screen
         name="Difficulty"

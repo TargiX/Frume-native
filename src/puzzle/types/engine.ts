@@ -6,6 +6,8 @@ export type PuzzleSessionStatus = 'ready' | 'playing' | 'completed';
 /** Runtime state of a single piece during play. */
 export type PieceRuntimeState = {
   pieceId: string;
+  /** Connected loose pieces share an ID and move together. */
+  groupId?: string;
   /**
    * Surface coordinates. While the piece is in the tray this is its slot
    * position in tray-content space, which the renderer offsets by the tray's

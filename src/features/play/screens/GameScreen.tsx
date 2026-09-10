@@ -33,6 +33,9 @@ import {
 import { GameHud } from '../components/GameHud';
 import { HowToPlaySheet } from '../components/HowToPlaySheet';
 import { PuzzleMenuSheet } from '../components/PuzzleMenuSheet';
+import { isDiscoveryPuzzle } from '../../../puzzle/discovery';
+import { usePremiumAccess } from '../../../premium';
+import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import { PuzzleCelebration } from '../components/PuzzleCelebration';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
 import { usePuzzleEngine } from '../../../puzzle/hooks';
@@ -49,14 +52,8 @@ import {
 } from '../../../puzzle/types';
 import type { PlayStackParamList } from '../../../navigation/types';
 import { colors, radius, spacing } from '../../../theme';
-import {
-  enqueuePhotoUse,
-  fetchPuzzlePhoto,
-} from '../../../services/unsplash';
-import {
-  computeSafeAreaPlayLayout,
-  TABLE_INSET,
-} from '../utils/boardLayout';
+import { enqueuePhotoUse, fetchPuzzlePhoto } from '../../../services/unsplash';
+import { computeSafeAreaPlayLayout, TABLE_INSET } from '../utils/boardLayout';
 import {
   advancePlayAnalytics,
   puzzleAbandonedProperties,
@@ -70,10 +67,7 @@ import {
   loadHowToPlaySeen,
   saveHowToPlaySeen,
 } from '../utils/howToPlayPreference';
-import {
-  completionPrimaryAction,
-  shouldRunGameTimer,
-} from './gameLifecycle';
+import { completionPrimaryAction, shouldRunGameTimer } from './gameLifecycle';
 import {
   beginNextPuzzleRequest,
   buildNextPuzzleSessionParams,
@@ -88,6 +82,8 @@ type Props = NativeStackScreenProps<PlayStackParamList, 'Game'>;
 
 export function GameScreen({ navigation }: Props) {
   const isFocused = useIsFocused();
+  const { isPremium } = usePremiumAccess();
+  const [showPremium, setShowPremium] = useState(false);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [guideMode, setGuideMode] = useState<PuzzleGuideMode>(
@@ -98,8 +94,9 @@ export function GameScreen({ navigation }: Props) {
   const [howToPlaySeen, setHowToPlaySeen] = useState(false);
   const [howToPlayPreferenceLoaded, setHowToPlayPreferenceLoaded] =
     useState(false);
-  const [tableAppearance, setTableAppearance] =
-    useState<PuzzleTableAppearance>(DEFAULT_PUZZLE_TABLE_APPEARANCE);
+  const [tableAppearance, setTableAppearance] = useState<PuzzleTableAppearance>(
+    DEFAULT_PUZZLE_TABLE_APPEARANCE,
+  );
   const [assistFeedback, setAssistFeedback] = useState<string | null>(null);
   const [nextPuzzleLoading, setNextPuzzleLoading] = useState(false);
   const [nextPuzzleError, setNextPuzzleError] = useState<string | null>(null);
@@ -146,7 +143,7 @@ export function GameScreen({ navigation }: Props) {
   const isCompleted = state?.status === 'completed';
   const recoveryError =
     !restoring && (!session || !engine || !state)
-      ? nextPuzzleError ?? error ?? persistenceError
+      ? (nextPuzzleError ?? error ?? persistenceError)
       : null;
   useAccessibilityAnnouncement(isFocused ? recoveryError : null);
   const image = state?.layout.image ?? session?.layout.image;
@@ -157,7 +154,9 @@ export function GameScreen({ navigation }: Props) {
   const currentBoardWidth = state?.layout.boardSize.width;
   const currentBoardHeight = state?.layout.boardSize.height;
   const imageAspect =
-    image && image.width > 0 && image.height > 0 ? image.width / image.height : 4 / 3;
+    image && image.width > 0 && image.height > 0
+      ? image.width / image.height
+      : 4 / 3;
   const currentPieceCount = state?.layout.pieces.length ?? 0;
   const playLayout = useMemo(
     () =>
@@ -193,6 +192,7 @@ export function GameScreen({ navigation }: Props) {
   // the player walked away from can still be described once `state` is gone.
   const playSnapshotRef = useRef<PlaySnapshot | null>(null);
   const completedSessionRef = useRef<object | null>(null);
+  const playedSessionRef = useRef<object | null>(null);
 
   const reportAbandoned = useCallback((snapshot: PlaySnapshot | null) => {
     if (!snapshot) {
@@ -229,13 +229,21 @@ export function GameScreen({ navigation }: Props) {
     // Keyed on the session object so replaying or starting the next puzzle
     // without leaving this screen is measured as its own completion.
     if (!isCompleted || !session || !state) {
+      if (session && !isCompleted) playedSessionRef.current = session;
       return;
     }
+    if (playedSessionRef.current !== session) return;
     if (completedSessionRef.current === session) {
       return;
     }
     completedSessionRef.current = session;
     track('puzzle_completed', {
+      source:
+        session.layout.image.contentSource?.kind === 'bundled'
+          ? 'discovery'
+          : session.layout.image.contentSource?.kind === 'own'
+            ? 'own_photo'
+            : 'theme',
       cut_id: session.cutterId,
       piece_count: state.layout.pieces.length,
       duration_s: state.activeElapsedMs / 1000,
@@ -479,11 +487,7 @@ export function GameScreen({ navigation }: Props) {
         }),
         {
           beginSessionReplacement: (params, transactionIsCurrent) =>
-            beginSessionReplacement(
-              params,
-              session,
-              transactionIsCurrent,
-            ),
+            beginSessionReplacement(params, session, transactionIsCurrent),
           enqueuePhotoUse: () =>
             enqueuePhotoUse(
               {
@@ -641,9 +645,7 @@ export function GameScreen({ navigation }: Props) {
     const assistedPlacedCount = Object.values(currentState.pieces).filter(
       (piece) => piece.locked,
     ).length;
-    setAssistFeedback(
-      `Piece ${(assistedDefinition?.index ?? 0) + 1} placed`,
-    );
+    setAssistFeedback(`Piece ${(assistedDefinition?.index ?? 0) + 1} placed`);
     AccessibilityInfo.announceForAccessibilityWithOptions(
       `Assist placed piece ${
         (assistedDefinition?.index ?? 0) + 1
@@ -684,20 +686,14 @@ export function GameScreen({ navigation }: Props) {
       <View
         style={styles.boardFrame}
         accessibilityElementsHidden={isCompleted}
-        importantForAccessibility={
-          isCompleted ? 'no-hide-descendants' : 'auto'
-        }
+        importantForAccessibility={isCompleted ? 'no-hide-descendants' : 'auto'}
       >
         <PuzzleBoard
           layout={state.layout}
           pieces={state.pieces}
           engine={engine}
-          viewportWidth={
-            width - insets.left - insets.right - TABLE_INSET * 2
-          }
-          viewportHeight={
-            height - insets.top - insets.bottom - TABLE_INSET * 2
-          }
+          viewportWidth={width - insets.left - insets.right - TABLE_INSET * 2}
+          viewportHeight={height - insets.top - insets.bottom - TABLE_INSET * 2}
           snapFeedback={state.snapFeedback}
           completed={isCompleted}
           guideMode={guideMode}
@@ -709,6 +705,19 @@ export function GameScreen({ navigation }: Props) {
       {isCompleted ? (
         <PuzzleCelebration
           elapsedMs={elapsedMs}
+          onExploreCuts={
+            !isPremium &&
+            isDiscoveryPuzzle(
+              session.layout.image,
+              session.cutterId,
+              session.difficulty,
+            )
+              ? () => {
+                  track('paywall_shown', { trigger_cut_id: 'organic' });
+                  setShowPremium(true);
+                }
+              : undefined
+          }
           nextLoading={nextPuzzleLoading}
           nextError={nextPuzzleError}
           persistenceError={persistenceError}
@@ -730,6 +739,14 @@ export function GameScreen({ navigation }: Props) {
           onRetrySave={() => void onRetryProgressSave()}
         />
       ) : null}
+      <PremiumCutsSheet
+        visible={showPremium}
+        onClose={() => setShowPremium(false)}
+        onUnlocked={() => {
+          setShowPremium(false);
+          onChooseAnotherPhoto();
+        }}
+      />
       {!isCompleted ? (
         <PuzzleMenuSheet
           visible={menuVisible}
@@ -777,20 +794,14 @@ export function GameScreen({ navigation }: Props) {
       ) : null}
       {assistFeedback && !isCompleted ? (
         <View
-          style={[
-            styles.feedback,
-            { bottom: insets.bottom + spacing.xl },
-          ]}
+          style={[styles.feedback, { bottom: insets.bottom + spacing.xl }]}
           pointerEvents="none"
           accessibilityLiveRegion="polite"
         >
           <Text style={styles.feedbackText}>{assistFeedback}</Text>
         </View>
       ) : null}
-      <HowToPlaySheet
-        visible={howToPlayVisible}
-        onClose={onCloseHowToPlay}
-      />
+      <HowToPlaySheet visible={howToPlayVisible} onClose={onCloseHowToPlay} />
     </View>
   );
 }

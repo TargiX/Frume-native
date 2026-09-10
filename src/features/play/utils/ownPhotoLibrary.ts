@@ -39,9 +39,11 @@ function extensionFor(uri: string): string {
 }
 
 export function isManagedOwnPhotoUri(uri: string | undefined): uri is string {
-  return typeof uri === 'string' &&
+  return (
+    typeof uri === 'string' &&
     uri.startsWith('file://') &&
-    MANAGED_OWN_PHOTO_URI.test(uri);
+    MANAGED_OWN_PHOTO_URI.test(uri)
+  );
 }
 
 /**
@@ -143,8 +145,15 @@ export async function storeOwnPhoto(
  */
 export async function reconcileOwnPhotoOwnership(
   ownedUris: readonly (string | undefined)[],
+  isCurrent: () => boolean = () => true,
 ): Promise<void> {
   const reconcile = async () => {
+    // Read the durable library at deletion time; a failed read must prevent pruning.
+    const { puzzleLibrary } =
+      await import('../../../puzzle/persistence/PuzzleLibrary');
+    const libraryUris = (await puzzleLibrary.load()).map(
+      (entry) => entry.snapshot.engine.layout.image.uri,
+    );
     const { Directory, Paths } = await fileSystem();
     const directory = new Directory(Paths.document, DIRECTORY_NAME);
     if (!directory.exists) {
@@ -157,9 +166,10 @@ export async function reconcileOwnPhotoOwnership(
         .filter((entry) => 'size' in entry)
         .map((entry) => [entry.uri, entry] as const),
     );
+    if (!isCurrent()) return;
     const prunePlan = resolveOwnPhotoPrunePlan(
       [...filesByUri.keys()],
-      [...ownedUris, ...activeCandidateUris],
+      [...ownedUris, ...libraryUris, ...activeCandidateUris],
     );
     for (const uri of prunePlan) {
       filesByUri.get(uri)?.delete();

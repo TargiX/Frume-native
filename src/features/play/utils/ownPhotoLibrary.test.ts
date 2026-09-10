@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const library = vi.hoisted(() => ({
+  load: vi.fn(
+    async () =>
+      [] as { snapshot: { engine: { layout: { image: { uri: string } } } } }[],
+  ),
+}));
+vi.mock('../../../puzzle/persistence/PuzzleLibrary', () => ({
+  puzzleLibrary: library,
+}));
+
 const fakeFileSystem = vi.hoisted(() => ({
   files: new Map<string, number>(),
   copiedSize: null as number | null,
@@ -82,6 +92,7 @@ const root = 'file:///documents/frume-own-photos';
 
 describe('own-photo ownership', () => {
   beforeEach(() => {
+    library.load.mockReset().mockResolvedValue([]);
     fakeFileSystem.files.clear();
     fakeFileSystem.copiedSize = null;
     fakeFileSystem.failAfterCopy = false;
@@ -111,10 +122,7 @@ describe('own-photo ownership', () => {
   });
 
   it('clears all managed files when no saved session owns one', () => {
-    const ownedByNoSession = [
-      'https://images.unsplash.com/photo-1',
-      undefined,
-    ];
+    const ownedByNoSession = ['https://images.unsplash.com/photo-1', undefined];
 
     expect(
       resolveOwnPhotoPrunePlan(
@@ -181,6 +189,7 @@ describe('own-photo ownership', () => {
 
 describe('storeOwnPhoto', () => {
   beforeEach(() => {
+    library.load.mockReset().mockResolvedValue([]);
     fakeFileSystem.files.clear();
     fakeFileSystem.copiedSize = null;
     fakeFileSystem.failAfterCopy = false;
@@ -221,5 +230,34 @@ describe('storeOwnPhoto', () => {
       'too large to keep',
     );
     expect(fakeFileSystem.files.has(`${root}/own-125.jpg`)).toBe(false);
+  });
+});
+
+describe('shelf photo ownership', () => {
+  it('keeps archived photos even when no active puzzle references them', async () => {
+    const uri = 'file:///documents/frume-own-photos/own-444.jpg';
+    fakeFileSystem.files.set(uri, 100);
+    library.load.mockResolvedValue([
+      { snapshot: { engine: { layout: { image: { uri } } } } },
+    ]);
+    await reconcileOwnPhotoOwnership([]);
+    expect(fakeFileSystem.files.has(uri)).toBe(true);
+  });
+  it('keeps files when the screen owner changes while cleanup is waiting', async () => {
+    const uri = 'file:///documents/frume-own-photos/own-446.jpg';
+    fakeFileSystem.files.set(uri, 100);
+    let current = true;
+    library.load.mockImplementationOnce(async () => { current = false; return []; });
+    await reconcileOwnPhotoOwnership([], () => current);
+    expect(fakeFileSystem.files.has(uri)).toBe(true);
+  });
+  it('does not prune anything when the durable shelf cannot be read', async () => {
+    const uri = 'file:///documents/frume-own-photos/own-445.jpg';
+    fakeFileSystem.files.set(uri, 100);
+    library.load.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(reconcileOwnPhotoOwnership([])).rejects.toThrow(
+      'storage unavailable',
+    );
+    expect(fakeFileSystem.files.has(uri)).toBe(true);
   });
 });

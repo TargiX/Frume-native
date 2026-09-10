@@ -4,6 +4,7 @@ export type PlayStackParamList = {
   PlayHome: undefined;
   AboutSupport: undefined;
   Gallery: undefined;
+  Library: undefined;
   Difficulty: {
     imageUri: string;
     imageWidth: number;

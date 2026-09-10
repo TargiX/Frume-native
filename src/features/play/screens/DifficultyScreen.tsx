@@ -52,6 +52,7 @@ import {
   resolvePuzzlePhotoTargetAspect,
 } from '../../../services/unsplash';
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
+import { PhotoCutPreview } from '../components/PhotoCutPreview';
 import { CutStylePreview } from '../components/CutStylePreview';
 import { PremiumCutsSheet } from '../components/PremiumCutsSheet';
 import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
@@ -76,9 +77,7 @@ import {
   buildDifficultyRouteParams,
   describePhotoRequestError,
 } from '../utils/photoRequest';
-import {
-  cancelPuzzlePreparationWhenAppLeavesActive,
-} from '../utils/preparationLifecycle';
+import { cancelPuzzlePreparationWhenAppLeavesActive } from '../utils/preparationLifecycle';
 import {
   commitManagedOwnPhotoCandidate,
   discardManagedOwnPhotoCandidate,
@@ -165,7 +164,10 @@ function GridPreview({
   const { rows, columns } = DIFFICULTY_GRID[difficulty];
 
   return (
-    <View style={styles.gridPreview} importantForAccessibility="no-hide-descendants">
+    <View
+      style={styles.gridPreview}
+      importantForAccessibility="no-hide-descendants"
+    >
       {Array.from({ length: rows }).map((_, row) => (
         <View key={row} style={styles.gridRow}>
           {Array.from({ length: columns }).map((__, col) => (
@@ -203,8 +205,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
     rollbackSessionReplacement,
     loading,
     error,
+    persistenceError,
   } = usePuzzleSessionContext();
   const { isPremium } = usePremiumAccess();
+  const [showAllCuts, setShowAllCuts] = useState(false);
+  const [showAllSizes, setShowAllSizes] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<PuzzleDifficulty>('4x4');
   const [selectedCutter, setSelectedCutter] =
@@ -235,7 +240,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
   >(null);
   const visibleError = imageError
     ? PHOTO_LOAD_ERROR
-    : photoError ?? trackingError ?? error;
+    : (photoError ?? persistenceError ?? trackingError ?? error);
   useAccessibilityAnnouncement(visibleError);
   useAccessibilityAnnouncement(sizeAdjustmentMessage);
   const startingRef = useRef(false);
@@ -244,13 +249,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
     createPremiumUnlockContinuation<PuzzleStartIntent>(),
   );
   const cutOptionRefs = useRef<
-    Partial<
-      Record<PlayableCutterId, React.ElementRef<typeof Pressable>>
-    >
+    Partial<Record<PlayableCutterId, React.ElementRef<typeof Pressable>>>
   >({});
-  const premiumReturnFocusRef = useRef<
-    React.ElementRef<typeof Pressable> | null
-  >(null);
+  const premiumReturnFocusRef = useRef<React.ElementRef<
+    typeof Pressable
+  > | null>(null);
   const mountedRef = useRef(true);
   const ownPhotoCandidateCommittedRef = useRef(false);
   const premiumUnlockedPendingRef = useRef(false);
@@ -296,8 +299,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
   });
   const selectedCut =
     CUT_STYLES.find((option) => option.id === selectedCutter) ?? CUT_STYLES[0];
-  const selectedCutLocked =
-    isPremiumCutter(selectedCutter) && !isPremium;
+  const selectedCutLocked = isPremiumCutter(selectedCutter) && !isPremium;
 
   const openPremiumCuts = () => {
     const pending = premiumStartContinuationRef.current.peek();
@@ -349,29 +351,25 @@ export function DifficultyScreen({ navigation, route }: Props) {
       if (nextState === 'active' && premiumUnlockedPendingRef.current) {
         queueMicrotask(() => resumePremiumIntentRef.current());
       }
-      cancelPuzzlePreparationWhenAppLeavesActive(
-        previousState,
-        nextState,
-        {
-          cancelStart: () => {
-            cancelNextPuzzleRequest(startRequestStateRef.current);
-            startingRef.current = false;
-            if (mountedRef.current) {
-              setStarting(false);
-            }
-          },
-          cancelPhotoSwap: () => {
-            const photoRequest = photoRequestRef.current;
-            photoRequestRef.current = null;
-            photoRequest?.controller.abort(
-              new Error('App left the active state'),
-            );
-            if (mountedRef.current) {
-              setSwapping(false);
-            }
-          },
+      cancelPuzzlePreparationWhenAppLeavesActive(previousState, nextState, {
+        cancelStart: () => {
+          cancelNextPuzzleRequest(startRequestStateRef.current);
+          startingRef.current = false;
+          if (mountedRef.current) {
+            setStarting(false);
+          }
         },
-      );
+        cancelPhotoSwap: () => {
+          const photoRequest = photoRequestRef.current;
+          photoRequestRef.current = null;
+          photoRequest?.controller.abort(
+            new Error('App left the active state'),
+          );
+          if (mountedRef.current) {
+            setSwapping(false);
+          }
+        },
+      });
     });
     return () => subscription.remove();
   }, []);
@@ -677,10 +675,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const photoPanel = (
     <>
       <View
-        style={[
-          styles.previewCard,
-          twoPane && styles.previewCardLandscape,
-        ]}
+        style={[styles.previewCard, twoPane && styles.previewCardLandscape]}
       >
         {imageLoading && !imageError ? (
           <ActivityIndicator
@@ -714,6 +709,15 @@ export function DifficultyScreen({ navigation, route }: Props) {
             setImageError(true);
           }}
         />
+        {!imageError ? (
+          <PhotoCutPreview
+            uri={imageUri}
+            imageWidth={imageWidth}
+            imageHeight={imageHeight}
+            cutterId={selectedCutter}
+            difficulty={selectedDifficulty}
+          />
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Another photo"
@@ -721,10 +725,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
             ownPhotoCandidateUri
               ? 'Returns to the photo picker to choose a different photograph'
               : categoryLabel
-              ? `Replaces this photograph with another ${categoryLabel} one`
-              : 'Replaces this photograph with another one'
+                ? `Replaces this photograph with another ${categoryLabel} one`
+                : 'Replaces this photograph with another one'
           }
-          accessibilityState={{ busy: swapping, disabled: swapping || starting }}
+          accessibilityState={{
+            busy: swapping,
+            disabled: swapping || starting,
+          }}
           disabled={swapping || starting}
           onPress={onAnotherPhoto}
           style={({ pressed }) => [
@@ -748,7 +755,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
       </View>
 
       <View style={[styles.meta, twoPane && styles.metaLandscape]}>
-        {categoryLabel ? <Text style={styles.category}>{categoryLabel}</Text> : null}
+        {categoryLabel ? (
+          <Text style={styles.category}>{categoryLabel}</Text>
+        ) : null}
         {photographerName ? (
           <View style={styles.credit}>
             <Text style={styles.creditText}>Photo by</Text>
@@ -796,7 +805,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
         Choose a cut
       </Text>
       <View style={styles.cutOptions} accessibilityRole="radiogroup">
-        {CUT_STYLES.map((option) => {
+        {CUT_STYLES.filter(
+          (option) =>
+            showAllCuts ||
+            ['classic', 'organic', 'biomorphic'].includes(option.id) ||
+            selectedCutter === option.id,
+        ).map((option) => {
           const active = selectedCutter === option.id;
           const locked = isPremiumCutter(option.id) && !isPremium;
           const status = locked
@@ -834,11 +848,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
                 cutterId={option.id}
                 active={active}
                 width={singleColumnCuts ? 64 : cutTileWidth}
-                height={
-                  singleColumnCuts ? 50 : Math.round(cutTileWidth * 0.74)
-                }
+                height={singleColumnCuts ? 50 : Math.round(cutTileWidth * 0.74)}
               />
-              <View style={singleColumnCuts ? styles.cutCopy : styles.cutTileCopy}>
+              <View
+                style={singleColumnCuts ? styles.cutCopy : styles.cutTileCopy}
+              >
                 <View style={styles.cutTitleRow}>
                   <Text
                     style={[
@@ -902,12 +916,17 @@ export function DifficultyScreen({ navigation, route }: Props) {
         </Text>
       ) : null}
 
+      <Button
+        label={showAllCuts ? 'Fewer cut styles' : 'Explore all cut styles'}
+        variant="ghost"
+        onPress={() => setShowAllCuts((value) => !value)}
+      />
       <Text style={styles.title} accessibilityRole="header">
         Choose a size
       </Text>
       <Text style={styles.sectionHint}>
         {sizesForCut.length < SIZE_OPTIONS.length
-          ? `Every size is free. ${selectedCut.label} is cut by simulation, so it comes in the sizes that were prepared.`
+          ? `Every size is free. ${selectedCut.label} has its own selection of sizes.`
           : 'Every size is free. Pick what feels comfortable.'}
       </Text>
       {sizeAdjustmentMessage ? (
@@ -920,7 +939,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
       ) : null}
 
       <View style={styles.difficultyOptions} accessibilityRole="radiogroup">
-        {SIZE_OPTIONS.filter((option) => sizesForCut.includes(option.id)).map((option) => {
+        {SIZE_OPTIONS.filter(
+          (option) =>
+            sizesForCut.includes(option.id) &&
+            (showAllSizes ||
+              ['4x4', '7x7', '10x10'].includes(option.id) ||
+              selectedDifficulty === option.id),
+        ).map((option) => {
           const active = selectedDifficulty === option.id;
           const { rows, columns } = DIFFICULTY_GRID[option.id];
 
@@ -962,13 +987,24 @@ export function DifficultyScreen({ navigation, route }: Props) {
                 ) : null}
               </View>
               <Text style={styles.optionDetail}>
-                {rows} × {columns}
+                {option.id === '4x4'
+                  ? 'A little pause'
+                  : option.id === '7x7'
+                    ? 'Settle in'
+                    : option.id === '10x10'
+                      ? 'Take your time'
+                      : `${rows} × ${columns}`}
               </Text>
             </Pressable>
           );
         })}
       </View>
 
+      <Button
+        label={showAllSizes ? 'Fewer sizes' : 'See every size'}
+        variant="ghost"
+        onPress={() => setShowAllSizes((value) => !value)}
+      />
       <Text style={styles.title} accessibilityRole="header">
         Board help
       </Text>
@@ -1046,13 +1082,13 @@ export function DifficultyScreen({ navigation, route }: Props) {
 
   const actionPanel = (
     <View style={[styles.actionPanel, twoPane && styles.actionPanelLandscape]}>
-      {photoError || trackingError || error ? (
+      {photoError || persistenceError || trackingError || error ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion="assertive"
           numberOfLines={twoPane ? 2 : undefined}
         >
-          {photoError ?? trackingError ?? error}
+          {photoError ?? persistenceError ?? trackingError ?? error}
         </Text>
       ) : null}
 
