@@ -508,7 +508,10 @@ export class PuzzleEngine {
             !neighborDef ||
             neighbor.inTray ||
             neighbor.locked ||
-            members.has(neighborId)
+            members.has(neighborId) ||
+            // A sideways neighbour is not joinable: turning it upright stays
+            // the player's task instead of being squared away by this join.
+            !alignmentOk(neighborId)
           )
             continue;
           const dx =

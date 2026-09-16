@@ -487,14 +487,50 @@ describe('PuzzleEngine piece rotation', () => {
     expect(engine.getState().pieces['piece-a'].groupId).toBeUndefined();
     expect(engine.getState().pieces['piece-b'].groupId).toBeUndefined();
 
-    // The same release joins once the piece faces the right way.
+    // The same release joins once both pieces face the right way: the deal
+    // turned each of them 180°, so each needs two quarter turns.
     engine.rotatePiece('piece-a');
     engine.rotatePiece('piece-a');
+    engine.rotatePiece('piece-b');
+    engine.rotatePiece('piece-b');
+    expect(engine.getState().pieces['piece-b'].rotation).toBe(0);
     const joined = engine.releasePiece('piece-a');
     expect(joined.connectedWithNeighbor).toBe(true);
     const groupId = engine.getState().pieces['piece-a'].groupId;
     expect(groupId).toBeDefined();
     expect(engine.getState().pieces['piece-b'].groupId).toBe(groupId);
+    random.mockRestore();
+  });
+
+  it('does not pull a sideways neighbour into a group and square it', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const puzzleLayout = layout(100, 80, [
+      { ...piece('piece-a', 0, 10, 10), neighborIds: ['piece-b'] },
+      { ...piece('piece-b', 1, 55, 10), neighborIds: ['piece-a'] },
+    ]);
+    const engine = new PuzzleEngine({
+      ...puzzleLayout,
+      piecesRotatable: true,
+    });
+
+    // Both pieces rest at the same offset from their targets, so a release
+    // recognises them as neighbours. piece-b comes out turned (random 0 ->
+    // no extra turn; rotate it once by hand instead of relying on the deal).
+    engine.takeFromTray('piece-b', { x: 59, y: 40 });
+    engine.takeFromTray('piece-a', { x: 14, y: 40 });
+    engine.rotatePiece('piece-b');
+    expect(engine.getState().pieces['piece-b'].rotation).toBe(90);
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(0);
+
+    const result = engine.releasePiece('piece-a');
+
+    // The dragged piece is upright but its neighbour is not: turning the
+    // neighbour upright is part of the solve, so no join may happen and the
+    // neighbour must keep the rotation the player left it with.
+    expect(result.connectedWithNeighbor).toBe(false);
+    expect(engine.getState().pieces['piece-a'].groupId).toBeUndefined();
+    expect(engine.getState().pieces['piece-b'].groupId).toBeUndefined();
+    expect(engine.getState().pieces['piece-b'].rotation).toBe(90);
     random.mockRestore();
   });
 
