@@ -71,6 +71,11 @@ new submission.
 
 **Promise:** a calm, tactile way to turn beautiful photographs into puzzles.
 
+**Ad-free is a property, not a tier:** Frume shows no advertising of any
+kind — no banners, no interstitials, no rewarded video — and nothing
+interrupts a puzzle in progress. This is the dominant complaint against every
+major competitor in the segment and Frume's single most repeatable claim.
+
 **Business model:** all Classic puzzles and every size are free. Premium Cuts
 is a one-time lifetime purchase that unlocks the shaped cuts — Organic, Living,
 Living spectrum, Crystal, Crystal quartered, Amoeba, and Amoeba columnar.
@@ -89,9 +94,9 @@ Quiet photo puzzles
 
 **Promotional text**
 
-Slow down with tactile photo puzzles. Cut your own photograph or a curated
-one, play every size for free, and unlock the shaped cuts forever with one
-purchase.
+No ads, no subscription, no account. Cut your own photograph or a curated one
+into a quiet puzzle — every size is free, and a built-in collection plays
+offline.
 
 **Description**
 
@@ -107,9 +112,17 @@ FREE CLASSIC PUZZLES
 - Cut a photograph from your own library, or a curated Nature, City, Animals,
   Travel, Food, or Ocean theme
 - Pinch to look closer on a large board; one finger always plays
-- Pieces wait on a shelf that gains rows as the pile grows
+- Pieces wait on a shelf that gains rows as the pile grows, and the menu can
+  filter it down to just the edge pieces
+- Turn on Rotate pieces for a boxed-jigsaw quarter-turn challenge
 - Use the photo guide whenever you need it
 - Leave and return without losing your puzzle
+
+ALWAYS HERE, EVEN OFFLINE
+
+A small collection of photographs is built into the app itself, so a puzzle is
+always one tap away — on a plane, underground, or anywhere with no signal.
+Photographs from your own library never need a connection either.
 
 YOUR OWN PHOTOGRAPHS
 
@@ -126,12 +139,13 @@ four blockier ones; Amoeba forms blobby pseudopod interlocks and Amoeba
 columnar tall banded lobes. Premium Cuts is one optional, non-consumable
 lifetime purchase. It does not lock any size, and it is not a subscription.
 
-Frume does not require an account. Photographer credit is shown for photos
-provided through Unsplash.
+Frume shows no advertising, requires no account, and sells nothing but the cut
+styles — one optional purchase, never a subscription. Photographer credit is
+shown for photos provided through Unsplash.
 
 **Keywords draft**
 
-jigsaw,puzzle,photo,my photos,relaxing,calm,focus,brain,organic,generative
+jigsaw,puzzle,photo,my photos,relaxing,calm,focus,brain,organic,generative,offline
 
 **Primary category**
 
@@ -152,8 +166,10 @@ the required iPhone and iPad device-family sets; do not stretch one family into
 the other.
 
 1. Home — “Photographs, cut differently.”
-2. Theme gallery — the six curated categories.
-3. Setup — photo preview, photographer credit, cut choice, and free difficulty.
+2. Theme gallery — the six curated categories and the always-offline
+   collection.
+3. Setup — photo preview, photographer credit, cut choice, free difficulty,
+   and the Classic rotation challenge.
 4. Classic game — a partly completed board and organized tray.
 5. Organic game — visibly irregular flowing seams.
 6. Living game — visibly non-grid generative cells.
@@ -204,7 +220,7 @@ from launching the app, and cover, in one take:
 5. Back to setup, tap a cut marked **Premium** → the Premium Cuts sheet opens →
    show the real localized price and the **Restore** action.
 6. Complete a sandbox purchase, showing that the premium cut then plays.
-7. **Choose from library** → the system photo picker → cut and start that photo.
+7. **Use my photo** on Home → the system photo picker → cut and start that photo.
 8. **About & Support**, showing Restore purchases, the privacy and support
    links, and the **anonymous usage** switch that turns analytics off.
 
@@ -246,18 +262,20 @@ into its functionality.
 - **Curated photograph:** Home → **Choose a photograph** → pick one of six
   themes (Nature, City, Animals, Travel, Food, Ocean) → setup screen → choose a
   cut and a size → **Start**.
-- **Own photograph:** Home → **Choose a photograph** → **choose a photo from
-  your library** → the system picker returns one photograph → same setup screen.
+- **Own photograph:** Home → **Use my photo** → the system picker returns one
+  photograph → the same setup screen. (The gallery has the same button.)
 - **Playing:** drag a piece from the tray onto the board; a correctly placed
-  piece snaps and locks. Pinch to zoom on larger boards. The photo guide and
-  the restart action are in the puzzle menu.
+  piece snaps and locks. Pinch to zoom on larger boards. The puzzle menu holds
+  the photo guide, the restart action, and an **Edge pieces only** tray filter;
+  the setup screen offers an optional **Rotate pieces** challenge on Classic.
 - **Resuming:** leaving and relaunching restores the puzzle in progress.
 
 Every Classic difficulty from 3x3 (9 pieces) to 14x14 (196 pieces) is free.
 
-An internet connection is required to load a curated photograph, because those
-are fetched from the provider rather than bundled. A photograph chosen from the
-library stays on the device and plays offline.
+An internet connection is required to load a curated theme photograph, because
+those are fetched from the provider rather than bundled. The built-in
+**Always here, even offline** collection and photographs from the library play
+fully offline, and no network state ever touches a saved puzzle.
 
 ### 5. External services used
 
@@ -379,7 +397,8 @@ These are pending edits, not saved dashboard state:
   binary before answering, because each one is load-bearing for the answer:
   - The complete set of events and their permitted properties is the allowlist
     in `src/analytics/analyticsEvents.ts`. Start and completion may include a
-    source enum (`theme`, `own_photo`, or the bundled `discovery` sample).
+    source enum (`theme`, `own_photo`, the `discovery` sample, or a `bundled`
+    offline photograph).
     Values outside it are dropped before
     storage, so no photograph, filename, URL, photographer name, or free text
     can be transmitted. A build that adds an event there changes this answer.

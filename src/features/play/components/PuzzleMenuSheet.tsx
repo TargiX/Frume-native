@@ -31,9 +31,11 @@ import type {
   PuzzleImageAttribution,
   PuzzleTableAppearance,
   PuzzleCutterId,
+  PuzzleTrayFilter,
 } from '../../../puzzle/types';
 import type { MusicSettingFeedback } from '../../../audio/musicPreference';
 import type { HapticsSettingFeedback } from '../../../haptics';
+import { supportsEdgeTrayFilter } from '../../../puzzle/engine/trayFilter';
 import {
   PUZZLE_GUIDE_OPTIONS,
   puzzleGuideLabel,
@@ -57,6 +59,7 @@ type PuzzleMenuSheetProps = {
   cutterId: PuzzleCutterId;
   guideMode: PuzzleGuideMode;
   tableAppearance: PuzzleTableAppearance;
+  trayFilter: PuzzleTrayFilter;
   musicEnabled: boolean;
   musicPreferenceLoaded: boolean;
   musicFeedback: MusicSettingFeedback;
@@ -69,6 +72,7 @@ type PuzzleMenuSheetProps = {
   onClose: () => void;
   onSelectGuide: (mode: PuzzleGuideMode) => void;
   onSelectTableAppearance: (appearance: PuzzleTableAppearance) => void;
+  onSetTrayFilter: (filter: PuzzleTrayFilter) => void;
   onSetMusicEnabled: (enabled: boolean) => void;
   onRetryMusic: () => void;
   onSetHapticsEnabled: (enabled: boolean) => void;
@@ -171,6 +175,7 @@ export function PuzzleMenuSheet({
   cutterId,
   guideMode,
   tableAppearance,
+  trayFilter,
   musicEnabled,
   musicPreferenceLoaded,
   musicFeedback,
@@ -183,6 +188,7 @@ export function PuzzleMenuSheet({
   onClose,
   onSelectGuide,
   onSelectTableAppearance,
+  onSetTrayFilter,
   onSetMusicEnabled,
   onRetryMusic,
   onSetHapticsEnabled,
@@ -210,6 +216,7 @@ export function PuzzleMenuSheet({
   );
   const usesApproximateZones =
     cutterId === 'biomorphic' || cutterId === 'amoeba';
+  const edgeFilterAvailable = supportsEdgeTrayFilter(cutterId);
   const headingRef = React.useRef<React.ElementRef<typeof Text>>(null);
   const overlayEntering = FadeIn.duration(
     reduceMotion
@@ -523,6 +530,56 @@ export function PuzzleMenuSheet({
               })}
               </View>
             </View>
+
+            {edgeFilterAvailable ? (
+              <View style={styles.menuSection}>
+                <Text style={styles.sectionLabel}>Tray</Text>
+                <View
+                  style={[
+                    styles.settingRow,
+                    stacksControls && styles.settingRowStacked,
+                  ]}
+                >
+                  <View style={styles.settingInfo}>
+                    <View style={styles.actionIcon}>
+                      <Ionicons
+                        name="square-outline"
+                        size={20}
+                        color={colors.textPrimary}
+                        accessible={false}
+                        importantForAccessibility="no"
+                      />
+                    </View>
+                    <View style={styles.actionCopy}>
+                      <Text style={styles.actionTitle}>Edge pieces only</Text>
+                      <Text style={styles.actionDetail}>
+                        Tray keeps just the border pieces in reach
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={trayFilter === 'edges'}
+                    onValueChange={(onlyEdges) =>
+                      onSetTrayFilter(onlyEdges ? 'edges' : 'all')
+                    }
+                    accessibilityLabel="Edge pieces only"
+                    accessibilityHint="Limits the tray to pieces from the puzzle's outer border"
+                    accessibilityValue={{
+                      text: trayFilter === 'edges' ? 'On' : 'Off',
+                    }}
+                    trackColor={{
+                      false: colors.borderStrong,
+                      true: colors.accent,
+                    }}
+                    thumbColor={colors.textPrimary}
+                    ios_backgroundColor={colors.surfaceRaised}
+                    style={
+                      stacksControls ? styles.settingSwitchStacked : undefined
+                    }
+                  />
+                </View>
+              </View>
+            ) : null}
 
             <View style={styles.menuSection}>
               <Text style={styles.sectionLabel}>Sound &amp; touch</Text>

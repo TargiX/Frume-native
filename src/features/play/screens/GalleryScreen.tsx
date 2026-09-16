@@ -7,6 +7,7 @@ import {
   Image,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -22,6 +23,11 @@ import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import type { PlayStackParamList } from '../../../navigation/types';
+import {
+  BUNDLED_PHOTOS,
+  type BundledPhoto,
+} from '../../../puzzle/bundledPhotos';
+import { bundledAssetForId } from '../../../puzzle/bundledAssets';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
 import {
   fetchPuzzlePhoto,
@@ -255,6 +261,27 @@ export function GalleryScreen({ navigation }: Props) {
     }
   };
 
+  const useBundledPhoto = (photo: BundledPhoto) => {
+    requestRef.current?.controller.abort(
+      new Error('Replaced by an offline photograph'),
+    );
+    requestRef.current = null;
+    nextRequestIdRef.current += 1;
+    setPending(null);
+    setError(null);
+    track('photo_source_chosen', { source: 'bundled' });
+    navigation.navigate('Difficulty', {
+      imageUri: photo.uri,
+      imageWidth: photo.width,
+      imageHeight: photo.height,
+      photoDescription: photo.accessibilityLabel,
+      photographerName: photo.attribution.photographerName,
+      photographerUrl: photo.attribution.photographerUrl,
+      attributionSourceUrl: photo.attribution.sourceUrl,
+      bundledPhotoId: photo.id,
+    });
+  };
+
   const retryLastPhoto = () => {
     if (retryActionRef.current) {
       retryActionRef.current();
@@ -321,6 +348,44 @@ export function GalleryScreen({ navigation }: Props) {
             }
           />
         ) : null}
+      </View>
+
+      <View style={styles.offlineSection}>
+        <Text style={styles.offlineTitle} accessibilityRole="header">
+          Always here, even offline
+        </Text>
+        <Text style={styles.offlineDetail}>
+          Bundled photographs that play with no connection at all.
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.offlineRow}
+        >
+          {BUNDLED_PHOTOS.map((photo) => (
+            <Pressable
+              key={photo.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${photo.title} by ${photo.attribution.photographerName}`}
+              accessibilityHint="Plays offline. Opens puzzle setup."
+              disabled={loading}
+              onPress={() => useBundledPhoto(photo)}
+              style={({ pressed }) => [
+                styles.offlineItem,
+                pressed && styles.cardPressed,
+              ]}
+            >
+              <Image
+                source={bundledAssetForId(photo.id)}
+                style={styles.offlineThumb}
+                accessibilityLabel={photo.accessibilityLabel}
+              />
+              <Text style={styles.offlineName} numberOfLines={1}>
+                {photo.title}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       {collection ? (
@@ -535,6 +600,37 @@ const styles = StyleSheet.create({
   },
   subtitleLandscape: {
     marginBottom: 0,
+  },
+  offlineSection: {
+    marginBottom: spacing.xl,
+  },
+  offlineTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  offlineDetail: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  offlineRow: {
+    gap: spacing.md,
+  },
+  offlineItem: {
+    width: 132,
+    gap: spacing.xs,
+  },
+  offlineThumb: {
+    width: 132,
+    height: 88,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  offlineName: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   grid: {
     flexDirection: 'row',

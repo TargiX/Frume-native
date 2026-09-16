@@ -25,7 +25,11 @@ export const ANALYTICS_EVENT_NAMES = [
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
 
-export type AnalyticsPhotoSource = 'theme' | 'own_photo' | 'discovery';
+export type AnalyticsPhotoSource =
+  | 'theme'
+  | 'own_photo'
+  | 'discovery'
+  | 'bundled';
 
 export type AnalyticsEventProperties = {
   app_opened: { cold_start: boolean };

@@ -20,6 +20,7 @@ import {
   type LibraryPuzzle,
 } from '../../../puzzle/persistence/PuzzleLibrary';
 import { displayImageUri } from '../../../puzzle/discoveryAsset';
+import { bundledPhotoByUri } from '../../../puzzle/bundledPhotos';
 import { colors, spacing, radius } from '../../../theme';
 import { puzzleCutStyleLabel } from '../cutStylePresentation';
 import { reconcileOwnPhotoOwnership } from '../utils/ownPhotoLibrary';
@@ -317,7 +318,8 @@ export function LibraryScreen({ navigation }: Props) {
                 <View style={styles.caption}>
                   <Text style={styles.name}>
                     {image.contentSource?.kind === 'bundled'
-                      ? 'Coastal morning'
+                      ? (bundledPhotoByUri(image.uri)?.title ??
+                        'Coastal morning')
                       : image.contentSource?.kind === 'own'
                         ? 'Your photograph'
                         : (image.contentSource?.categoryLabel ??

@@ -8,6 +8,7 @@ import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { useDerivedValue } from 'react-native-reanimated';
 
+import { displayImageUri } from '../discoveryAsset';
 import type { PuzzleTableAppearance } from '../types';
 import { PUZZLE_LIGHT_DIRECTION } from './lighting';
 import {
@@ -31,7 +32,13 @@ export function TableSurface({
   appearance = 'felt',
   imageUri,
 }: TableSurfaceProps) {
-  const photoGlass = appearance === 'photo-glass' && !!imageUri;
+  // Bundled photographs carry a frume:// URI; resolve it to the packaged file
+  // before handing it to the platform image loader.
+  const photoGlassUri =
+    appearance === 'photo-glass' && imageUri
+      ? displayImageUri(imageUri)
+      : undefined;
+  const photoGlass = photoGlassUri !== undefined;
   const lightCenter = useDerivedValue(() => ({
     x: width * (0.5 + PUZZLE_LIGHT_DIRECTION.value.x * 0.2),
     y: height * (0.5 + PUZZLE_LIGHT_DIRECTION.value.y * 0.2),
@@ -41,7 +48,7 @@ export function TableSurface({
     <View style={styles.canvas} pointerEvents="none">
       {photoGlass ? (
         <Image
-          source={{ uri: imageUri }}
+          source={{ uri: photoGlassUri }}
           style={styles.photoBackdrop}
           resizeMode="cover"
           blurRadius={PHOTO_GLASS_BLUR_RADIUS}

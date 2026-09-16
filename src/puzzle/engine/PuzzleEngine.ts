@@ -3,6 +3,7 @@ import type {
   PuzzleEngineListener,
   PuzzleEngineSnapshot,
   PuzzleEngineState,
+  PuzzleTrayFilter,
   SnapResult,
 } from '../types/engine';
 import type { Point } from '../types/geometry';
@@ -10,6 +11,7 @@ import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
 import { shouldSnap } from './snap';
 import { buildShuffledPieceStates } from './shuffle';
 import { getTraySlotPosition } from './tray';
+import { arrangeTrayForFilter } from './trayFilter';
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -47,6 +49,21 @@ function recoverablePosition(
   };
 }
 
+/**
+ * A piece seats only when it faces its cut orientation. Rotations are dealt
+ * in exact quarter turns, so the tolerance only absorbs accumulated float
+ * error from gesture paths that ever write a non-quarter value.
+ */
+function isRotationAligned(rotation: number, correctRotation: number): boolean {
+  const delta = (((rotation - correctRotation) % 360) + 540) % 360 - 180;
+  return Math.abs(delta) <= 0.5;
+}
+
+/** Upright in ordinary play; a random quarter turn when the puzzle rotates. */
+function trayExitRotation(layout: PuzzleLayout): number {
+  return layout.piecesRotatable ? Math.floor(Math.random() * 4) * 90 : 0;
+}
+
 function clonePieces(
   pieces: Record<string, PieceRuntimeState>,
 ): Record<string, PieceRuntimeState> {
@@ -82,6 +99,7 @@ export class PuzzleEngine {
       activeElapsedMs: snapshot?.activeElapsedMs ?? 0,
       activeStartedAt: snapshot?.activeStartedAt ?? null,
       snapFeedback: null,
+      trayFilter: 'all',
     };
   }
 
@@ -189,7 +207,11 @@ export class PuzzleEngine {
       this.start();
     }
 
-    this.updatePiece(pieceId, { inTray: false, position, rotation: 0 });
+    this.updatePiece(pieceId, {
+      inTray: false,
+      position,
+      rotation: trayExitRotation(this.state.layout),
+    });
   }
 
   /** Returns a piece to its own slot when it is dropped back over the tray. */
@@ -200,7 +222,7 @@ export class PuzzleEngine {
       return;
     }
 
-    const pieces = { ...this.state.pieces };
+    let pieces = { ...this.state.pieces };
     for (const id of this.getConnectedPieceIds(pieceId)) {
       const current = pieces[id];
       const def = this.getPieceDefinition(id)!;
@@ -211,6 +233,16 @@ export class PuzzleEngine {
         position: getTraySlotPosition(this.state.layout, current.traySlot, def),
         rotation: current.traySlot % 2 === 0 ? 1.6 : -1.6,
       };
+    }
+    // A returned edge piece rejoins the gathered run rather than landing back
+    // among the pieces the filter has hidden.
+    if (this.state.trayFilter !== 'all') {
+      pieces =
+        arrangeTrayForFilter(
+          this.state.layout,
+          pieces,
+          this.state.trayFilter,
+        ) ?? pieces;
     }
     this.patch({ pieces, selectedPieceId: null, snapFeedback: null });
   }
@@ -244,17 +276,49 @@ export class PuzzleEngine {
       changed = true;
     });
 
+    // Returning pieces land on their own slots first; an active filter then
+    // re-gathers its matching run so the visible strip stays contiguous.
+    const arranged =
+      changed && this.state.trayFilter !== 'all'
+        ? arrangeTrayForFilter(
+            this.state.layout,
+            pieces,
+            this.state.trayFilter,
+          )
+        : null;
+
     if (
       changed ||
       this.state.selectedPieceId !== null ||
       this.state.snapFeedback !== null
     ) {
       this.patch({
-        pieces,
+        pieces: arranged ?? pieces,
         selectedPieceId: null,
         snapFeedback: null,
       });
     }
+  }
+
+  /**
+   * Gathers the pieces a tray filter shows at the front of the waiting row.
+   * Slots are re-dealt only among pieces still in the tray, so pieces on the
+   * table keep their slots and the permutation persistence validates stays
+   * intact. Pieces out of the tray are never hidden or moved by the filter.
+   */
+  setTrayFilter(filter: PuzzleTrayFilter): void {
+    if (filter === this.state.trayFilter) {
+      return;
+    }
+    const arranged = arrangeTrayForFilter(
+      this.state.layout,
+      this.state.pieces,
+      filter,
+    );
+    this.patch({
+      trayFilter: filter,
+      ...(arranged ? { pieces: arranged } : {}),
+    });
   }
 
   /**
@@ -287,8 +351,36 @@ export class PuzzleEngine {
     } else {
       this.movePiece(definition.id, definition.correctPosition);
     }
+    // Assist always seats the piece, so it squares a rotated one first rather
+    // than leaving the player to discover why the drop refused to land.
+    this.updatePiece(definition.id, { rotation: definition.correctRotation });
 
     return this.releasePiece(definition.id);
+  }
+
+  /**
+   * Turns a lone loose piece a quarter turn clockwise. Rotation is a property
+   * of a single piece only: a joined group is always squared up, and a piece
+   * resting in the tray keeps its small display tilt.
+   */
+  rotatePiece(pieceId: string): void {
+    const pieceState = this.state.pieces[pieceId];
+    const definition = this.getPieceDefinition(pieceId);
+    if (
+      !this.state.layout.piecesRotatable ||
+      !pieceState ||
+      !definition ||
+      pieceState.locked ||
+      pieceState.inTray ||
+      pieceState.groupId !== undefined ||
+      this.state.status === 'completed'
+    ) {
+      return;
+    }
+
+    this.updatePiece(pieceId, {
+      rotation: (pieceState.rotation + 90) % 360,
+    });
   }
 
   bringToFront(pieceId: string): void {
@@ -357,8 +449,21 @@ export class PuzzleEngine {
 
     const ids = this.getConnectedPieceIds(pieceId);
     const members = new Set(ids);
-    const snapped = ids.some((id) =>
-      shouldSnap(this.getPieceDefinition(id)!, this.state.pieces[id].position),
+    // With the rotation challenge on, a sideways piece neither seats nor
+    // joins a group — turning it upright is part of the solve.
+    const alignmentOk = (id: string) =>
+      !this.state.layout.piecesRotatable ||
+      isRotationAligned(
+        this.state.pieces[id].rotation,
+        this.getPieceDefinition(id)!.correctRotation,
+      );
+    const snapped = ids.some(
+      (id) =>
+        alignmentOk(id) &&
+        shouldSnap(
+          this.getPieceDefinition(id)!,
+          this.state.pieces[id].position,
+        ),
     );
     const pieces = { ...this.state.pieces };
     let connectedWithNeighbor = false;
@@ -392,6 +497,7 @@ export class PuzzleEngine {
         distance: number;
       } | null = null;
       for (const id of ids) {
+        if (!alignmentOk(id)) continue;
         const def = this.getPieceDefinition(id)!;
         const current = pieces[id];
         for (const neighborId of def.neighborIds) {
@@ -489,6 +595,7 @@ export class PuzzleEngine {
       activeElapsedMs: 0,
       activeStartedAt: null,
       snapFeedback: null,
+      trayFilter: 'all',
     };
     this.emit();
   }

@@ -44,6 +44,7 @@ export {
 export type {
   PieceRuntimeState,
   PuzzleEngineListener,
+  PuzzleTrayFilter,
   PuzzleEngineSnapshot,
   PuzzleEngineState,
   PuzzleSessionStatus,
