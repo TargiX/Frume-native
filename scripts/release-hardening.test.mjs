@@ -137,15 +137,15 @@ test('release CLIs execute through the macOS /tmp physical-path alias', () => {
 });
 
 test('Apple release toolchain accepts only the reviewed Xcode build', () => {
-  const reviewed = parseXcodeVersion('Xcode 26.6\nBuild version 17F113\n');
-  assert.deepEqual(reviewed, { version: '26.6', build: '17F113' });
+  const reviewed = parseXcodeVersion('Xcode 27.0\nBuild version 27A266a\n');
+  assert.deepEqual(reviewed, { version: '27.0', build: '27A266a' });
   assert.doesNotThrow(() => validateAppleToolchain(reviewed));
   assert.throws(
-    () => validateAppleToolchain({ version: '26.6', build: '17F114' }),
-    /require Xcode 26\.6 \(17F113\)/,
+    () => validateAppleToolchain({ version: '27.0', build: '27A266b' }),
+    /require Xcode 27\.0 \(27A266a\)/,
   );
   assert.throws(
-    () => parseXcodeVersion('Xcode 26.6 beta\nBuild version 17F113\nextra'),
+    () => parseXcodeVersion('Xcode 27.0 beta\nBuild version 27A266a\nextra'),
     /Could not parse/,
   );
 });

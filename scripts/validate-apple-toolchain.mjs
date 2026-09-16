@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process';
 
 import { isDirectCli } from './is-direct-cli.mjs';
 
-export const REVIEWED_XCODE_VERSION = '26.6';
-export const REVIEWED_XCODE_BUILD = '17F113';
+export const REVIEWED_XCODE_VERSION = '27.0';
+export const REVIEWED_XCODE_BUILD = '27A266a';
 
 export function parseXcodeVersion(output) {
   const match = /^Xcode ([^\r\n]+)\r?\nBuild version ([^\r\n]+)\s*$/u.exec(
