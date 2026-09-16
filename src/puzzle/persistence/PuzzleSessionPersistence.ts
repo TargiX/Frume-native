@@ -259,8 +259,10 @@ function parseImageContentSource(
     return null;
   }
   if (value.kind === 'bundled') {
-    return value.id === 'coastal-morning'
-      ? { kind: 'bundled', id: 'coastal-morning' }
+    // The id is not matched against the shipping collection: a photo retired
+    // from a later build must not strand a saved puzzle.
+    return isBoundedString(value.id) && value.id.length <= 128
+      ? { kind: 'bundled', id: value.id }
       : null;
   }
   if (value.kind === 'own') {
@@ -475,6 +477,15 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     }
     traySurfaceExtent = value.traySurfaceExtent;
   }
+  // Absent on puzzles saved before pieces could come out rotated; those
+  // restore upright, exactly as they were saved.
+  let piecesRotatable: boolean | undefined;
+  if (value.piecesRotatable !== undefined) {
+    if (typeof value.piecesRotatable !== 'boolean') {
+      return null;
+    }
+    piecesRotatable = value.piecesRotatable;
+  }
 
   return {
     cutterId,
@@ -483,6 +494,7 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     image,
     boardSize,
     ...(traySurfaceExtent !== undefined ? { traySurfaceExtent } : {}),
+    ...(piecesRotatable !== undefined ? { piecesRotatable } : {}),
     pieces,
   };
 }

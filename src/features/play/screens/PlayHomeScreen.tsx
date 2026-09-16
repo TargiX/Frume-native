@@ -25,6 +25,8 @@ import {
   displayImageUri,
 } from '../../../puzzle/discoveryAsset';
 import { computeSafeAreaPlayLayout } from '../utils/boardLayout';
+import { pickOwnPhoto } from '../utils/pickOwnPhoto';
+import { discardManagedOwnPhotoCandidate } from '../utils/ownPhotoLibrary';
 import { puzzleLibrary } from '../../../puzzle/persistence/PuzzleLibrary';
 import { track } from '../../../analytics';
 import { Button } from '../../../components/Button';
@@ -50,7 +52,9 @@ export function PlayHomeScreen({ navigation }: Props) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const discoveryStartingRef = useRef(false);
+  const ownPhotoStartingRef = useRef(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const {
     session,
     completion,
@@ -194,6 +198,39 @@ export function PlayHomeScreen({ navigation }: Props) {
   const navigateToAbout = () => {
     supersedePendingAction();
     navigation.navigate('AboutSupport');
+  };
+
+  const useOwnPhoto = async () => {
+    if (ownPhotoStartingRef.current || loading || restoring) return;
+    ownPhotoStartingRef.current = true;
+    setImportError(null);
+    const requestId = actionGuard.beginAction();
+    try {
+      const result = await pickOwnPhoto([session?.layout.image.uri]);
+      if (!actionGuard.isCurrent(requestId)) {
+        if (result.status === 'picked') {
+          await discardManagedOwnPhotoCandidate(result.photo.uri);
+        }
+        return;
+      }
+      if (result.status === 'cancelled') {
+        return;
+      }
+      if (result.status === 'rejected') {
+        setImportError(result.message);
+        return;
+      }
+      track('photo_source_chosen', { source: 'own_photo' });
+      navigation.navigate('Difficulty', {
+        imageUri: result.photo.uri,
+        imageWidth: result.photo.width,
+        imageHeight: result.photo.height,
+        photoDescription: 'Your own photograph',
+        ownPhotoCandidateUri: result.photo.uri,
+      });
+    } finally {
+      ownPhotoStartingRef.current = false;
+    }
   };
 
   const continuePuzzle = async () => {
@@ -360,30 +397,31 @@ export function PlayHomeScreen({ navigation }: Props) {
               disabled={checkingAccess || loading}
               block
             />
-            {session ? (
-              <View style={styles.centered}>
-                <Button
-                  label="New photograph"
-                  variant="ghost"
-                  onPress={chooseNewPhotograph}
-                  disabled={checkingAccess || loading}
-                  accessibilityHint="Choose another photograph; this puzzle will wait on your shelf"
-                />
-              </View>
-            ) : null}
+            <View style={styles.photoSources}>
+              <Button
+                label={session ? 'New photograph' : 'Choose a photograph'}
+                variant="secondary"
+                onPress={chooseNewPhotograph}
+                disabled={checkingAccess || loading}
+                accessibilityHint={
+                  session
+                    ? 'Choose another photograph; this puzzle will wait on your shelf'
+                    : 'Opens the curated photograph collections'
+                }
+              />
+              <Button
+                label="Use my photo"
+                variant="secondary"
+                onPress={() => void useOwnPhoto()}
+                disabled={checkingAccess || loading}
+                accessibilityHint="Opens your photo library to cut one of your own photographs; it never leaves this device"
+              />
+            </View>
           </View>
 
-          {!session ? (
-            <Button
-              label="Choose a photograph"
-              variant="ghost"
-              onPress={navigateToGallery}
-              disabled={loading}
-            />
-          ) : null}
           <Button
             label="Shelf & album"
-            variant="secondary"
+            variant="ghost"
             onPress={() => navigation.navigate('Library')}
             disabled={loading}
           />
@@ -409,12 +447,12 @@ export function PlayHomeScreen({ navigation }: Props) {
         </>
       )}
 
-      {persistenceError || error || discoveryError ? (
+      {persistenceError || error || discoveryError || importError ? (
         <Text
           style={styles.error}
           accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
         >
-          {persistenceError ?? error ?? discoveryError}
+          {persistenceError ?? error ?? discoveryError ?? importError}
         </Text>
       ) : null}
 
@@ -480,6 +518,12 @@ const styles = StyleSheet.create({
   actions: {
     alignSelf: 'stretch',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  photoSources: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: spacing.sm,
   },
   savedPremiumNotice: {

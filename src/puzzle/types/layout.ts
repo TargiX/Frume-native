@@ -53,7 +53,7 @@ export type PuzzleImageAttribution = {
  * unrelated network photograph.
  */
 export type PuzzleImageContentSource =
-  | { kind: 'bundled'; id: 'coastal-morning' }
+  | { kind: 'bundled'; id: string }
   | {
       kind: 'own';
     }
@@ -129,5 +129,11 @@ export type PuzzleLayout = {
    * then it falls back to the board's own extent.
    */
   traySurfaceExtent?: number;
+  /**
+   * The quarter-turn challenge chosen at setup: loose pieces come out of the
+   * tray rotated and must be turned upright before they seat. Absent on
+   * puzzles saved before the option existed — those play exactly as saved.
+   */
+  piecesRotatable?: boolean;
   pieces: readonly PuzzlePieceDefinition[];
 };

@@ -17,6 +17,10 @@ export type PlayStackParamList = {
     /** The theme the player asked for; absent means "Surprise me". */
     categoryId?: string;
     categoryLabel?: string;
+    /** Bundled offline-collection photo; packaged asset, never fetched. */
+    bundledPhotoId?: string;
+    /** Exact credit link; falls back to the generic Unsplash referral. */
+    attributionSourceUrl?: string;
   } & (
     | {
         /** Unsplash endpoint pinged when the photo is actually played. */

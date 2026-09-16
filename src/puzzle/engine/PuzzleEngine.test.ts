@@ -275,3 +275,288 @@ describe('PuzzleEngine recoverability', () => {
     vi.useRealTimers();
   });
 });
+
+describe('PuzzleEngine tray filter', () => {
+  function gridPiece(
+    row: number,
+    col: number,
+    columns: number,
+  ): PuzzlePieceDefinition {
+    const x = col * 30;
+    const y = row * 20;
+    return {
+      id: `p-${row}-${col}`,
+      index: row * columns + col,
+      row,
+      col,
+      path: `M ${x} ${y} L ${x + 30} ${y} L ${x + 30} ${y + 20} L ${x} ${y + 20} Z`,
+      bounds: { x, y, width: 30, height: 20 },
+      clipRegion: { x: 0, y: 0, width: 0.3, height: 0.25 },
+      correctPosition: { x, y },
+      correctRotation: 0,
+      neighborIds: [],
+    };
+  }
+
+  function gridLayout(rows = 3, columns = 3): PuzzleLayout {
+    const pieces: PuzzlePieceDefinition[] = [];
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < columns; col += 1) {
+        pieces.push(gridPiece(row, col, columns));
+      }
+    }
+    return {
+      cutterId: 'classic',
+      image: {
+        uri: 'https://example.test/puzzle.jpg',
+        width: 1200,
+        height: 800,
+      },
+      boardSize: { width: columns * 30, height: rows * 20 },
+      pieces,
+    };
+  }
+
+  function sortedSlots(engine: PuzzleEngine): number[] {
+    return Object.values(engine.getState().pieces)
+      .map((piece) => piece.traySlot)
+      .sort((a, b) => a - b);
+  }
+
+  it('gathers edge pieces ahead of interior ones without losing slots', () => {
+    const puzzleLayout = gridLayout();
+    const engine = new PuzzleEngine(puzzleLayout);
+
+    engine.setTrayFilter('edges');
+
+    const state = engine.getState();
+    expect(state.trayFilter).toBe('edges');
+    const centre = state.pieces['p-1-1'];
+    expect(centre.traySlot).toBe(8);
+    puzzleLayout.pieces.forEach((definition) => {
+      const piece = state.pieces[definition.id];
+      expect(piece.inTray).toBe(true);
+      expect(piece.position).toEqual(
+        getTraySlotPosition(puzzleLayout, piece.traySlot, definition),
+      );
+      if (definition.id !== 'p-1-1') {
+        expect(piece.traySlot).toBeLessThan(8);
+      }
+    });
+    expect(sortedSlots(engine)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('leaves the dealt order untouched when the filter is cleared', () => {
+    const engine = new PuzzleEngine(gridLayout());
+    engine.setTrayFilter('edges');
+    const filtered = engine.getState().pieces;
+
+    engine.setTrayFilter('all');
+
+    expect(engine.getState().trayFilter).toBe('all');
+    expect(engine.getState().pieces).toEqual(filtered);
+  });
+
+  it('rejoins a returned edge piece into the gathered run', () => {
+    const puzzleLayout = gridLayout();
+    const engine = new PuzzleEngine(puzzleLayout);
+    engine.setTrayFilter('edges');
+    // The centre is filtered to the last slot; an edge piece leaves the tray.
+    engine.takeFromTray('p-0-0', { x: 60, y: 40 });
+
+    engine.returnToTray('p-0-0');
+
+    const state = engine.getState();
+    expect(state.pieces['p-0-0'].inTray).toBe(true);
+    expect(state.pieces['p-0-0'].traySlot).toBeLessThan(8);
+    expect(state.pieces['p-1-1'].traySlot).toBe(8);
+    expect(sortedSlots(engine)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('keeps the visible run ahead of hidden pieces when loose pieces return', () => {
+    const engine = new PuzzleEngine(gridLayout());
+    engine.setTrayFilter('edges');
+    engine.takeFromTray('p-1-1', { x: 45, y: 30 });
+    engine.takeFromTray('p-0-0', { x: 60, y: 40 });
+
+    engine.returnAllLoosePiecesToTray();
+
+    const state = engine.getState();
+    expect(state.pieces['p-1-1'].traySlot).toBe(8);
+    expect(sortedSlots(engine)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('restores a filtered session showing every remaining piece', () => {
+    const engine = new PuzzleEngine(gridLayout());
+    engine.setTrayFilter('edges');
+
+    const restored = PuzzleEngine.fromSnapshot(engine.getSnapshot());
+
+    expect(restored.getState().trayFilter).toBe('all');
+    expect(restored.getState().pieces).toEqual(engine.getSnapshot().pieces);
+  });
+
+  it('clears the filter when the puzzle resets', () => {
+    const engine = new PuzzleEngine(gridLayout());
+    engine.setTrayFilter('edges');
+
+    engine.reset();
+
+    expect(engine.getState().trayFilter).toBe('all');
+    expect(
+      Object.values(engine.getState().pieces).every((piece) => piece.inTray),
+    ).toBe(true);
+  });
+});
+
+describe('PuzzleEngine piece rotation', () => {
+  function rotatableLayout(): PuzzleLayout {
+    return { ...layout(), piecesRotatable: true };
+  }
+
+  it('deals pieces upright when the layout is not rotatable', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+    const engine = new PuzzleEngine(layout());
+
+    engine.takeFromTray('piece-a', { x: 40, y: 40 });
+    engine.rotatePiece('piece-a');
+
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(0);
+    random.mockRestore();
+  });
+
+  it('deals a quarter turn on tray exit and rotates a loose piece by 90°', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+    const engine = new PuzzleEngine(rotatableLayout());
+
+    engine.takeFromTray('piece-a', { x: 40, y: 40 });
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(270);
+
+    engine.rotatePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(0);
+    engine.rotatePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(90);
+    random.mockRestore();
+  });
+
+  it('refuses to seat a sideways piece inside the snap radius until upright', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.75);
+    const engine = new PuzzleEngine(rotatableLayout());
+    const target = layout().pieces[0].correctPosition;
+
+    engine.takeFromTray('piece-a', { x: target.x, y: target.y });
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(270);
+
+    const refused = engine.releasePiece('piece-a');
+    expect(refused.snapped).toBe(false);
+    expect(engine.getState().pieces['piece-a'].locked).toBe(false);
+
+    engine.rotatePiece('piece-a');
+    const seated = engine.releasePiece('piece-a');
+    expect(seated.snapped).toBe(true);
+    expect(engine.getState().pieces['piece-a']).toMatchObject({
+      locked: true,
+      rotation: 0,
+      position: target,
+    });
+    random.mockRestore();
+  });
+
+  it('does not let a sideways piece join a loose group', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const puzzleLayout = layout(100, 80, [
+      { ...piece('piece-a', 0, 10, 10), neighborIds: ['piece-b'] },
+      { ...piece('piece-b', 1, 55, 10), neighborIds: ['piece-a'] },
+    ]);
+    const engine = new PuzzleEngine({
+      ...puzzleLayout,
+      piecesRotatable: true,
+    });
+
+    // piece-b waits loose on the table — never released, so it does not seat.
+    // Both pieces rest at the same offset from their targets, which is how a
+    // release recognizes they are neighbours; piece-a is too far from its own
+    // target to seat on its own.
+    engine.takeFromTray('piece-b', { x: 59, y: 40 });
+    engine.takeFromTray('piece-a', { x: 14, y: 40 });
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(180);
+
+    const result = engine.releasePiece('piece-a');
+
+    expect(result.snapped).toBe(false);
+    expect(engine.getState().pieces['piece-a'].groupId).toBeUndefined();
+    expect(engine.getState().pieces['piece-b'].groupId).toBeUndefined();
+
+    // The same release joins once the piece faces the right way.
+    engine.rotatePiece('piece-a');
+    engine.rotatePiece('piece-a');
+    const joined = engine.releasePiece('piece-a');
+    expect(joined.connectedWithNeighbor).toBe(true);
+    const groupId = engine.getState().pieces['piece-a'].groupId;
+    expect(groupId).toBeDefined();
+    expect(engine.getState().pieces['piece-b'].groupId).toBe(groupId);
+    random.mockRestore();
+  });
+
+  it('cannot rotate a piece once it has joined a group', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const puzzleLayout = layout(100, 80, [
+      { ...piece('piece-a', 0, 10, 10), neighborIds: ['piece-b'] },
+      { ...piece('piece-b', 1, 55, 10), neighborIds: ['piece-a'] },
+    ]);
+    const engine = new PuzzleEngine({
+      ...puzzleLayout,
+      piecesRotatable: true,
+    });
+
+    engine.takeFromTray('piece-b', { x: 59, y: 40 });
+    engine.takeFromTray('piece-a', { x: 14, y: 40 });
+    engine.releasePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].groupId).toBeDefined();
+
+    engine.rotatePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(0);
+    random.mockRestore();
+  });
+
+  it('never rotates a tray piece, a grouped piece, or a locked one', () => {
+    const engine = new PuzzleEngine(rotatableLayout());
+
+    engine.rotatePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].inTray).toBe(true);
+    expect(Math.abs(engine.getState().pieces['piece-a'].rotation)).toBe(1.6);
+
+    engine.assistPiece('piece-a');
+    engine.rotatePiece('piece-a');
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(0);
+  });
+
+  it('seats a sideways piece through Assist without leaving it rotated', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const engine = new PuzzleEngine(rotatableLayout());
+
+    engine.takeFromTray('piece-a', { x: 40, y: 40 });
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(180);
+
+    const result = engine.assistPiece('piece-a');
+
+    expect(result?.snapped).toBe(true);
+    expect(engine.getState().pieces['piece-a']).toMatchObject({
+      locked: true,
+      rotation: 0,
+    });
+    random.mockRestore();
+  });
+
+  it('keeps the rotation challenge across a reset', () => {
+    const engine = new PuzzleEngine(rotatableLayout());
+
+    engine.reset();
+
+    expect(engine.getState().layout.piecesRotatable).toBe(true);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    engine.takeFromTray('piece-a', { x: 40, y: 40 });
+    expect(engine.getState().pieces['piece-a'].rotation).toBe(180);
+    random.mockRestore();
+  });
+});

@@ -31,6 +31,7 @@ import {
   type PremiumCutCatalogId,
   usePremiumAccess,
 } from '../../../premium';
+import { displayImageUri } from '../../../puzzle/bundledAssets';
 import { usePuzzleSessionContext } from '../../../puzzle/context';
 import {
   PREMIUM_CUTS_REQUIRED_ERROR,
@@ -197,6 +198,8 @@ export function DifficultyScreen({ navigation, route }: Props) {
     downloadLocation,
     trackingToken,
     ownPhotoCandidateUri,
+    bundledPhotoId,
+    attributionSourceUrl,
   } = route.params;
   const {
     session,
@@ -216,6 +219,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     useState<PlayableCutterId>('classic');
   const [selectedGuideMode, setSelectedGuideMode] =
     useState<PuzzleGuideMode>('cuts');
+  const [rotatePieces, setRotatePieces] = useState(false);
   const sizesForCut = availableSizes(selectedCutter);
   /**
    * The cuts are a contact sheet: samples laid out to be compared, each with
@@ -383,7 +387,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
     if (appStateRef.current !== 'active') {
       return;
     }
-    if (ownPhotoCandidateUri) {
+    if (ownPhotoCandidateUri || bundledPhotoId !== undefined) {
       navigation.goBack();
       return;
     }
@@ -483,17 +487,21 @@ export function DifficultyScreen({ navigation, route }: Props) {
                 photographerUrl,
                 sourceName: 'Unsplash',
                 sourceUrl:
+                  attributionSourceUrl ??
                   'https://unsplash.com/?utm_source=frume&utm_medium=referral',
               }
             : undefined,
         contentSource:
-          downloadLocation && trackingToken
-            ? createUnsplashContentSource(categoryId, categoryLabel)
-            : { kind: 'own' as const },
+          bundledPhotoId !== undefined
+            ? { kind: 'bundled' as const, id: bundledPhotoId }
+            : downloadLocation && trackingToken
+              ? createUnsplashContentSource(categoryId, categoryLabel)
+              : { kind: 'own' as const },
       },
       cutterId: selectedCutter,
       difficulty: selectedDifficulty,
       guideMode: selectedGuideMode,
+      piecesRotatable: rotatePieces && selectedCutter === 'classic',
       boardMaxWidth: playLayout.boardWidth,
       boardMaxHeight: playLayout.boardHeight,
       traySurfaceExtent: playLayout.trayRunExtent,
@@ -576,12 +584,14 @@ export function DifficultyScreen({ navigation, route }: Props) {
         track('puzzle_started', {
           cut_id: intent.sessionParams.cutterId ?? 'classic',
           piece_count: pieceCount(intent.sessionParams.difficulty),
-          // Only an imported photograph carries the `own` content source; a
-          // curated one always carries the provider's.
+          // An imported photograph carries `own`, a bundled offline one
+          // carries `bundled`, and a curated one carries the provider's.
           source:
-            intent.sessionParams.image.contentSource?.kind === 'own'
-              ? 'own_photo'
-              : 'theme',
+            intent.sessionParams.image.contentSource?.kind === 'bundled'
+              ? 'bundled'
+              : intent.sessionParams.image.contentSource?.kind === 'own'
+                ? 'own_photo'
+                : 'theme',
         });
       }
       if (
@@ -690,7 +700,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
           </Text>
         ) : null}
         <Image
-          source={{ uri: imageUri }}
+          source={{ uri: displayImageUri(imageUri) }}
           style={[styles.preview, imageError && styles.previewHidden]}
           resizeMode="contain"
           accessibilityLabel={
@@ -722,8 +732,8 @@ export function DifficultyScreen({ navigation, route }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Another photo"
           accessibilityHint={
-            ownPhotoCandidateUri
-              ? 'Returns to the photo picker to choose a different photograph'
+            ownPhotoCandidateUri || bundledPhotoId !== undefined
+              ? 'Returns to choose a different photograph'
               : categoryLabel
                 ? `Replaces this photograph with another ${categoryLabel} one`
                 : 'Replaces this photograph with another one'
@@ -1077,6 +1087,67 @@ export function DifficultyScreen({ navigation, route }: Props) {
           );
         })}
       </View>
+
+      {selectedCutter === 'classic' ? (
+        <>
+          <Text style={styles.title} accessibilityRole="header">
+            Challenge
+          </Text>
+          <Text style={styles.sectionHint}>
+            A quarter-turn puzzle, the way a boxed jigsaw plays.
+          </Text>
+          <Pressable
+            accessibilityRole="togglebutton"
+            accessibilityState={{ checked: rotatePieces, disabled: loading }}
+            accessibilityLabel="Rotate pieces"
+            accessibilityHint="Loose pieces come out of the tray turned sideways; double-tap a piece on the table to rotate it"
+            disabled={loading}
+            onPress={() => setRotatePieces((value) => !value)}
+            style={({ pressed }) => [
+              styles.guideOption,
+              rotatePieces && styles.optionSelected,
+              pressed && styles.optionPressed,
+            ]}
+          >
+            <View
+              style={styles.guideIcon}
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Ionicons
+                name="refresh"
+                size={23}
+                color={rotatePieces ? colors.accent : colors.textSecondary}
+              />
+            </View>
+            <View style={styles.guideCopy}>
+              <View style={styles.optionTitleRow}>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    rotatePieces && styles.optionLabelActive,
+                  ]}
+                >
+                  Rotate pieces
+                </Text>
+                {rotatePieces ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={17}
+                    color={colors.accent}
+                    accessible={false}
+                    importantForAccessibility="no"
+                  />
+                ) : null}
+              </View>
+              <Text style={styles.optionDetail}>
+                Loose pieces come out turned; double-tap to rotate
+              </Text>
+            </View>
+          </Pressable>
+        </>
+      ) : null}
     </>
   );
 

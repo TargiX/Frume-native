@@ -3,9 +3,21 @@ export type HowToPlayStep = {
     | 'hand-left-outline'
     | 'swap-horizontal-outline'
     | 'scan-outline'
+    | 'refresh-outline'
     | 'sparkles-outline';
   title: string;
   detail: string;
+};
+
+/**
+ * Appended only while the active puzzle was started with the rotation
+ * challenge — a permanent step would teach a gesture that does nothing.
+ */
+export const ROTATION_STEP: HowToPlayStep = {
+  icon: 'refresh-outline',
+  title: 'Turn a piece upright',
+  detail:
+    'This puzzle deals pieces rotated. Double-tap a piece on the table to turn it a quarter; it only seats once it faces the right way. With VoiceOver, focus the piece and use the Rotate piece action.',
 };
 
 export const HOW_TO_PLAY_STEPS: readonly HowToPlayStep[] = [

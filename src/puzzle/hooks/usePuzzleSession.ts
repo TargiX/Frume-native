@@ -47,6 +47,8 @@ export type StartPuzzleSessionParams = {
   /** Width of the table the shelf runs across; defaults to the board. */
   traySurfaceExtent?: number;
   trayPlacement?: PuzzleTrayPlacement;
+  /** Classic only: loose pieces come out rotated and must be turned upright. */
+  piecesRotatable?: boolean;
 };
 
 export type PuzzleSessionStartResult =
@@ -196,6 +198,7 @@ export async function preparePuzzleSession(
     boardMaxHeight,
     traySurfaceExtent,
     trayPlacement = 'bottom',
+    piecesRotatable = false,
   }: StartPuzzleSessionParams,
   resolveCutter = getCutter,
   premiumCutsUnlocked = false,
@@ -220,7 +223,13 @@ export async function preparePuzzleSession(
       traySurfaceExtent,
       trayPlacement,
     };
-    const layout = await cutter.generate(image, options);
+    const generated = await cutter.generate(image, options);
+    // Only the classic grid defines what a quarter turn means; a request for
+    // another cutter is dropped rather than producing an unsolvable layout.
+    const layout =
+      piecesRotatable && cutterId === 'classic'
+        ? { ...generated, piecesRotatable: true }
+        : generated;
     const engine = new PuzzleEngine(layout);
     return {
       success: true,
@@ -894,6 +903,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         boardMaxHeight,
         traySurfaceExtent,
         trayPlacement = 'bottom',
+        piecesRotatable = false,
       }: StartPuzzleSessionParams,
       expectedSession: PuzzleSession | null,
       isRequestCurrent: () => boolean,
@@ -932,6 +942,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             boardMaxHeight,
             traySurfaceExtent,
             trayPlacement,
+            piecesRotatable,
           },
           getCutter,
           premiumCutsUnlocked,
@@ -1295,7 +1306,13 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           trayPlacement,
           cutDescriptor: current.layout.cutDescriptor,
         };
-        const layout = await cutter.generate(current.layout.image, options);
+        const generated = await cutter.generate(current.layout.image, options);
+        // The regenerated layout drops session-only flags, so the rotation
+        // challenge the player chose is carried forward explicitly.
+        const layout =
+          current.layout.piecesRotatable === true
+            ? { ...generated, piecesRotatable: true }
+            : generated;
         const latest = sessionRef.current;
         if (
           requestId !== resizeRequestId.current ||

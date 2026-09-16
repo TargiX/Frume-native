@@ -36,10 +36,14 @@ import {
   useAccessibilityAnnouncement,
 } from '../../accessibility';
 import { Button } from '../../components/Button';
-import { playPuzzlePlacementHaptic } from '../../haptics';
+import {
+  playPuzzlePlacementHaptic,
+  playPuzzleRotateHaptic,
+} from '../../haptics';
 import { MIN_TOUCH_TARGET } from '../../theme';
 import type { PuzzleEngine } from '../engine';
 import { getTrayMetrics } from '../engine/tray';
+import { edgePieceIds, isPieceHiddenByTrayFilter } from '../engine/trayFilter';
 import { usePieceGesture } from '../interaction';
 import {
   clampOffset,
@@ -58,6 +62,7 @@ import type {
   PuzzleLayout,
   PuzzlePieceDefinition,
   PuzzleTableAppearance,
+  PuzzleTrayFilter,
   SnapFeedback,
 } from '../types';
 import { displayImageUri as resolveDisplayImageUri } from '../discoveryAsset';
@@ -258,6 +263,7 @@ type PieceGestureOverlayProps = {
   surfaceInset: number;
   surfaceInsetY: number;
   hapticsEnabled: boolean;
+  rotatable: boolean;
 };
 
 function PieceGestureOverlay({
@@ -281,6 +287,7 @@ function PieceGestureOverlay({
   surfaceInset,
   surfaceInsetY,
   hapticsEnabled,
+  rotatable,
 }: PieceGestureOverlayProps) {
   const companionsRef = useRef(companions);
   if (
@@ -309,6 +316,7 @@ function PieceGestureOverlay({
     pieceId: definition.id,
     locked: runtime.locked || !interactive,
     inTray,
+    rotatable,
     trayPlacement,
     trayTop,
     trayLeft,
@@ -357,6 +365,30 @@ function PieceGestureOverlay({
       transform: [{ scale }, { rotate: `${visual.rotation.value}deg` }],
     };
   });
+  const rotateWithAssistiveTechnology = useCallback(() => {
+    if (!interactive || !rotatable) {
+      return;
+    }
+    const before = engine.getState().pieces[definition.id]?.rotation;
+    engine.rotatePiece(definition.id);
+    const after = engine.getState().pieces[definition.id]?.rotation;
+    if (after === undefined || after === before) {
+      return;
+    }
+    void playPuzzleRotateHaptic(hapticsEnabled);
+    AccessibilityInfo.announceForAccessibilityWithOptions(
+      `Piece ${definition.index + 1} turned to ${Math.round(after)} degrees.`,
+      { queue: true },
+    );
+  }, [
+    definition.id,
+    definition.index,
+    engine,
+    hapticsEnabled,
+    interactive,
+    rotatable,
+  ]);
+
   const placeWithAssistiveTechnology = useCallback(() => {
     if (!interactive) {
       return;
@@ -397,14 +429,23 @@ function PieceGestureOverlay({
           inTray ? ', in tray' : ', on board'
         }`}
         accessibilityHint={
-          'Double tap to use Assist and place this piece in its matching position'
+          rotatable && !inTray
+            ? 'Activate to place this piece with Assist; use the rotate action to turn it upright first'
+            : 'Double tap to use Assist and place this piece in its matching position'
         }
         accessibilityState={{ disabled: runtime.locked || !interactive }}
         onAccessibilityTap={placeWithAssistiveTechnology}
-        accessibilityActions={[{ name: 'activate', label: 'Place piece' }]}
+        accessibilityActions={[
+          { name: 'activate', label: 'Place piece' },
+          ...(rotatable && !inTray
+            ? [{ name: 'rotate', label: 'Rotate piece' }]
+            : []),
+        ]}
         onAccessibilityAction={(event) => {
           if (event.nativeEvent.actionName === 'activate') {
             placeWithAssistiveTechnology();
+          } else if (event.nativeEvent.actionName === 'rotate') {
+            rotateWithAssistiveTechnology();
           }
         }}
         style={[
@@ -433,6 +474,8 @@ type PuzzleBoardProps = {
   viewportWidth?: number;
   viewportHeight?: number;
   snapFeedback: SnapFeedback | null;
+  /** Which waiting pieces the tray keeps in reach; 'all' shows everything. */
+  trayFilter?: PuzzleTrayFilter;
   completed?: boolean;
   guideMode?: PuzzleGuideMode;
   tableAppearance?: PuzzleTableAppearance;
@@ -448,6 +491,7 @@ export function PuzzleBoard({
   viewportWidth,
   viewportHeight,
   snapFeedback,
+  trayFilter = 'all',
   completed = false,
   guideMode = 'cuts',
   tableAppearance = 'felt',
@@ -638,6 +682,29 @@ export function PuzzleBoard({
   ]);
 
   /**
+   * Waiting pieces an active tray filter hides. They keep their slots and
+   * stay in engine state — only the drawing, hit areas, and scroll bounds
+   * skip them — so turning the filter off returns everything untouched.
+   */
+  const trayEdgeIds = useMemo(() => edgePieceIds(layout), [layout]);
+  const hiddenTrayPieceIds = useMemo(() => {
+    if (trayFilter === 'all') {
+      return null;
+    }
+    const hidden = new Set<string>();
+    layout.pieces.forEach((definition) => {
+      const runtime = pieces[definition.id];
+      if (
+        runtime &&
+        isPieceHiddenByTrayFilter(runtime, trayFilter, trayEdgeIds)
+      ) {
+        hidden.add(definition.id);
+      }
+    });
+    return hidden;
+  }, [trayFilter, layout.pieces, pieces, trayEdgeIds]);
+
+  /**
    * Extent of the pieces still waiting in the tray, in tray-content space.
    * Scrolling is bounded by what is actually left rather than by the original
    * row, so the strip cannot be dragged into the empty space behind pieces the
@@ -649,7 +716,7 @@ export function PuzzleBoard({
 
     layout.pieces.forEach((definition) => {
       const runtime = pieces[definition.id];
-      if (!runtime?.inTray) {
+      if (!runtime?.inTray || hiddenTrayPieceIds?.has(definition.id)) {
         return;
       }
       // The renderer scales around the piece centre, so the drawn box is inset
@@ -667,7 +734,13 @@ export function PuzzleBoard({
     });
 
     return Number.isFinite(min) ? { min, max } : null;
-  }, [layout.pieces, pieces, trayMetrics.scale, trayPlacement]);
+  }, [
+    layout.pieces,
+    pieces,
+    trayMetrics.scale,
+    trayPlacement,
+    hiddenTrayPieceIds,
+  ]);
 
   const trayViewportExtent =
     trayPlacement === 'bottom' ? trayMetrics.width : trayMetrics.height;
@@ -1348,7 +1421,11 @@ export function PuzzleBoard({
               {orderedPieces.map((definition) => {
                 const runtime = pieces[definition.id];
                 const visual = visuals.get(definition.id);
-                if (!runtime || !visual) {
+                if (
+                  !runtime ||
+                  !visual ||
+                  hiddenTrayPieceIds?.has(definition.id)
+                ) {
                   return null;
                 }
                 return (
@@ -1382,7 +1459,11 @@ export function PuzzleBoard({
             {orderedPieces.map((definition) => {
               const runtime = pieces[definition.id];
               const visual = visuals.get(definition.id);
-              if (!runtime || !visual) {
+              if (
+                !runtime ||
+                !visual ||
+                hiddenTrayPieceIds?.has(definition.id)
+              ) {
                 return null;
               }
               return (
@@ -1421,6 +1502,7 @@ export function PuzzleBoard({
                   surfaceInset={originX}
                   surfaceInsetY={originY}
                   hapticsEnabled={hapticsEnabled}
+                  rotatable={layout.piecesRotatable === true}
                 />
               );
             })}

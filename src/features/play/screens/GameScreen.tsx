@@ -240,7 +240,9 @@ export function GameScreen({ navigation }: Props) {
     track('puzzle_completed', {
       source:
         session.layout.image.contentSource?.kind === 'bundled'
-          ? 'discovery'
+          ? session.layout.image.contentSource.id === 'coastal-morning'
+            ? 'discovery'
+            : 'bundled'
           : session.layout.image.contentSource?.kind === 'own'
             ? 'own_photo'
             : 'theme',
@@ -695,6 +697,7 @@ export function GameScreen({ navigation }: Props) {
           viewportWidth={width - insets.left - insets.right - TABLE_INSET * 2}
           viewportHeight={height - insets.top - insets.bottom - TABLE_INSET * 2}
           snapFeedback={state.snapFeedback}
+          trayFilter={state.trayFilter}
           completed={isCompleted}
           guideMode={guideMode}
           tableAppearance={tableAppearance}
@@ -755,6 +758,7 @@ export function GameScreen({ navigation }: Props) {
           cutterId={session.cutterId}
           guideMode={guideMode}
           tableAppearance={tableAppearance}
+          trayFilter={state.trayFilter}
           musicEnabled={musicEnabled}
           musicPreferenceLoaded={musicPreferenceLoaded}
           musicFeedback={musicFeedback}
@@ -773,6 +777,10 @@ export function GameScreen({ navigation }: Props) {
           onSelectTableAppearance={(appearance) => {
             setTableAppearance(appearance);
             void saveTableAppearance(appearance);
+          }}
+          onSetTrayFilter={(filter) => {
+            engine.setTrayFilter(filter);
+            setMenuVisible(false);
           }}
           onSetMusicEnabled={setMusicEnabled}
           onRetryMusic={retryMusic}
@@ -801,7 +809,11 @@ export function GameScreen({ navigation }: Props) {
           <Text style={styles.feedbackText}>{assistFeedback}</Text>
         </View>
       ) : null}
-      <HowToPlaySheet visible={howToPlayVisible} onClose={onCloseHowToPlay} />
+      <HowToPlaySheet
+        visible={howToPlayVisible}
+        onClose={onCloseHowToPlay}
+        rotatable={session?.layout.piecesRotatable === true}
+      />
     </View>
   );
 }

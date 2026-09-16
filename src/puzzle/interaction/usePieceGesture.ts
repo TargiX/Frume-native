@@ -8,7 +8,10 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { playPuzzlePlacementHaptic } from '../../haptics';
+import {
+  playPuzzlePlacementHaptic,
+  playPuzzleRotateHaptic,
+} from '../../haptics';
 import type { PuzzleEngine } from '../engine';
 import { beginPieceDrag, completePieceDrag } from './dragLifecycle';
 import {
@@ -26,6 +29,8 @@ type UsePieceGestureParams = {
   locked: boolean;
   /** True while the piece is resting in the tray. */
   inTray: boolean;
+  /** Quarter-turn challenge: double-tap on the table turns the piece. */
+  rotatable?: boolean;
   trayPlacement: 'bottom' | 'right';
   /** Tray origin in the shared surface coordinate space. */
   trayTop: number;
@@ -60,6 +65,7 @@ export function usePieceGesture({
   pieceId,
   locked,
   inTray,
+  rotatable = false,
   trayPlacement,
   trayTop,
   trayLeft,
@@ -92,6 +98,17 @@ export function usePieceGesture({
   const beginDrag = useCallback(() => {
     beginPieceDrag(engine, pieceId);
   }, [engine, pieceId]);
+
+  const rotatePiece = useCallback(() => {
+    const before = engine.getState().pieces[pieceId]?.rotation;
+    engine.rotatePiece(pieceId);
+    if (
+      before !== undefined &&
+      engine.getState().pieces[pieceId]?.rotation !== before
+    ) {
+      void playPuzzleRotateHaptic(hapticsEnabled);
+    }
+  }, [engine, hapticsEnabled, pieceId]);
 
   const endDrag = useCallback(
     (x: number, y: number) => {
@@ -274,6 +291,16 @@ export function usePieceGesture({
       // native default pan threshold can swallow that first correction and
       // make a loose piece feel locked even though the engine still allows it.
       pieceDrag.minDistance(BOARD_PIECE_ACTIVATION_DISTANCE);
+      if (rotatable) {
+        // A tap never satisfies the pan's movement threshold, so the two are
+        // never ambiguous: a still double-tap turns the piece, any slide
+        // drags it.
+        const rotateTap = Gesture.Tap()
+          .numberOfTaps(2)
+          .enabled(!locked)
+          .onEnd(() => runOnJS(rotatePiece)());
+        return Gesture.Race(rotateTap, pieceDrag);
+      }
       return pieceDrag;
     }
 
@@ -338,6 +365,8 @@ export function usePieceGesture({
     positionX,
     positionY,
     reduceMotion,
+    rotatable,
+    rotatePiece,
     trayAttached,
     trayFactor,
     trayLeft,

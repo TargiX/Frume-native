@@ -208,6 +208,55 @@ describe('puzzle session persistence codec', () => {
     ).toEqual({ kind: 'own' });
   });
 
+  it('preserves bundled offline-photo intent for any collection id', () => {
+    const source = sessionSnapshot();
+    source.engine.layout.image = {
+      ...source.engine.layout.image,
+      uri: 'frume://bundled/blue-fjord',
+      contentSource: { kind: 'bundled', id: 'blue-fjord' },
+    };
+
+    expect(
+      deserializePuzzleSession(serializePuzzleSession(source))?.engine.layout
+        .image.contentSource,
+    ).toEqual({ kind: 'bundled', id: 'blue-fjord' });
+  });
+
+  it('rejects a bundled intent without a usable id', () => {
+    const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
+    persisted.engine.layout.image.contentSource = {
+      kind: 'bundled',
+      id: 'x'.repeat(129),
+    };
+
+    expect(deserializePuzzleSession(JSON.stringify(persisted))).toBeNull();
+  });
+
+  it('preserves the rotation-challenge flag and drops it when absent', () => {
+    const rotated = sessionSnapshot();
+    rotated.engine.layout = {
+      ...rotated.engine.layout,
+      piecesRotatable: true,
+    };
+    expect(
+      deserializePuzzleSession(serializePuzzleSession(rotated))?.engine.layout
+        .piecesRotatable,
+    ).toBe(true);
+
+    const plain = sessionSnapshot();
+    expect(
+      deserializePuzzleSession(serializePuzzleSession(plain))?.engine.layout
+        .piecesRotatable,
+    ).toBeUndefined();
+  });
+
+  it('rejects a non-boolean rotation flag', () => {
+    const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
+    persisted.engine.layout.piecesRotatable = 'yes';
+
+    expect(deserializePuzzleSession(JSON.stringify(persisted))).toBeNull();
+  });
+
   it('rejects malformed persisted photo source intent', () => {
     const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
     persisted.engine.layout.image.contentSource = {

@@ -608,6 +608,59 @@ describe('completed session clear safety', () => {
   });
 });
 
+describe('rotation challenge', () => {
+  const stubCutter = (id: PuzzleCutter['meta']['id']): PuzzleCutter => ({
+    meta: { id, name: 'Test', description: 'Test cutter' },
+    generate: async (image, options) => ({
+      cutterId: id,
+      image,
+      boardSize: {
+        width: options.boardMaxWidth ?? 100,
+        height: options.boardMaxHeight ?? 80,
+      },
+      pieces: [
+        {
+          id: 'piece-a',
+          index: 0,
+          row: 0,
+          col: 0,
+          path: 'M 0 0 L 30 0 L 30 20 L 0 20 Z',
+          bounds: { x: 0, y: 0, width: 30, height: 20 },
+          clipRegion: { x: 0, y: 0, width: 0.3, height: 0.25 },
+          correctPosition: { x: 0, y: 0 },
+          correctRotation: 0,
+          neighborIds: [],
+        },
+      ],
+    }),
+  });
+
+  it('marks a classic layout rotatable only when asked', async () => {
+    const result = await preparePuzzleSession(
+      { ...params, cutterId: 'classic', piecesRotatable: true },
+      () => stubCutter('classic'),
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.session.layout.piecesRotatable).toBe(true);
+    }
+  });
+
+  it('drops the request for a cutter with no quarter-turn meaning', async () => {
+    const result = await preparePuzzleSession(
+      { ...params, cutterId: 'organic', piecesRotatable: true },
+      () => stubCutter('organic'),
+      true,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.session.layout.piecesRotatable).toBeUndefined();
+    }
+  });
+});
+
 describe('free discovery access', () => {
   it('allows exactly the bundled Organic 4x4 sample without a purchase', async () => {
     const result = await preparePuzzleSession({

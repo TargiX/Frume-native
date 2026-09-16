@@ -15,6 +15,11 @@ export function playPuzzlePlacementHaptic(
   );
 }
 
+/** A quarter turn is a nudge, not a placement, so it gets the lightest tick. */
+export function playPuzzleRotateHaptic(enabled: boolean) {
+  return runSafeHapticFeedback(enabled, () => Haptics.selectionAsync());
+}
+
 export function playPuzzleCompletionHaptic(enabled: boolean) {
   return runSafeHapticFeedback(enabled, () =>
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),

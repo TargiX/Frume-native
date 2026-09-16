@@ -3,6 +3,13 @@ import type { PuzzleLayout } from './layout';
 
 export type PuzzleSessionStatus = 'ready' | 'playing' | 'completed';
 
+/**
+ * Which waiting pieces the tray keeps in reach. A runtime preference, not
+ * durable state: a relaunched puzzle always restores 'all' so no piece can
+ * stay hidden from a player who forgot the filter was on.
+ */
+export type PuzzleTrayFilter = 'all' | 'edges';
+
 /** Runtime state of a single piece during play. */
 export type PieceRuntimeState = {
   pieceId: string;
@@ -38,6 +45,8 @@ export type PuzzleEngineState = {
   /** Start of the current foreground interval, or null while paused. */
   activeStartedAt: number | null;
   snapFeedback: SnapFeedback | null;
+  /** Tray view preference; see PuzzleTrayFilter. */
+  trayFilter: PuzzleTrayFilter;
 };
 
 /**

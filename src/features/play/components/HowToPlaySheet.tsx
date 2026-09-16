@@ -16,14 +16,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../../components/Button';
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../../../theme';
-import { HOW_TO_PLAY_STEPS } from './howToPlayPresentation';
+import {
+  HOW_TO_PLAY_STEPS,
+  ROTATION_STEP,
+} from './howToPlayPresentation';
 
 type HowToPlaySheetProps = {
   visible: boolean;
   onClose: () => void;
+  /** True while the active puzzle deals rotated pieces. */
+  rotatable?: boolean;
 };
 
-export function HowToPlaySheet({ visible, onClose }: HowToPlaySheetProps) {
+export function HowToPlaySheet({
+  visible,
+  onClose,
+  rotatable = false,
+}: HowToPlaySheetProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const headingRef = React.useRef<React.ElementRef<typeof Text>>(null);
@@ -124,13 +133,16 @@ export function HowToPlaySheet({ visible, onClose }: HowToPlaySheetProps) {
             </Text>
 
             <View style={styles.steps} accessibilityRole="list">
-              {HOW_TO_PLAY_STEPS.map((step, index) => (
+              {(rotatable
+                ? [...HOW_TO_PLAY_STEPS, ROTATION_STEP]
+                : HOW_TO_PLAY_STEPS
+              ).map((step, index, steps) => (
                 <View
                   key={step.title}
                   style={styles.step}
                   accessible
                   accessibilityRole="text"
-                  accessibilityLabel={`${index + 1} of ${HOW_TO_PLAY_STEPS.length}. ${step.title}. ${step.detail}`}
+                  accessibilityLabel={`${index + 1} of ${steps.length}. ${step.title}. ${step.detail}`}
                 >
                   <View
                     style={styles.stepIcon}

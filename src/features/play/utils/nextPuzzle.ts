@@ -206,6 +206,8 @@ export function buildNextPuzzleSessionParams(
     cutterId: current.cutterId,
     difficulty: current.difficulty,
     guideMode: current.guideMode,
+    // The rotation challenge is a playstyle choice, not a per-photo one.
+    piecesRotatable: current.layout.piecesRotatable,
     ...layout,
   };
 }
