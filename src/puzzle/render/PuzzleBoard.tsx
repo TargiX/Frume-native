@@ -93,7 +93,7 @@ import { TrayEdgeHint } from './TrayEdgeHint';
 import { resolveTrayAutoRevealScroll } from './trayAutoReveal';
 import { TraySurface } from './TraySurface';
 import { resolveTraySurfaceFrame } from './traySurfaceFrame';
-import { PUZZLE_SURFACE_COLORS } from './surfacePalette';
+import { resolveBoardMaterial, resolveSurfaceInk } from './photoGlassStyle';
 
 type PieceVisualState = {
   x: SharedValue<number>;
@@ -499,6 +499,8 @@ export function PuzzleBoard({
   hapticsEnabled = false,
 }: PuzzleBoardProps) {
   const { boardSize, image } = layout;
+  const loadingPlate = resolveBoardMaterial(tableAppearance);
+  const plateInk = resolveSurfaceInk(tableAppearance);
   const [imageError, setImageError] = useState<string | null>(null);
   const [displayImageUri, setDisplayImageUri] = useState<string | null>(null);
   const [manualImageLoadRetries, setManualImageLoadRetries] = useState(0);
@@ -1266,15 +1268,22 @@ export function PuzzleBoard({
       <View
         style={[
           styles.workspace,
-          styles.loading,
           styles.imageStatus,
-          { width: workspaceWidth, height: workspaceHeight },
+          {
+            width: workspaceWidth,
+            height: workspaceHeight,
+            backgroundColor: loadingPlate.loading,
+          },
         ]}
         accessibilityLiveRegion={androidAccessibilityLiveRegion('assertive')}
       >
-        <Text style={styles.imageStatusTitle}>Photograph unavailable</Text>
-        <Text style={styles.imageStatusBody}>{imageError}</Text>
-        <Text style={styles.imageStatusBody}>
+        <Text style={[styles.imageStatusTitle, { color: plateInk.onSurface }]}>
+          Photograph unavailable
+        </Text>
+        <Text style={[styles.imageStatusBody, { color: plateInk.onSurfaceMuted }]}>
+          {imageError}
+        </Text>
+        <Text style={[styles.imageStatusBody, { color: plateInk.onSurfaceMuted }]}>
           {imageRetryPresentation.guidance}
         </Text>
         {imageRetryPresentation.canRetry &&
@@ -1297,12 +1306,17 @@ export function PuzzleBoard({
       <View
         style={[
           styles.workspace,
-          styles.loading,
-          { width: workspaceWidth, height: workspaceHeight },
+          {
+            width: workspaceWidth,
+            height: workspaceHeight,
+            backgroundColor: loadingPlate.loading,
+          },
         ]}
         accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
       >
-        <Text style={styles.imageStatusBody}>Loading photograph…</Text>
+        <Text style={[styles.imageStatusBody, { color: plateInk.onSurfaceMuted }]}>
+          Loading photograph…
+        </Text>
       </View>
     );
   }
@@ -1527,6 +1541,7 @@ export function PuzzleBoard({
                 edge={trayExtent.min}
                 trayScroll={trayScroll}
                 viewportExtent={trayViewportExtent}
+                color={plateInk.trayHint}
                 crossExtent={
                   trayPlacement === 'bottom'
                     ? trayMetrics.height
@@ -1538,6 +1553,7 @@ export function PuzzleBoard({
                 edge={trayExtent.max}
                 trayScroll={trayScroll}
                 viewportExtent={trayViewportExtent}
+                color={plateInk.trayHint}
                 crossExtent={
                   trayPlacement === 'bottom'
                     ? trayMetrics.height
@@ -1564,22 +1580,17 @@ const styles = StyleSheet.create({
   viewport: {
     overflow: 'hidden',
   },
-  loading: {
-    backgroundColor: PUZZLE_SURFACE_COLORS.boardLoading,
-  },
   imageStatus: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   imageStatusTitle: {
-    color: 'rgba(255, 246, 232, 0.92)',
     fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
   },
   imageStatusBody: {
-    color: 'rgba(255, 246, 232, 0.68)',
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

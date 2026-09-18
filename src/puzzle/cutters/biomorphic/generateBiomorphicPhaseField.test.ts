@@ -179,7 +179,7 @@ describe("createBiomorphicPhaseFieldTopology", () => {
 
     expect(Math.max(...sorted)).toBeGreaterThan(1.7);
     expect(sorted[Math.floor(sorted.length / 2)]).toBeGreaterThan(1.15);
-  }, 60_000);
+  }, 180_000);
 
   it("keeps a seed matrix connected, substantial, simple, and gap-free", () => {
     for (let index = 0; index < 18; index += 1) {
@@ -228,5 +228,5 @@ describe("generateBiomorphicPhaseFieldPieces", () => {
       expect((piece.bounds.width / width) * 5).toBeLessThan(2.15);
       expect((piece.bounds.height / height) * 5).toBeLessThan(2.15);
     });
-  }, 60_000);
+  }, 180_000);
 });

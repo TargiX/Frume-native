@@ -16,7 +16,10 @@ import {
   PHOTO_GLASS_TINT,
   PHOTO_GLASS_VIGNETTE,
 } from './photoGlassStyle';
-import { PUZZLE_SURFACE_COLORS } from './surfacePalette';
+import {
+  LINEN_SURFACE_COLORS,
+  PUZZLE_SURFACE_COLORS,
+} from './surfacePalette';
 
 type TableSurfaceProps = {
   width: number;
@@ -25,7 +28,11 @@ type TableSurfaceProps = {
   imageUri?: string;
 };
 
-/** Quiet graphite table treatment behind the edge-to-edge board. */
+/**
+ * The table treatment behind the edge-to-edge board: deep felt, photo-tinted
+ * glass, or light linen. Only glass blurs the photograph itself; the other two
+ * are flat materials the pieces sit on.
+ */
 export function TableSurface({
   width,
   height,
@@ -39,6 +46,17 @@ export function TableSurface({
       ? displayImageUri(imageUri)
       : undefined;
   const photoGlass = photoGlassUri !== undefined;
+  const linen = appearance === 'linen' && !photoGlass;
+  const tableBase = photoGlass
+    ? PHOTO_GLASS_TINT
+    : linen
+      ? LINEN_SURFACE_COLORS.tableBase
+      : PUZZLE_SURFACE_COLORS.tableBase;
+  const vignette = photoGlass
+    ? PHOTO_GLASS_VIGNETTE
+    : linen
+      ? ['rgba(255, 255, 255, 0.5)', 'rgba(112, 96, 70, 0.16)']
+      : ['rgba(255, 255, 255, 0.075)', 'rgba(0, 0, 0, 0.2)'];
   const lightCenter = useDerivedValue(() => ({
     x: width * (0.5 + PUZZLE_LIGHT_DIRECTION.value.x * 0.2),
     y: height * (0.5 + PUZZLE_LIGHT_DIRECTION.value.y * 0.2),
@@ -61,18 +79,14 @@ export function TableSurface({
           y={0}
           width={width}
           height={height}
-          color={
-            photoGlass
-              ? PHOTO_GLASS_TINT
-              : PUZZLE_SURFACE_COLORS.tableBase
-          }
+          color={tableBase}
         />
         <Rect
           x={0}
           y={0}
           width={width}
           height={height}
-          opacity={photoGlass ? 0.055 : 0.035}
+          opacity={photoGlass ? 0.055 : linen ? 0.045 : 0.035}
           blendMode="softLight"
         >
           <FractalNoise freqX={0.018} freqY={0.018} octaves={2} seed={31} />
@@ -81,11 +95,7 @@ export function TableSurface({
           <RadialGradient
             c={lightCenter}
             r={Math.max(width, height) * 0.92}
-            colors={
-              photoGlass
-                ? PHOTO_GLASS_VIGNETTE
-                : ['rgba(255, 255, 255, 0.075)', 'rgba(0, 0, 0, 0.2)']
-            }
+            colors={vignette}
           />
         </Rect>
       </Canvas>

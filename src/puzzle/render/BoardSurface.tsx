@@ -24,8 +24,7 @@ import type {
 } from '../types';
 import { DrawBoardImage } from './DrawBoardImage';
 import { PUZZLE_LIGHT_DIRECTION } from './lighting';
-import { resolveBoardMaterial } from './photoGlassStyle';
-import { PUZZLE_SURFACE_COLORS } from './surfacePalette';
+import { resolveBoardMaterial, resolveSurfaceInk } from './photoGlassStyle';
 
 type BoardSurfaceProps = {
   layout: PuzzleLayout;
@@ -57,6 +56,7 @@ export function BoardSurface({
 }: BoardSurfaceProps) {
   const { width, height } = layout.boardSize;
   const material = resolveBoardMaterial(appearance);
+  const ink = resolveSurfaceInk(appearance);
 
   const gradientStart = useDerivedValue(() => {
     const light = PUZZLE_LIGHT_DIRECTION.value;
@@ -90,18 +90,18 @@ export function BoardSurface({
           path={path}
           style="stroke"
           strokeWidth={1.4}
-          color={PUZZLE_SURFACE_COLORS.guideCut}
+          color={ink.guideCut}
         />,
         <Path
           key={`${piece.id}-edge`}
           path={path}
           style="stroke"
           strokeWidth={0.55}
-          color={PUZZLE_SURFACE_COLORS.guideEdge}
+          color={ink.guideEdge}
         />,
       ];
     });
-  }, [guideMode, layout.pieces]);
+  }, [guideMode, layout.pieces, ink.guideCut, ink.guideEdge]);
   const gridGuide = useMemo(() => {
     if (guideMode !== 'grid') {
       return null;
@@ -123,7 +123,7 @@ export function BoardSurface({
           path={path}
           style="stroke"
           strokeWidth={1.2}
-          color={PUZZLE_SURFACE_COLORS.guideCut}
+          color={ink.guideCut}
         >
           <DashPathEffect intervals={[6, 5]} />
         </Path>,
@@ -140,14 +140,14 @@ export function BoardSurface({
           path={path}
           style="stroke"
           strokeWidth={1.2}
-          color={PUZZLE_SURFACE_COLORS.guideCut}
+          color={ink.guideCut}
         >
           <DashPathEffect intervals={[6, 5]} />
         </Path>,
       );
     }
     return lines;
-  }, [guideMode, height, layout.pieces, width]);
+  }, [guideMode, height, layout.pieces, width, ink.guideCut]);
 
   return (
     <Canvas style={styles.canvas} pointerEvents="none">

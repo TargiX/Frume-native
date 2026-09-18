@@ -33,4 +33,10 @@ describe('table appearance preference', () => {
     expect(storage.read()).toBe('felt');
     expect(TABLE_APPEARANCE_STORAGE_KEY).toBe('@frume/table-appearance');
   });
+
+  it('round-trips the light linen choice instead of falling back', async () => {
+    const storage = memoryStorage();
+    await expect(saveTableAppearance('linen', storage)).resolves.toBe(true);
+    await expect(loadTableAppearance(storage)).resolves.toBe('linen');
+  });
 });
