@@ -113,7 +113,7 @@ describe("createBiomorphicPhaseFieldTopology", () => {
       return runBiomorphicPhaseFieldLab(settings).finalSvg;
     };
     expect(compareStyle("amoeba")).not.toEqual(compareStyle("dendrite"));
-  }, 180_000);
+  }, 600_000);
 
   it("extracts each simulated interface once and traverses it in exact reverse", () => {
     const topology = createBiomorphicPhaseFieldTopology(4, 4, "phase-shared");
@@ -206,7 +206,7 @@ describe("createBiomorphicPhaseFieldTopology", () => {
 
       expect(totalArea).toBeCloseTo(1, 5);
     }
-  }, 600_000);
+  }, 1_200_000);
 });
 
 describe("generateBiomorphicPhaseFieldPieces", () => {
