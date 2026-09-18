@@ -405,7 +405,7 @@ export function PuzzleMenuSheet({
             <View style={styles.menuSection}>
               <Text style={styles.sectionLabel}>Table</Text>
               <Text style={styles.sectionDetail}>
-                Choose a quiet felt surface or photo-tinted glass
+                Felt, photo glass, or a light table for dark photographs
               </Text>
               <View
                 style={[
@@ -424,6 +424,11 @@ export function PuzzleMenuSheet({
                     id: 'felt',
                     label: 'Dark felt',
                     icon: 'layers-outline',
+                  },
+                  {
+                    id: 'linen',
+                    label: 'Light linen',
+                    icon: 'sunny-outline',
                   },
                 ] as const
               ).map((option) => {

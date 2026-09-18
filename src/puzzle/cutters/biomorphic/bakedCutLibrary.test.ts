@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { encodeBakedCut } from "./bakedCut";
+import { encodeBakedCut, type BakedCut } from "./bakedCut";
 import {
   describeLibrary,
   gridKey,
@@ -24,6 +24,13 @@ function bake(rows: number, columns: number, seed: string) {
       { ...BIOMORPHIC_PHASE_FIELD_NUMERICS, samplesPerPiece: 42 },
     ),
   );
+}
+
+/** The one entry the module-scope library holds, asserted rather than indexed. */
+function firstBakedCut(library: BakedCutLibrary): BakedCut {
+  const entry = library["amoeba-coral"]?.[gridKey(3, 3)]?.[0];
+  if (!entry) throw new Error("the test library lost its only entry");
+  return entry;
 }
 
 describe("baked cut library", () => {
@@ -73,7 +80,7 @@ describe("baked cut library", () => {
   it("turns a cut into a board that is still whole", async () => {
     const { isBiomorphicTopologySafe } = await import("./generateBiomorphic");
     const { decodeBakedCut } = await import("./bakedCut");
-    const baked = bake(3, 3, "a");
+    const baked = firstBakedCut(library);
     const upright = decodeBakedCut(baked, 0);
 
     for (const turns of [1, 2, 3] as const) {
@@ -95,7 +102,7 @@ describe("baked cut library", () => {
 
   it("turns rigidly rather than reshaping", async () => {
     const { decodeBakedCut } = await import("./bakedCut");
-    const baked = bake(3, 3, "a");
+    const baked = firstBakedCut(library);
     const upright = decodeBakedCut(baked, 0);
     const quarter = decodeBakedCut(baked, 1);
 
@@ -122,9 +129,12 @@ describe("baked cut library", () => {
 
   it("catches an entry filed under the wrong grid", () => {
     // Silently returning the wrong board shape would surface much later, as
-    // pieces that do not tile.
+    // pieces that do not tile. The entry is one already baked for the library:
+    // this test is about the filing, not about generating another cut.
     const mislabelled: BakedCutLibrary = {
-      "amoeba-coral": { [gridKey(5, 5)]: [bake(3, 3, "a")] },
+      "amoeba-coral": {
+        [gridKey(5, 5)]: [firstBakedCut(library)],
+      },
     };
     expect(() =>
       topologyFromLibrary(mislabelled, "amoeba-coral", 5, 5, "seed"),

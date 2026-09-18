@@ -13,6 +13,8 @@ type TrayEdgeHintProps = {
   trayScroll: SharedValue<number>;
   viewportExtent: number;
   crossExtent: number;
+  /** Chevron ink, matched to the tray material it floats over. */
+  color: string;
 };
 
 /**
@@ -28,6 +30,7 @@ export function TrayEdgeHint({
   trayScroll,
   viewportExtent,
   crossExtent,
+  color,
 }: TrayEdgeHintProps) {
   const animatedStyle = useAnimatedStyle(() => {
     const windowLeft = -trayScroll.value;
@@ -63,7 +66,7 @@ export function TrayEdgeHint({
       <Ionicons
         name={icon}
         size={20}
-        color="rgba(255, 246, 232, 0.5)"
+        color={color}
       />
     </Animated.View>
   );
