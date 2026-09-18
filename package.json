@@ -41,7 +41,8 @@
     "ota:verify": "node ./scripts/validate-ota-config.mjs",
     "ota:publish": "./scripts/publish-ota-update.sh",
     "release:guards": "npm run toolchain:check && sh -n scripts/archive-ios-release.sh scripts/build-ios-release-simulator.sh scripts/publish-ota-update.sh scripts/test-production-photo-api-url.sh && node --test scripts/release-hardening.test.mjs scripts/release-revision-adversarial.test.mjs scripts/release-stage-handoff.test.mjs scripts/dependency-audit.test.mjs scripts/public-release-page-content-contract.test.mjs scripts/validate-production-photo-api-health.test.mjs scripts/validate-ota-config.test.mjs scripts/publish-ota-update.test.mjs && node support-site/check.mjs && ./scripts/test-production-photo-api-url.sh",
-    "check": "npm run typecheck && npm test && npm run server:typecheck && npm run server:test && npm run doctor && npm run release:guards"
+    "check": "npm run typecheck && npm run test:release && npm run server:typecheck && npm run server:test && npm run doctor && npm run release:guards",
+    "test:release": "vitest run --exclude \"**/generateBiomorphicPhaseField.test.ts\" && vitest run generateBiomorphicPhaseField.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
