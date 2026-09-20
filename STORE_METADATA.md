@@ -22,7 +22,7 @@ Use the existing [Frume App Store Connect record](https://appstoreconnect.apple.
   build `1` appears under `1.0.0` and `1.0.4`
 - Invalid uploaded build: `1.0.0 (2)`; its source archive contains a RevenueCat
   test key and it must never be attached or submitted
-- Current source default: marketing version `1.0.0`, build `3`; build `3`
+- Current source default: marketing version `1.1.0`, build `10`; build `10`
   still requires an availability check immediately before archive
 
 **Live dashboard state, read through the App Store Connect API on 2026-08-15.**
@@ -363,8 +363,8 @@ These are pending edits, not saved dashboard state:
 
 - Keep the existing Apple ID, bundle ID, and SKU, but change the editable
   platform version from `1.0` to the exact three-component binary version
-  `1.0.0`. Never select invalid build `2`; select the planned `1.0.0 (3)`
-  archive only after confirming build `3` remains unused in that train. Never
+  `1.1.0`. Never select invalid build `2`; select the planned `1.1.0 (10)`
+  archive only after confirming build `10` remains unused in that train. Never
   reuse the old build number `1`.
 - Replace the old photo-frame subtitle, description, promotional text,
   keywords, and screenshots with the puzzle copy and sequence above, reviewed

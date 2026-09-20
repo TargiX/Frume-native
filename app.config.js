@@ -23,7 +23,7 @@ module.exports = {
     name: 'Frume',
     owner: 'targix',
     slug: 'frume',
-    version: '1.0.0',
+    version: '1.1.0',
     orientation: 'default',
     icon: './assets/frume-organic-icon.png',
     scheme: 'frume',
