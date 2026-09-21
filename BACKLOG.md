@@ -35,7 +35,7 @@ work is intentionally deferred and does not block App Store submission.
 - Use the checked-in guarded local Xcode archive path. Remote EAS builds remain
   deliberately blocked until they reproduce the same clean-install, live-page,
   and post-artifact bundle checks.
-- Use the checked-in exact Xcode 27.0 build `27A266a` and compiler-discovery
+- Use the checked-in exact Xcode 26.6 build `17F113` and compiler-discovery
   workaround to build and sign
   the fresh native candidate, then complete the iPhone, iPad, physical-device,
   and TestFlight QA matrix, including purchase, restore, game entry/exit,

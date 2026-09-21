@@ -4,8 +4,11 @@ import { execFileSync } from 'node:child_process';
 
 import { isDirectCli } from './is-direct-cli.mjs';
 
-export const REVIEWED_XCODE_VERSION = '27.0';
-export const REVIEWED_XCODE_BUILD = '27A266a';
+// iOS 27 SDK binaries must adopt UIScene lifecycle (TN3187); Expo 54 /
+// RN 0.81 have no scene support, so Xcode 27 builds trap at launch on
+// iOS 27. Keep the pin on 26.6 until scene adoption lands.
+export const REVIEWED_XCODE_VERSION = '26.6';
+export const REVIEWED_XCODE_BUILD = '17F113';
 
 export function parseXcodeVersion(output) {
   const match = /^Xcode ([^\r\n]+)\r?\nBuild version ([^\r\n]+)\s*$/u.exec(
