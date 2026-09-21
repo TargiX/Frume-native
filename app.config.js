@@ -123,6 +123,7 @@ module.exports = {
       ],
       './plugins/withIosOwnPhotoBackupPolicy',
       './plugins/withIosPodDeploymentTarget',
+      './plugins/withSceneLifecycle',
     ],
   },
 };
