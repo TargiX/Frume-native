@@ -25,7 +25,7 @@ module.exports = {
     slug: 'frume',
     version: '1.1.0',
     orientation: 'default',
-    icon: './assets/frume-organic-icon.png',
+    icon: './assets/frume-wood-icon.png',
     scheme: 'frume',
     runtimeVersion: {
       // The update layer may run only on a binary with the exact same native
