@@ -392,8 +392,8 @@ These are pending edits, not saved dashboard state:
   Functionality`, not linked to the user's identity, and not used for
   tracking.** Frume sends eight declared events — app opens, photo source,
   puzzle start, completion, abandonment, paywall view, purchase, and restore —
-  to the PostHog project configured by `EXPO_PUBLIC_ANALYTICS_HOST` and
-  `EXPO_PUBLIC_ANALYTICS_API_KEY`. Confirm the following against the final
+  to the self-hosted Umami website configured by `EXPO_PUBLIC_ANALYTICS_HOST` and
+  `EXPO_PUBLIC_UMAMI_WEBSITE_ID`. Confirm the following against the final
   binary before answering, because each one is load-bearing for the answer:
   - The complete set of events and their permitted properties is the allowlist
     in `src/analytics/analyticsEvents.ts`. Start and completion may include a
@@ -405,15 +405,12 @@ These are pending edits, not saved dashboard state:
   - The identifier is a random value Frume generates and stores on the device.
     It is not the advertising identifier, not the vendor identifier, and not
     derived from any device property, so it supports **not linked to identity**.
-    `$process_person_profile: false` is sent with every event so the receiving
-    project builds no person record.
-  - `$geoip_disable: true` is sent with every event, so PostHog derives no
-    location from the request address and no location is stored on the event.
-    **Whether the raw address itself is retained is a PostHog project setting,
-    not something the app controls** — Settings > Project > Privacy > "IP data
-    capture configuration" must be set to discard client IP addresses, and
-    `RELEASE.md` requires verifying it. With that confirmed, **do not declare
-    Location**; without it, re-answer this question rather than assuming.
+    It is namespaced to Frume and is not an account identity.
+  - The dedicated native proxy and payload supply a loopback address to Umami;
+    forwarding headers are stripped and endpoint access logging is disabled.
+    Country, region and city must remain empty in the received session. Verify
+    this after infrastructure changes as required by `RELEASE.md`. This does
+    not assert anything about unrelated infrastructure logs.
   - There is no advertising SDK, no third-party attribution, and no data broker,
     so **not used for tracking** holds and App Tracking Transparency is not
     required.

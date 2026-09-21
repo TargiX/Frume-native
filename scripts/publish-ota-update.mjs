@@ -34,7 +34,7 @@ const REQUIRED_PUBLIC_VALUES = [
 const ALLOWED_PUBLIC_VALUES = new Set([
   ...REQUIRED_PUBLIC_VALUES,
   'EXPO_PUBLIC_ANALYTICS_HOST',
-  'EXPO_PUBLIC_ANALYTICS_API_KEY',
+  'EXPO_PUBLIC_UMAMI_WEBSITE_ID',
 ]);
 
 /** Returns one explicit, non-blank environment value without normalizing it. */
@@ -94,15 +94,15 @@ export function validateOtaPublicationRequest(environment) {
   }
 
   const analyticsHost = environment.EXPO_PUBLIC_ANALYTICS_HOST?.trim();
-  const analyticsKey = environment.EXPO_PUBLIC_ANALYTICS_API_KEY?.trim();
+  const analyticsKey = environment.EXPO_PUBLIC_UMAMI_WEBSITE_ID?.trim();
   if (Boolean(analyticsHost) !== Boolean(analyticsKey)) {
     throw new Error(
-      'EXPO_PUBLIC_ANALYTICS_HOST and EXPO_PUBLIC_ANALYTICS_API_KEY must both be set or both be unset.',
+      'EXPO_PUBLIC_ANALYTICS_HOST and EXPO_PUBLIC_UMAMI_WEBSITE_ID must both be set or both be unset.',
     );
   }
   if (analyticsHost && analyticsKey) {
     requireValue(environment, 'EXPO_PUBLIC_ANALYTICS_HOST');
-    requireValue(environment, 'EXPO_PUBLIC_ANALYTICS_API_KEY');
+    requireValue(environment, 'EXPO_PUBLIC_UMAMI_WEBSITE_ID');
     resolveAnalyticsSettings(environment);
   }
 
