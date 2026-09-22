@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
@@ -344,127 +345,155 @@ export function PlayHomeScreen({ navigation }: Props) {
       style={styles.content}
       background={<HomeBackdrop source={heroSource} />}
     >
-      <View style={styles.masthead}>
-        <Text style={styles.wordmark} accessibilityRole="header">
-          FRUME
-        </Text>
-        <Text style={styles.tagline}>Photographs, cut differently</Text>
+      <View style={styles.body}>
+        <View style={styles.masthead}>
+          <Text style={styles.wordmark} accessibilityRole="header">
+            FRUME
+          </Text>
+          <Text style={styles.tagline}>Photographs, cut differently</Text>
+        </View>
+
+        {restoring ? (
+          <View
+            style={styles.restoring}
+            accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+          >
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.restoringText}>{restoringMessage}</Text>
+          </View>
+        ) : (
+          <>
+            <HomePhotoCard
+              source={heroSource}
+              aspectRatio={heroAspectRatio}
+              onPress={openPrimary}
+              accessibilityLabel={
+                session
+                  ? `${completed ? 'Completed puzzle' : 'Puzzle in progress'}, ${placed} of ${total} pieces placed`
+                  : completion
+                    ? `${completionCaption} puzzle`
+                    : 'Try Coastal morning, a free 16-piece Organic puzzle'
+              }
+              accessibilityHint={
+                session
+                  ? 'Opens the table with this photograph'
+                  : completion
+                    ? 'Opens your album of completed photographs'
+                    : 'Starts the free Organic sample'
+              }
+              disabled={checkingAccess || loading}
+              progress={session && !completed ? { placed, total } : undefined}
+              caption={
+                session
+                  ? undefined
+                  : (completionCaption ??
+                    'Coastal morning · 16 flowing pieces · Free sample')
+              }
+            />
+
+            <View style={styles.actions}>
+              <Button
+                ref={premiumTriggerRef}
+                label={primaryLabel}
+                onPress={openPrimary}
+                disabled={checkingAccess || loading}
+                block
+              />
+              <View style={styles.photoSources}>
+                <View style={styles.photoSource}>
+                  <Button
+                    label={session ? 'New photograph' : 'Choose a photograph'}
+                    variant="secondary"
+                    onPress={chooseNewPhotograph}
+                    disabled={checkingAccess || loading}
+                    block
+                    accessibilityHint={
+                      session
+                        ? 'Choose another photograph; this puzzle will wait on your shelf'
+                        : 'Opens the curated photograph collections'
+                    }
+                  />
+                </View>
+                <View style={styles.photoSource}>
+                  <Button
+                    label="Use my photo"
+                    variant="secondary"
+                    onPress={() => void useOwnPhoto()}
+                    disabled={checkingAccess || loading}
+                    block
+                    accessibilityHint="Opens your photo library to cut one of your own photographs; it never leaves this device"
+                  />
+                </View>
+              </View>
+              {session ? (
+                <View style={styles.sampleWrap}>
+                  <Button
+                    label="Try the free sample"
+                    variant="accent"
+                    size="compact"
+                    onPress={() => void startDiscovery()}
+                    disabled={loading}
+                  />
+                </View>
+              ) : null}
+            </View>
+
+            {sessionAccessBlocked && !premiumLoading ? (
+              <Text style={styles.savedPremiumNotice}>
+                Your {savedPremiumCutLabel} puzzle is still saved. Restore or
+                unlock Premium Cuts to continue it.
+              </Text>
+            ) : null}
+            {!session ? (
+              <Text style={styles.savedPremiumNotice}>
+                A Frume study. No account, no timer to beat. Your photographs
+                stay yours.
+              </Text>
+            ) : null}
+          </>
+        )}
+
+        {persistenceError || error || discoveryError || importError ? (
+          <Text
+            style={styles.error}
+            accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+          >
+            {persistenceError ?? error ?? discoveryError ?? importError}
+          </Text>
+        ) : null}
       </View>
 
-      {restoring ? (
-        <View
-          style={styles.restoring}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
+      <View style={styles.tabBar}>
+        <Pressable
+          style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}
+          onPress={() => navigation.navigate('Library')}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Shelf and album"
+          accessibilityHint="Opens your saved puzzles and completed photographs"
         >
-          <ActivityIndicator color={colors.accent} />
-          <Text style={styles.restoringText}>{restoringMessage}</Text>
-        </View>
-      ) : (
-        <>
-          <HomePhotoCard
-            source={heroSource}
-            aspectRatio={heroAspectRatio}
-            onPress={openPrimary}
-            accessibilityLabel={
-              session
-                ? `${completed ? 'Completed puzzle' : 'Puzzle in progress'}, ${placed} of ${total} pieces placed`
-                : completion
-                  ? `${completionCaption} puzzle`
-                  : 'Try Coastal morning, a free 16-piece Organic puzzle'
-            }
-            accessibilityHint={
-              session
-                ? 'Opens the table with this photograph'
-                : completion
-                  ? 'Opens your album of completed photographs'
-                  : 'Starts the free Organic sample'
-            }
-            disabled={checkingAccess || loading}
-            progress={session && !completed ? { placed, total } : undefined}
-            caption={
-              session
-                ? undefined
-                : (completionCaption ??
-                  'Coastal morning · 16 flowing pieces · Free sample')
-            }
+          <Ionicons
+            name="albums-outline"
+            size={22}
+            color={colors.textSecondary}
           />
-
-          <View style={styles.actions}>
-            <Button
-              ref={premiumTriggerRef}
-              label={primaryLabel}
-              onPress={openPrimary}
-              disabled={checkingAccess || loading}
-              block
-            />
-            <View style={styles.photoSources}>
-              <Button
-                label={session ? 'New photograph' : 'Choose a photograph'}
-                variant="secondary"
-                onPress={chooseNewPhotograph}
-                disabled={checkingAccess || loading}
-                accessibilityHint={
-                  session
-                    ? 'Choose another photograph; this puzzle will wait on your shelf'
-                    : 'Opens the curated photograph collections'
-                }
-              />
-              <Button
-                label="Use my photo"
-                variant="secondary"
-                onPress={() => void useOwnPhoto()}
-                disabled={checkingAccess || loading}
-                accessibilityHint="Opens your photo library to cut one of your own photographs; it never leaves this device"
-              />
-            </View>
-          </View>
-
-          <Button
-            label="Shelf & album"
-            variant="ghost"
-            onPress={() => navigation.navigate('Library')}
-            disabled={loading}
-          />
-          {session ? (
-            <Button
-              label="Try the free Organic sample"
-              variant="ghost"
-              onPress={() => void startDiscovery()}
-              disabled={loading}
-            />
-          ) : (
-            <Text style={styles.savedPremiumNotice}>
-              A Frume study. No account, no timer to beat. Your photographs stay
-              yours.
-            </Text>
-          )}
-          {sessionAccessBlocked && !premiumLoading ? (
-            <Text style={styles.savedPremiumNotice}>
-              Your {savedPremiumCutLabel} puzzle is still saved. Restore or
-              unlock Premium Cuts to continue it.
-            </Text>
-          ) : null}
-        </>
-      )}
-
-      {persistenceError || error || discoveryError || importError ? (
-        <Text
-          style={styles.error}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
-        >
-          {persistenceError ?? error ?? discoveryError ?? importError}
-        </Text>
-      ) : null}
-
-      <View style={styles.centered}>
-        <Button
-          label="About & Support"
-          variant="ghost"
+          <Text style={styles.tabLabel}>Shelf</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}
           onPress={navigateToAbout}
           disabled={checkingAccess || loading}
+          accessibilityRole="button"
+          accessibilityLabel="About and support"
           accessibilityHint="Opens privacy, support, purchase restore, and app version information"
-          style={styles.aboutButton}
-        />
+        >
+          <Ionicons
+            name="help-circle-outline"
+            size={22}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.tabLabel}>About</Text>
+        </Pressable>
       </View>
       <PremiumCutsSheet
         visible={showPremium}
@@ -479,10 +508,14 @@ export function PlayHomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
-    gap: spacing.xl,
+    gap: spacing.lg,
   },
-  centered: {
-    alignSelf: 'center',
+  body: {
+    flex: 1,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xl,
   },
   masthead: {
     alignItems: 'center',
@@ -517,14 +550,18 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignSelf: 'stretch',
-    alignItems: 'center',
     gap: spacing.sm,
   },
   photoSources: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: spacing.sm,
+  },
+  photoSource: {
+    flex: 1,
+  },
+  sampleWrap: {
+    alignSelf: 'center',
+    marginTop: spacing.xs,
   },
   savedPremiumNotice: {
     color: colors.textSecondary,
@@ -538,7 +575,27 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: spacing.lg,
   },
-  aboutButton: {
-    paddingHorizontal: 0,
+  tabBar: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginHorizontal: -spacing.xl,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+    gap: 3,
+  },
+  tabPressed: {
+    opacity: 0.6,
+  },
+  tabLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
 });

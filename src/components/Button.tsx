@@ -6,11 +6,13 @@ import { colors, MIN_TOUCH_TARGET, radius, spacing } from '../theme';
 export type ButtonProps = {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'accent';
   disabled?: boolean;
   accessibilityHint?: string;
   /** Opt in to filling the row; buttons are sized to their label by default. */
   block?: boolean;
+  /** Compact trims label and padding for quiet navigation rows. */
+  size?: 'regular' | 'compact';
   style?: ViewStyle;
 };
 
@@ -31,6 +33,7 @@ export const Button = React.forwardRef<
     disabled = false,
     accessibilityHint,
     block = false,
+    size = 'regular',
     style,
   },
   ref,
@@ -47,13 +50,22 @@ export const Button = React.forwardRef<
         style={({ pressed }) => [
           styles.base,
           styles[variant],
+          size === 'compact' && styles.compactBase,
           block && styles.block,
           pressed && !disabled && styles.pressed,
           disabled && styles.disabled,
           style,
         ]}
       >
-        <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+        <Text
+          style={[
+            styles.label,
+            styles[`${variant}Label`],
+            size === 'compact' && styles.compactLabel,
+          ]}
+        >
+          {label}
+        </Text>
       </Pressable>
     </View>
   );
@@ -76,6 +88,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   block: { alignSelf: 'stretch' },
+  compactBase: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
   primary: { backgroundColor: colors.accent },
   secondary: {
     backgroundColor: colors.surfaceRaised,
@@ -83,6 +100,11 @@ const styles = StyleSheet.create({
     borderColor: colors.interactiveBorder,
   },
   ghost: { backgroundColor: 'transparent' },
+  accent: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
   pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.45 },
   label: {
@@ -91,7 +113,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  compactLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   primaryLabel: { color: colors.onAccent },
   secondaryLabel: { color: colors.textPrimary },
   ghostLabel: { color: colors.textSecondary },
+  accentLabel: { color: colors.accent },
 });
