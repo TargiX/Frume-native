@@ -1,178 +1,34 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import {
-  AnalyticsApiError,
-  analyticsConfigured,
-  readAnalyticsConfiguration,
-  sendAnalyticsBatch,
-} from './analyticsApi';
-import type { AnalyticsEvent } from './analyticsEvents';
-
-const originalKey = process.env.EXPO_PUBLIC_ANALYTICS_API_KEY;
-const originalHost = process.env.EXPO_PUBLIC_ANALYTICS_HOST;
-
-const event: AnalyticsEvent = {
-  name: 'puzzle_completed',
-  properties: { cut_id: 'crystal', piece_count: 25, duration_s: 431 },
-  occurredAt: Date.UTC(2026, 7, 15, 12, 0, 0),
-};
-
-const PROJECT_TOKEN = `phc_${'A1b2C3d4E5f6G7h8I9j0'.repeat(2)}`;
-
-function configure(host: string, key: string = PROJECT_TOKEN) {
-  process.env.EXPO_PUBLIC_ANALYTICS_HOST = host;
-  process.env.EXPO_PUBLIC_ANALYTICS_API_KEY = key;
-}
-
-beforeEach(() => {
-  delete process.env.EXPO_PUBLIC_ANALYTICS_HOST;
-  delete process.env.EXPO_PUBLIC_ANALYTICS_API_KEY;
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  if (originalKey === undefined) {
-    delete process.env.EXPO_PUBLIC_ANALYTICS_API_KEY;
-  } else {
-    process.env.EXPO_PUBLIC_ANALYTICS_API_KEY = originalKey;
-  }
-  if (originalHost === undefined) {
-    delete process.env.EXPO_PUBLIC_ANALYTICS_HOST;
-  } else {
-    process.env.EXPO_PUBLIC_ANALYTICS_HOST = originalHost;
-  }
-});
-
-describe('analytics configuration', () => {
-  it('reports an unconfigured build instead of raising', () => {
-    expect(readAnalyticsConfiguration()).toBeNull();
-    expect(analyticsConfigured()).toBe(false);
-
-    process.env.EXPO_PUBLIC_ANALYTICS_HOST = 'https://eu.i.posthog.com';
-    expect(readAnalyticsConfiguration()).toBeNull();
-  });
-
-  it('builds the batch endpoint from a bare origin', () => {
-    configure('https://eu.i.posthog.com');
-    expect(readAnalyticsConfiguration()).toEqual({
-      captureUrl: 'https://eu.i.posthog.com/batch/',
-      apiKey: PROJECT_TOKEN,
-    });
-    expect(analyticsConfigured()).toBe(true);
-  });
-
-  it('refuses a personal API key, which would be published in the bundle', () => {
-    configure('https://eu.i.posthog.com', `phx_${'A1b2C3d4E5f6G7h8I9j0'.repeat(2)}`);
-    expect(() => readAnalyticsConfiguration()).toThrowError(
-      /personal API key/,
-    );
-    expect(analyticsConfigured()).toBe(false);
-  });
-
-  it('refuses any key that is not a project token', () => {
-    for (const key of [
-      'phc_short',
-      'private_service_credential',
-      'abcdefghijklmnopqrstuvwxyz',
-    ]) {
-      configure('https://eu.i.posthog.com', key);
-      expect(() => readAnalyticsConfiguration()).toThrowError(AnalyticsApiError);
-      expect(analyticsConfigured()).toBe(false);
-    }
-  });
-
-  it('refuses a host that is not a bare secure origin', () => {
-    for (const host of [
-      'http://analytics.example.com',
-      'https://user:pass@eu.i.posthog.com',
-      'https://eu.i.posthog.com/ingest',
-      'https://eu.i.posthog.com/?token=1',
-      'not a url',
-    ]) {
-      configure(host);
-      expect(() => readAnalyticsConfiguration()).toThrowError(AnalyticsApiError);
-      expect(analyticsConfigured()).toBe(false);
-    }
-  });
-
-  it('allows a local origin for development', () => {
-    configure('http://127.0.0.1:8000');
-    expect(readAnalyticsConfiguration()?.captureUrl).toBe(
-      'http://127.0.0.1:8000/batch/',
-    );
-  });
-});
-
-describe('analytics delivery', () => {
-  it('sends only declared properties plus the anonymity flags', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await sendAnalyticsBatch([event], 'a'.repeat(32), {
-      captureUrl: 'https://eu.i.posthog.com/batch/',
-      apiKey: 'phc_test',
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://eu.i.posthog.com/batch/');
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toEqual({
-      api_key: 'phc_test',
-      batch: [
-        {
-          event: 'puzzle_completed',
-          timestamp: '2026-08-15T12:00:00.000Z',
-          properties: {
-            cut_id: 'crystal',
-            piece_count: 25,
-            duration_s: 431,
-            distinct_id: 'a'.repeat(32),
-            $process_person_profile: false,
-            $geoip_disable: true,
-          },
-        },
-      ],
-    });
-  });
-
-  it('makes no request for an empty batch', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await sendAnalyticsBatch([], 'a'.repeat(32), {
-      captureUrl: 'https://eu.i.posthog.com/batch/',
-      apiKey: 'phc_test',
-    });
-
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('reports the status so the queue can tell permanent from transient', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 401 }),
-    );
-
-    await expect(
-      sendAnalyticsBatch([event], 'a'.repeat(32), {
-        captureUrl: 'https://eu.i.posthog.com/batch/',
-        apiKey: 'phc_test',
-      }),
-    ).rejects.toMatchObject({ code: 'request_failed', status: 401 });
-  });
-
-  it('reports an unreachable service without a status', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new TypeError('Network request failed')),
-    );
-
-    await expect(
-      sendAnalyticsBatch([event], 'a'.repeat(32), {
-        captureUrl: 'https://eu.i.posthog.com/batch/',
-        apiKey: 'phc_test',
-      }),
-    ).rejects.toMatchObject({ code: 'network_error', status: undefined });
-  });
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readAnalyticsConfiguration, sendAnalyticsBatch } from './analyticsApi';
+const configuration = { captureUrl: 'https://stats.phosphene.cc/native/batch', apiKey: 'b7375888-6948-4e98-9805-8d4a9a1399db' };
+const event = { name: 'puzzle_completed' as const, occurredAt: 1789970000000, properties: { cut_id: 'crystal', piece_count: 25, duration_s: 30, email: 'private@example.com' } };
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+describe('Umami privacy and delivery', () => {
+ it('requires both reviewed public configuration values', () => {
+  vi.stubEnv('EXPO_PUBLIC_ANALYTICS_HOST', ''); vi.stubEnv('EXPO_PUBLIC_UMAMI_WEBSITE_ID', ''); expect(readAnalyticsConfiguration()).toBeNull();
+  vi.stubEnv('EXPO_PUBLIC_ANALYTICS_HOST', 'https://us.i.posthog.com'); expect(() => readAnalyticsConfiguration()).toThrow();
+  vi.stubEnv('EXPO_PUBLIC_ANALYTICS_HOST', 'https://stats.phosphene.cc'); vi.stubEnv('EXPO_PUBLIC_UMAMI_WEBSITE_ID', configuration.apiKey); expect(readAnalyticsConfiguration()).toEqual(configuration);
+ });
+ it('retains event time and strips undeclared private data', async () => {
+  const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ processed: 1, errors: 0 }) }); vi.stubGlobal('fetch', fetcher);
+  await sendAnalyticsBatch([event], 'a'.repeat(32), configuration);
+  const batch = JSON.parse(fetcher.mock.calls[0][1].body);
+  expect(batch[0].payload).toMatchObject({ id: `frume:${'a'.repeat(32)}`, timestamp: 1789970000, ip: '127.0.0.1', name: 'puzzle_completed' });
+  expect(batch[0].payload.data).toEqual({ cut_id: 'crystal', piece_count: 25, duration_s: 30 });
+  expect(JSON.stringify(batch)).not.toContain('private@example.com');
+ });
+ it('does not acknowledge partial ingestion as success', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ processed: 0, errors: 1 }) }));
+  await expect(sendAnalyticsBatch([event], 'a'.repeat(32), configuration)).rejects.toMatchObject({ code: 'request_failed' });
+ });
+ it('rejects an identifying installation value and foreign destination before networking', async () => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  await expect(sendAnalyticsBatch([event], 'private@example.com', configuration)).rejects.toThrow();
+  await expect(sendAnalyticsBatch([event], 'a'.repeat(32), { ...configuration, captureUrl: 'https://example.com' })).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+ });
+ it('preserves retryable network failures', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+  await expect(sendAnalyticsBatch([event], 'a'.repeat(32), configuration)).rejects.toMatchObject({ code: 'network_error' });
+ });
 });

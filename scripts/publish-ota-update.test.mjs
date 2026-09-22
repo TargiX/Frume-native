@@ -98,7 +98,7 @@ test('OTA publication treats analytics as an explicit all-or-nothing choice', ()
     () =>
       validateOtaPublicationRequest(
         validEnvironment({
-          EXPO_PUBLIC_ANALYTICS_HOST: 'https://eu.i.posthog.com',
+          EXPO_PUBLIC_ANALYTICS_HOST: 'https://stats.phosphene.cc',
         }),
       ),
     /must both be set or both be unset/,
@@ -107,8 +107,8 @@ test('OTA publication treats analytics as an explicit all-or-nothing choice', ()
     () =>
       validateOtaPublicationRequest(
         validEnvironment({
-          EXPO_PUBLIC_ANALYTICS_HOST: ' https://eu.i.posthog.com',
-          EXPO_PUBLIC_ANALYTICS_API_KEY: `phc_${'b'.repeat(24)}`,
+          EXPO_PUBLIC_ANALYTICS_HOST: ' https://stats.phosphene.cc',
+          EXPO_PUBLIC_UMAMI_WEBSITE_ID: 'b7375888-6948-4e98-9805-8d4a9a1399db',
         }),
       ),
     /must not contain surrounding whitespace/,
@@ -117,8 +117,8 @@ test('OTA publication treats analytics as an explicit all-or-nothing choice', ()
   assert.deepEqual(
     validateOtaPublicationRequest(
       validEnvironment({
-        EXPO_PUBLIC_ANALYTICS_HOST: 'https://eu.i.posthog.com',
-        EXPO_PUBLIC_ANALYTICS_API_KEY: `phc_${'b'.repeat(24)}`,
+        EXPO_PUBLIC_ANALYTICS_HOST: 'https://stats.phosphene.cc',
+        EXPO_PUBLIC_UMAMI_WEBSITE_ID: 'b7375888-6948-4e98-9805-8d4a9a1399db',
       }),
     ),
     {

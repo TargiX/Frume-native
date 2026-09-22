@@ -322,38 +322,29 @@ but Apple's required Support URL must be a website with real contact
 information. Prefer one canonical HTTPS support page for the app and App Store
 Connect.
 
-`EXPO_PUBLIC_ANALYTICS_HOST` and `EXPO_PUBLIC_ANALYTICS_API_KEY` enable
-anonymous product analytics. The host must be a bare origin; the code appends
-`/batch/`, so do not include a path.
+`EXPO_PUBLIC_ANALYTICS_HOST=https://stats.phosphene.cc` and
+`EXPO_PUBLIC_UMAMI_WEBSITE_ID=b7375888-6948-4e98-9805-8d4a9a1399db` enable
+anonymous product analytics in the self-hosted Frume iOS website. Both are public
+routing values. Leave both unset to disable collection; partial or unreviewed
+configuration is rejected. Remove the obsolete `EXPO_PUBLIC_ANALYTICS_API_KEY`
+from release configuration. No administrator credential belongs in a bundle.
 
-**The host must match the cloud region the PostHog project lives in** —
-`https://us.i.posthog.com` or `https://eu.i.posthog.com`. They are separate
-deployments and a project token exists in exactly one of them. A mismatch is
-silent: the capture endpoint answers `200 {"status":"Ok"}` to a token from the
-other region and discards the event, so a build can pass every local check and
-still measure nothing. Run `npm run analytics:verify`, which authenticates the
-token against the configured region before sending, and then confirm the check
-event actually appears in the project. **The key must be the PostHog project token, which starts with `phc_`.**
-A personal API key starts with `phx_`, grants read and write access to the whole
-account, and would be inlined into the shipped bundle by Metro exactly like
-every other `EXPO_PUBLIC_*` value; it also does not authenticate the capture
-endpoint. The client refuses to send with any non-`phc_` key, and the archived
-bundle scan in `scripts/validate-revenuecat-ios-release.mjs` fails the archive
-if a `phx_` key reaches it. If a personal key was ever placed in an environment
-file, revoke it in PostHog rather than only replacing it.
-**Both must be set, or the app sends nothing.** Decide
-this before freezing store metadata: a build that sends events must declare
-`Usage Data → Product Interaction` in App Privacy, and a build that does not
-must leave it undeclared. See the App Privacy bullet in
-[STORE_METADATA.md](./STORE_METADATA.md) for the exact answer and the facts it
-depends on.
+The client posts allowlisted events to `/native/batch`, preserving the existing
+bounded queue and opt-out. A successful receipt must acknowledge every event
+with zero errors. Run `FRUME_VERIFY_ANALYTICS=1 npm run analytics:verify`, then
+confirm the marked event appears in Frume iOS. Server ingestion alone does not
+prove the signed binary uses these values: verify a real device after releasing
+through the existing reviewed-main/archive gates.
 
-If analytics is enabled, one setting must also be verified in the PostHog
-project itself, because the app cannot assert it from a payload: **Settings >
-Project > Privacy > "IP data capture configuration" must discard client IP
-addresses.** The client sends `$geoip_disable: true`, which stops location being
-derived from the request, but retention of the raw address is a project-side
-decision. Record the observed setting; do not assume the account default.
+The native proxy removes incoming forwarding headers, supplies a loopback IP and
+fixed user agent, and disables access logging for this endpoint. The client also
+supplies a loopback IP. Verify empty country/region/city fields in the received
+session after any proxy or Umami upgrade. The identifier is installation-local
+and namespaced to Frume; no photo, URL or free text is sent. Existing PostHog
+history remains separate and must not be deleted as part of this migration.
+
+Update App Privacy from [STORE_METADATA.md](./STORE_METADATA.md) for the exact
+submitted binary. Source changes and server tests are not an App Store rollout.
 
 For the guarded local Xcode archive, make the five reviewed Apple release
 values available during the release prebuild and bundle step:
