@@ -1157,7 +1157,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
         <Text
           style={styles.error}
           accessibilityLiveRegion="assertive"
-          numberOfLines={twoPane ? 2 : undefined}
+          // The panel is pinned outside the scroll view in both layouts, so a
+          // long error at large text sizes must not push the button away.
+          numberOfLines={twoPane ? 2 : 3}
         >
           {photoError ?? persistenceError ?? trackingError ?? error}
         </Text>
