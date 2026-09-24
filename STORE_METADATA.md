@@ -25,6 +25,28 @@ Use the existing [Frume App Store Connect record](https://appstoreconnect.apple.
 - Current source default: marketing version `1.1.0`, build `10`; build `10`
   still requires an availability check immediately before archive
 
+**Live state on 2026-09-24, read and written through the App Store Connect
+API.** This supersedes the 2026-08-15 snapshot below; re-read the API before
+relying on either.
+
+- `1.0.0` is live (released 2026-08-31, every territory) with name `Frume`,
+  subtitle `Quiet photo puzzles`, en-US only, four iPhone screenshots, and zero
+  ratings. A search audit that day found it only for the query `frume`: not in
+  the top 200 for `jigsaw puzzle`, `photo puzzle`, or its own subtitle.
+- `1.1.0` build `12` (main `9df9a5a`, Worker `f0c852c9`, no analytics
+  environment) is attached to a new version with **manual** release and was
+  submitted for review with this search-oriented listing:
+  - Name `Frume: Photo Jigsaw Puzzles`, subtitle `Custom puzzle maker · No ads`
+  - en-US keywords
+    `picture,pics,own,image,relax,calm,zen,mindful,offline,adults,pieces,art,gallery,family,focus,brain`
+    (never repeat words already in the name or subtitle; Apple indexes them once)
+  - Localizations en-GB, es-MX (also indexed for the US storefront), ru, de-DE,
+    and fr-FR; non-English descriptions state that the interface is English
+  - Six iPhone 6.9" screenshots rendered by
+    `scripts/store/render-store-screenshots.mjs`; the iPad set is unchanged
+- An ongoing App Analytics report request exists, so impressions and
+  conversion become available through the Analytics Reports API.
+
 **Live dashboard state, read through the App Store Connect API on 2026-08-15.**
 This supersedes the 2026-07-31 read-only audit, which described the old
 photo-frame listing and is no longer true of anything below.
