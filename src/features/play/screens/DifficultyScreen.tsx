@@ -1204,10 +1204,14 @@ export function DifficultyScreen({ navigation, route }: Props) {
           </View>
         </Screen>
       ) : (
-        <Screen scroll style={styles.content}>
+        <Screen
+          scroll
+          style={styles.content}
+          footer={actionPanel}
+          footerStyle={styles.stickyFooter}
+        >
           {photoPanel}
           {choicesPanel}
-          {actionPanel}
         </Screen>
       )}
 
@@ -1561,6 +1565,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   actionPanel: {},
+  stickyFooter: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
   actionPanelLandscape: {
     marginTop: 'auto',
     paddingTop: spacing.md,

@@ -357,12 +357,6 @@ export function PremiumCutsSheet({
                   disabled={!configured || purchasing}
                   block
                 />
-                <Button
-                  label="Not now"
-                  variant="ghost"
-                  onPress={closeWithoutUnlock}
-                  block
-                />
               </View>
             )}
 

@@ -67,6 +67,7 @@ import {
   loadHowToPlaySeen,
   saveHowToPlaySeen,
 } from '../utils/howToPlayPreference';
+import { recordCompletionForReview } from '../../../review/reviewPrompt';
 import { completionPrimaryAction, shouldRunGameTimer } from './gameLifecycle';
 import {
   beginNextPuzzleRequest,
@@ -250,6 +251,9 @@ export function GameScreen({ navigation }: Props) {
       piece_count: state.layout.pieces.length,
       duration_s: state.activeElapsedMs / 1000,
     });
+    // Let the finished picture land before the system rating sheet can appear.
+    // Not cleared on re-render: the completion guard above already ran once.
+    setTimeout(() => void recordCompletionForReview(), 1_500);
   }, [isCompleted, session, state]);
 
   useEffect(
