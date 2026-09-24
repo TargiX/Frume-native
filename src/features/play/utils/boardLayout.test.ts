@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { TRAY_BOARD_GAP } from '../../../puzzle/engine/tray';
+import {
+  MAX_TRAY_HEIGHT,
+  MIN_TRAY_HEIGHT,
+  TRAY_BOARD_GAP,
+  TRAY_HEIGHT_RATIO,
+} from '../../../puzzle/engine/tray';
 import {
   computePlayLayout,
   computeSafeAreaPlayLayout,
@@ -85,5 +90,51 @@ describe('computePlayLayout', () => {
     expect(tablet.surfaceHeight).toBeLessThanOrEqual(
       1366 - tabletInsets.top - tabletInsets.bottom,
     );
+  });
+
+  it('gives a width-limited board’s spare table to the shelf, not the board', () => {
+    // A 3:2 photo cut into 49 on a 402×874 phone: the board runs out of width
+    // with half the table still empty below it.
+    const insets = { top: 62, right: 0, bottom: 34, left: 0 };
+    const layout = computeSafeAreaPlayLayout(402, 874, insets, 3 / 2, 49);
+
+    expect(layout.boardWidth).toBeCloseTo(402 - TABLE_INSET * 2);
+    expect(layout.boardHeight).toBeCloseTo((402 - TABLE_INSET * 2) / (3 / 2));
+    // Two rows, each as deep as a row is allowed to grow.
+    expect(layout.trayHeight).toBeCloseTo(MAX_TRAY_HEIGHT * 2);
+    expect(layout.surfaceHeight).toBeCloseTo(
+      layout.boardHeight + TRAY_BOARD_GAP + MAX_TRAY_HEIGHT * 2,
+    );
+    expect(layout.surfaceHeight).toBeLessThanOrEqual(
+      874 - insets.top - insets.bottom - TABLE_INSET * 2,
+    );
+  });
+
+  it('fills the table exactly when there is less spare than a full row', () => {
+    const layout = computePlayLayout(402, 410, 3 / 2, 16);
+
+    expect(layout.trayPlacement).toBe('bottom');
+    expect(layout.boardWidth).toBeCloseTo(402 - TABLE_INSET * 2);
+    expect(layout.trayHeight).toBeGreaterThan(MIN_TRAY_HEIGHT);
+    expect(layout.trayHeight).toBeLessThan(MAX_TRAY_HEIGHT);
+    expect(layout.surfaceHeight).toBeCloseTo(410 - TABLE_INSET * 2);
+  });
+
+  it('keeps the fitted shelf when the board is limited by height', () => {
+    const layout = computePlayLayout(390, 600, 3 / 4, 16);
+
+    // The board is the one that ran out of room: it did not reach the sides.
+    expect(layout.boardWidth).toBeLessThan(390 - TABLE_INSET * 2);
+    expect(layout.trayHeight).toBeCloseTo(
+      (layout.boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+    );
+    expect(layout.surfaceHeight).toBeLessThanOrEqual(600 - TABLE_INSET * 2);
+  });
+
+  it('leaves the side shelf of a landscape layout alone', () => {
+    const landscape = computePlayLayout(874, 402, 3 / 2, 49);
+
+    expect(landscape.trayPlacement).toBe('right');
+    expect(landscape.trayHeight).toBeUndefined();
   });
 });

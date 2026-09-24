@@ -250,6 +250,19 @@ describe('puzzle session persistence codec', () => {
     ).toBeUndefined();
   });
 
+  it('keeps a deepened shelf and rejects a depth that is not a size', () => {
+    const deep = sessionSnapshot();
+    deep.engine.layout = { ...deep.engine.layout, trayHeight: 240 };
+    expect(
+      deserializePuzzleSession(serializePuzzleSession(deep))?.engine.layout
+        .trayHeight,
+    ).toBe(240);
+
+    const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
+    persisted.engine.layout.trayHeight = -1;
+    expect(deserializePuzzleSession(JSON.stringify(persisted))).toBeNull();
+  });
+
   it('rejects a non-boolean rotation flag', () => {
     const persisted = JSON.parse(serializePuzzleSession(sessionSnapshot()));
     persisted.engine.layout.piecesRotatable = 'yes';

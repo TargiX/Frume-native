@@ -85,6 +85,7 @@ export const OrganicCutter: PuzzleCutter = {
       image,
       boardSize: { width, height },
       traySurfaceExtent: options.traySurfaceExtent,
+      trayHeight: options.trayHeight,
       pieces: generateOrganicPieces(
         cutDescriptor.rows,
         cutDescriptor.columns,

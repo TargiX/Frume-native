@@ -87,7 +87,10 @@ import {
   imageLoadRetryPresentation,
 } from './imageLoadRetry';
 import { PUZZLE_SEAM_DISSOLVE_MS } from './revealMotion';
-import { getPieceOverflowMargin } from './pieceOverflowMargin';
+import {
+  getPieceOverflowMargin,
+  resolveWorkspaceInset,
+} from './pieceOverflowMargin';
 import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
 import { TrayEdgeHint } from './TrayEdgeHint';
 import { resolveTrayAutoRevealScroll } from './trayAutoReveal';
@@ -573,11 +576,21 @@ export function PuzzleBoard({
     () => getPieceOverflowMargin(layout.pieces),
     [layout.pieces],
   );
-  const workspaceWidth = surfaceWidth + surfaceInset * 2;
-  const workspaceHeight = surfaceHeight + surfaceInset * 2;
+  const workspaceInsetX = resolveWorkspaceInset(
+    surfaceWidth,
+    surfaceInset,
+    viewportWidth,
+  );
+  const workspaceInsetY = resolveWorkspaceInset(
+    surfaceHeight,
+    surfaceInset,
+    viewportHeight,
+  );
+  const workspaceWidth = surfaceWidth + workspaceInsetX * 2;
+  const workspaceHeight = surfaceHeight + workspaceInsetY * 2;
   // Where the board's own (0, 0) lands inside the drawn workspace.
-  const originX = surfaceInset + surfaceOriginX;
-  const originY = surfaceInset + surfaceOriginY;
+  const originX = workspaceInsetX + surfaceOriginX;
+  const originY = workspaceInsetY + surfaceOriginY;
   const traySurfaceFrame = useMemo(
     () =>
       resolveTraySurfaceFrame(

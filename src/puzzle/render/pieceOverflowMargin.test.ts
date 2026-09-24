@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PuzzlePieceDefinition } from '../types';
-import { getPieceOverflowMargin } from './pieceOverflowMargin';
+import {
+  getPieceOverflowMargin,
+  resolveWorkspaceInset,
+} from './pieceOverflowMargin';
 
 function piece(width: number, height: number): PuzzlePieceDefinition {
   return {
@@ -25,5 +28,23 @@ describe('piece overflow margin', () => {
 
   it('keeps a small shadow allowance even for an empty layout', () => {
     expect(getPieceOverflowMargin([])).toBe(8);
+  });
+});
+
+describe('workspace inset', () => {
+  it('keeps the overflow margin when the surface already fills the screen', () => {
+    expect(resolveWorkspaceInset(669, 190, 746)).toBe(190);
+  });
+
+  it('fills a short table to the viewport so the camera has nothing to centre', () => {
+    // A 3:2 photo cut into 49 on a 402×874 phone: 415 of surface, 746 of view.
+    const inset = resolveWorkspaceInset(415, 78, 746);
+
+    expect(inset).toBeCloseTo(165.5);
+    expect(415 + inset * 2).toBeCloseTo(746);
+  });
+
+  it('falls back to the overflow margin without a known viewport', () => {
+    expect(resolveWorkspaceInset(415, 78)).toBe(78);
   });
 });

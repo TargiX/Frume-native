@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { getTrayMetrics, getTraySlotPosition, trayDepth, trayLanes } from './tray';
+import {
+  getTrayMetrics,
+  getTraySlotPosition,
+  MAX_TRAY_HEIGHT,
+  MAX_TRAY_PIECE_SCALE,
+  trayDepth,
+  trayLanes,
+} from './tray';
 import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
 
 function piece(id: string): PuzzlePieceDefinition {
@@ -84,5 +91,42 @@ describe('tray slots across lanes', () => {
         metrics.top + metrics.height + 1,
       );
     }
+  });
+});
+
+describe('a deeper bottom shelf', () => {
+  it('draws waiting pieces larger, but no more than half again', () => {
+    const layout = { ...layoutOf(49), trayHeight: MAX_TRAY_HEIGHT * 2 };
+    const metrics = getTrayMetrics(layout);
+
+    expect(metrics.height).toBe(MAX_TRAY_HEIGHT * 2);
+    expect(getTrayMetrics(layoutOf(49)).scale).toBeLessThan(metrics.scale);
+    expect(metrics.scale).toBe(MAX_TRAY_PIECE_SCALE);
+
+    // Scaled around its centre, the larger piece still sits inside its row.
+    for (const slot of [0, 1, 48]) {
+      const position = getTraySlotPosition(layout, slot, piece(String(slot)));
+      const drawn = 40 * metrics.scale;
+      const top = position.y + 20 - drawn / 2;
+      expect(top).toBeGreaterThanOrEqual(metrics.top - 1);
+      expect(top + drawn).toBeLessThanOrEqual(metrics.top + metrics.height + 1);
+    }
+  });
+
+  it('never makes the shelf shallower than the board alone gives it', () => {
+    const fitted = getTrayMetrics(layoutOf(49));
+    const saved = getTrayMetrics({ ...layoutOf(49), trayHeight: 10 });
+
+    expect(saved.height).toBe(fitted.height);
+  });
+
+  it('keeps pieces beside a landscape board at board size or smaller', () => {
+    const layout: PuzzleLayout = {
+      ...layoutOf(49),
+      trayPlacement: 'right',
+      boardSize: { width: 600, height: 400 },
+    };
+
+    expect(getTrayMetrics(layout).scale).toBeLessThanOrEqual(1);
   });
 });

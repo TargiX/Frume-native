@@ -46,6 +46,8 @@ export type StartPuzzleSessionParams = {
   boardMaxHeight: number;
   /** Width of the table the shelf runs across; defaults to the board. */
   traySurfaceExtent?: number;
+  /** Depth of a bottom shelf; defaults to the share the board alone gives. */
+  trayHeight?: number;
   trayPlacement?: PuzzleTrayPlacement;
   /** Classic only: loose pieces come out rotated and must be turned upright. */
   piecesRotatable?: boolean;
@@ -110,6 +112,7 @@ export type UsePuzzleSessionResult = {
     boardMaxWidth: number;
     boardMaxHeight: number;
     traySurfaceExtent?: number;
+    trayHeight?: number;
     trayPlacement: PuzzleTrayPlacement;
   }) => Promise<void>;
   /** Updates and durably schedules the board-help choice for this puzzle. */
@@ -197,6 +200,7 @@ export async function preparePuzzleSession(
     boardMaxWidth,
     boardMaxHeight,
     traySurfaceExtent,
+    trayHeight,
     trayPlacement = 'bottom',
     piecesRotatable = false,
   }: StartPuzzleSessionParams,
@@ -221,6 +225,7 @@ export async function preparePuzzleSession(
       boardMaxWidth,
       boardMaxHeight,
       traySurfaceExtent,
+      trayHeight,
       trayPlacement,
     };
     const generated = await cutter.generate(image, options);
@@ -902,6 +907,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         boardMaxWidth,
         boardMaxHeight,
         traySurfaceExtent,
+        trayHeight,
         trayPlacement = 'bottom',
         piecesRotatable = false,
       }: StartPuzzleSessionParams,
@@ -941,6 +947,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
             boardMaxWidth,
             boardMaxHeight,
             traySurfaceExtent,
+            trayHeight,
             trayPlacement,
             piecesRotatable,
           },
@@ -1273,11 +1280,13 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
       boardMaxWidth,
       boardMaxHeight,
       traySurfaceExtent,
+      trayHeight,
       trayPlacement,
     }: {
       boardMaxWidth: number;
       boardMaxHeight: number;
       traySurfaceExtent?: number;
+      trayHeight?: number;
       trayPlacement: PuzzleTrayPlacement;
     }) => {
       const current = sessionRef.current;
@@ -1290,6 +1299,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
         Math.abs(
           (current.layout.traySurfaceExtent ?? 0) - (traySurfaceExtent ?? 0),
         ) < 0.5 &&
+        Math.abs((current.layout.trayHeight ?? 0) - (trayHeight ?? 0)) < 0.5 &&
         (current.layout.trayPlacement ?? 'bottom') === trayPlacement
       ) {
         return;
@@ -1303,6 +1313,7 @@ export function usePuzzleSession(): UsePuzzleSessionResult {
           boardMaxWidth,
           boardMaxHeight,
           traySurfaceExtent,
+          trayHeight,
           trayPlacement,
           cutDescriptor: current.layout.cutDescriptor,
         };

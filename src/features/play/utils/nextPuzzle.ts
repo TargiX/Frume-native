@@ -11,6 +11,7 @@ type NextPuzzleLayout = Pick<
   | 'boardMaxWidth'
   | 'boardMaxHeight'
   | 'traySurfaceExtent'
+  | 'trayHeight'
   | 'trayPlacement'
 >;
 

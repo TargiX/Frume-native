@@ -71,6 +71,8 @@ export type CutOptions = {
    * of it. Defaults to the board when the caller does not know the table.
    */
   traySurfaceExtent?: number;
+  /** Depth of a bottom shelf; defaults to the share the board alone gives. */
+  trayHeight?: number;
   /** Stable input for procedural cutters. Equal seeds produce equal normalized cuts. */
   seed?: string | number;
   /** Reuses an existing procedural cut exactly, for example after a resize. */
