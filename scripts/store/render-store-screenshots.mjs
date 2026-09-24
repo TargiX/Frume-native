@@ -11,6 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const WIDTH = 1320;
@@ -52,11 +53,11 @@ SHOTS.forEach(([stem, headline, accent, support], index) => {
   </style></head><body>
   <div class="top"><span>FRUME</span><span>${number} / ${String(SHOTS.length).padStart(2, '0')}</span></div>
   <h1>${headline}<em>${accent}</em></h1><p>${support}</p>
-  <div class="device"><img src="file://${capture}"></div></body></html>`;
+  <div class="device"><img src="${pathToFileURL(capture).href.replaceAll('"', '%22')}"></div></body></html>`;
   const htmlPath = `${outDir}/${number}.html`;
   const pngPath = `${outDir}/${number}.png`;
   writeFileSync(htmlPath, html);
-  execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1', '--allow-file-access-from-files', `--screenshot=${pngPath}`, `--window-size=${WIDTH},${HEIGHT}`, `file://${htmlPath}`], { stdio: 'ignore' });
+  execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1', '--allow-file-access-from-files', `--screenshot=${pngPath}`, `--window-size=${WIDTH},${HEIGHT}`, pathToFileURL(htmlPath).href], { stdio: 'ignore' });
   execFileSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '92', pngPath, '--out', `${outDir}/${number}.jpg`], { stdio: 'ignore' });
   console.log(`${outDir}/${number}.jpg`);
 });
