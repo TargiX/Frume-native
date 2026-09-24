@@ -67,6 +67,7 @@ import {
   loadHowToPlaySeen,
   saveHowToPlaySeen,
 } from '../utils/howToPlayPreference';
+import { recordCompletionForReview } from '../../../review/reviewPrompt';
 import { completionPrimaryAction, shouldRunGameTimer } from './gameLifecycle';
 import {
   beginNextPuzzleRequest,
@@ -250,6 +251,8 @@ export function GameScreen({ navigation }: Props) {
       piece_count: state.layout.pieces.length,
       duration_s: state.activeElapsedMs / 1000,
     });
+    // Counts now; any rating prompt waits for the finished picture to land.
+    void recordCompletionForReview();
   }, [isCompleted, session, state]);
 
   useEffect(

@@ -82,7 +82,7 @@ output before building:
 | `CategoryPhotoPool` / `TrackingGrant` migration `v1` and `ProviderBudget` migration `v2` deployed | Deployed; all three live readiness bindings passed |
 | Rate-limit namespace IDs `2026073101` / `2026073102` confirmed unique | TODO |
 | Worker deploy URL | `https://frume-photos.targix8.workers.dev` |
-| Immutable Worker version ID | `7b62bdb3-9e60-4663-8387-10c2f584305d`; installed as `FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID` in the gitignored release environment |
+| Immutable Worker version ID | `f0c852c9-377f-4e47-9ec0-bdc89433b4ec`, deployed 2026-09-24 with the #13 `browse=1` collection endpoint (nine readiness checks true; single-photo `/photo` unchanged for 1.0.0). Previous: `7b62bdb3-9e60-4663-8387-10c2f584305d`. Install it as `FRUME_EXPECTED_PHOTO_API_DEPLOYMENT_ID` in the gitignored release environment |
 | Rotated Unsplash key installed and legacy key revoked | TODO |
 | Independent tracking-token HMAC secret generated and installed | Installed 2026-08-13; value intentionally not recorded |
 | Global grant limits and Cloudflare allowance | `10000` retained rows, `5` issuances/minute, `1` photo issuance/IP/minute, and `900` usable provider requests/hour deployed on Workers Free |

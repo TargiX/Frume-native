@@ -20,6 +20,12 @@ type ScreenProps = {
    * column and the safe-area padding.
    */
   background?: React.ReactNode;
+  /**
+   * Pinned below the scrolling content, above the bottom safe area, so a
+   * primary action or tab bar never scrolls away or clips on short phones.
+   */
+  footer?: React.ReactNode;
+  footerStyle?: ViewStyle;
   style?: ViewStyle;
 };
 
@@ -34,6 +40,8 @@ export function Screen({
   scroll = false,
   safeTop = false,
   background,
+  footer,
+  footerStyle,
   style,
 }: ScreenProps) {
   const edges = safeTop
@@ -67,6 +75,9 @@ export function Screen({
           {children}
         </View>
       )}
+      {footer ? (
+        <View style={[styles.footer, footerStyle]}>{footer}</View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -92,6 +103,11 @@ const styles = StyleSheet.create({
   },
   scrollContentCentered: {
     justifyContent: 'center',
+  },
+  footer: {
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: 'center',
   },
   contentCentered: {
     flex: 1,
