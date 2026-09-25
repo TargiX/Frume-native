@@ -2,10 +2,8 @@ import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   ImageBackground,
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,10 +40,6 @@ import {
 } from '../utils/photoRequest';
 import { pickOwnPhoto } from '../utils/pickOwnPhoto';
 import { discardManagedOwnPhotoCandidate } from '../utils/ownPhotoLibrary';
-import {
-  browsePuzzlePhotos,
-  type PuzzlePhoto,
-} from '../../../services/unsplash/fetchPuzzlePhoto';
 import { CATEGORY_COVERS } from './categoryCovers';
 import {
   galleryRetryAccessibilityHint,
@@ -63,11 +57,6 @@ export function GalleryScreen({ navigation }: Props) {
   const { session } = usePuzzleSessionContext();
   // The saved puzzle's photograph must survive the cleanup an import runs.
   const sessionImageUri = session?.layout.image.uri;
-  const [collection, setCollection] = useState<{
-    categoryId: string;
-    photos: PuzzlePhoto[];
-  } | null>(null);
-  const collectionsRef = useRef(new Map<string, PuzzlePhoto[]>());
   const retryActionRef = useRef<(() => void) | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +103,7 @@ export function GalleryScreen({ navigation }: Props) {
     };
   }, []);
 
-  const pickPhoto = async (categoryId?: string, photoId?: string) => {
+  const pickPhoto = async (categoryId?: string) => {
     requestRef.current?.controller.abort(
       new Error('Replaced by a newer photo selection'),
     );
@@ -122,26 +111,15 @@ export function GalleryScreen({ navigation }: Props) {
     const controller = new AbortController();
     requestRef.current = { id: requestId, controller };
     lastAttemptRef.current = { source: 'remote', categoryId };
-    retryActionRef.current = () => void pickPhoto(categoryId, photoId);
+    retryActionRef.current = () => void pickPhoto(categoryId);
     setPending(categoryId ?? 'surprise');
     setError(null);
     try {
-      const chosenPhoto = photoId
-        ? collection?.photos.find((photo) => photo.id === photoId)
-        : undefined;
-      const chosenOrientation = chosenPhoto
-        ? chosenPhoto.height > chosenPhoto.width
-          ? 'portrait'
-          : 'landscape'
-        : photoOrientation;
       const result = await fetchPuzzlePhoto(
         categoryId,
         controller.signal,
-        chosenOrientation,
-        chosenPhoto
-          ? chosenPhoto.width / chosenPhoto.height
-          : (targetPhotoAspect ?? undefined),
-        photoId,
+        photoOrientation,
+        targetPhotoAspect ?? undefined,
       );
       if (
         !mountedRef.current ||
@@ -218,49 +196,6 @@ export function GalleryScreen({ navigation }: Props) {
     });
   };
 
-  const browseCollection = async (categoryId: string) => {
-    requestRef.current?.controller.abort();
-    const id = ++nextRequestIdRef.current;
-    const controller = new AbortController();
-    requestRef.current = { id, controller };
-    lastAttemptRef.current = { source: 'remote', categoryId };
-    retryActionRef.current = () => void browseCollection(categoryId);
-    setPending(categoryId);
-    setError(null);
-    setCollection(null);
-    const cacheKey = `${categoryId}:${photoOrientation}:${targetPhotoAspect}`;
-    try {
-      const photos =
-        collectionsRef.current.get(cacheKey) ??
-        (await browsePuzzlePhotos(
-          categoryId,
-          controller.signal,
-          photoOrientation,
-          targetPhotoAspect ?? undefined,
-        ));
-      if (
-        !mountedRef.current ||
-        requestRef.current?.id !== id ||
-        controller.signal.aborted
-      )
-        return;
-      collectionsRef.current.set(cacheKey, photos);
-      setCollection({ categoryId, photos });
-    } catch (caught) {
-      if (
-        mountedRef.current &&
-        requestRef.current?.id === id &&
-        !controller.signal.aborted
-      )
-        setError(describePhotoRequestError(caught));
-    } finally {
-      if (requestRef.current?.id === id) {
-        requestRef.current = null;
-        if (mountedRef.current) setPending(null);
-      }
-    }
-  };
-
   const useBundledPhoto = (photo: BundledPhoto) => {
     requestRef.current?.controller.abort(
       new Error('Replaced by an offline photograph'),
@@ -293,354 +228,174 @@ export function GalleryScreen({ navigation }: Props) {
     });
   };
 
-  return (
-    <Screen
-      scroll
-      style={compactLandscape ? styles.landscapeContent : undefined}
-    >
-      <View style={compactLandscape ? styles.landscapeHeader : undefined}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.title} accessibilityRole="header">
-            Find your next quiet moment
-          </Text>
-          {compactLandscape && error ? (
-            <View style={styles.landscapeErrorRow}>
-              <Text
-                style={styles.landscapeError}
-                accessibilityLiveRegion={androidAccessibilityLiveRegion(
-                  'polite',
-                )}
-              >
-                {error}
-              </Text>
-              <Pressable
-                onPress={retryLastPhoto}
-                accessibilityRole="button"
-                accessibilityLabel={galleryRetryAccessibilityLabel(
-                  lastAttemptRef.current,
-                )}
-                hitSlop={12}
-              >
-                <Text style={styles.landscapeRetry}>Try again</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Text
-              style={[
-                styles.subtitle,
-                compactLandscape && styles.subtitleLandscape,
-              ]}
-            >
-              Browse a small collection, then choose the picture you want to
-              spend time with. Your own photos are always welcome.
-            </Text>
-          )}
-        </View>
-        {compactLandscape ? (
-          <Button
-            label="Surprise me"
-            variant="secondary"
-            onPress={() => pickPhoto()}
-            accessibilityHint={
-              loading
-                ? 'Cancels the current search and finds a surprise photo instead'
-                : undefined
-            }
-          />
-        ) : null}
-      </View>
-
-      <View style={styles.offlineSection}>
-        <Text style={styles.offlineTitle} accessibilityRole="header">
-          Always here, even offline
-        </Text>
-        <Text style={styles.offlineDetail}>
-          Bundled photographs that play with no connection at all.
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.offlineRow}
-        >
-          {BUNDLED_PHOTOS.map((photo) => (
-            <Pressable
-              key={photo.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${photo.title} by ${photo.attribution.photographerName}`}
-              accessibilityHint="Plays offline. Opens puzzle setup."
-              disabled={loading}
-              onPress={() => useBundledPhoto(photo)}
-              style={({ pressed }) => [
-                styles.offlineItem,
-                pressed && styles.cardPressed,
-              ]}
-            >
-              <Image
-                source={bundledAssetForId(photo.id)}
-                style={styles.offlineThumb}
-                accessibilityLabel={photo.accessibilityLabel}
-              />
-              <Text style={styles.offlineName} numberOfLines={1}>
-                {photo.title}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {collection ? (
-        <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-          <Button
-            label="Refresh photographs"
-            variant="ghost"
-            disabled={loading}
-            onPress={() => {
-              collectionsRef.current.clear();
-              void browseCollection(collection.categoryId);
-            }}
-          />
-          <Button
-            label="Browse other themes"
-            variant="ghost"
-            onPress={() => setCollection(null)}
-          />
-          <Text style={styles.title} accessibilityRole="header">
-            {
-              PUZZLE_CATEGORIES.find(
-                (item) => item.id === collection.categoryId,
-              )?.label
-            }{' '}
-            · Choose your photograph
-          </Text>
-          {collection.photos.map((photo) => (
-            <View key={photo.id} style={{ gap: spacing.xs }}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  photo.alt_description ?? 'Choose this photograph'
-                }
-                disabled={loading}
-                onPress={() => void pickPhoto(collection.categoryId, photo.id)}
-              >
-                <Image
-                  source={{ uri: photo.urls.regular }}
-                  style={{
-                    width: '100%',
-                    aspectRatio: photo.width / photo.height,
-                    maxHeight: 320,
-                    borderRadius: radius.lg,
-                  }}
-                  resizeMode="contain"
-                />
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel={`Photo by ${photo.user.name} on Unsplash`}
-                onPress={() =>
-                  void Linking.openURL(photo.user.links.html).catch(
-                    () => undefined,
-                  )
-                }
-                style={{ minHeight: 44, justifyContent: 'center' }}
-              >
-                <Text style={styles.subtitle}>
-                  Photo by {photo.user.name} on Unsplash
-                </Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <View style={[styles.grid, compactLandscape && styles.gridLandscape]}>
-        {PUZZLE_CATEGORIES.map((category) => {
-          const isPending = pending === category.id;
-          const coverContent = (
-            <>
-              {/* Keeps the label legible whatever the photograph does. */}
-              <View style={styles.scrim} />
-              {isPending ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <Text style={styles.cardLabel}>{category.label}</Text>
-              )}
-            </>
-          );
-
-          return (
-            <Pressable
-              key={category.id}
-              accessibilityRole="button"
-              accessibilityLabel={category.label}
-              accessibilityHint={
-                loading && !isPending
-                  ? 'Cancels the current search and finds this theme instead'
-                  : undefined
-              }
-              accessibilityState={{ busy: isPending }}
-              style={({ pressed }) => [
-                styles.card,
-                compactLandscape && [
-                  styles.cardLandscape,
-                  { width: cardWidth ?? undefined },
-                ],
-                useSingleColumnCards && styles.cardSingleColumn,
-                pressed && styles.cardPressed,
-              ]}
-              onPress={() => void browseCollection(category.id)}
-            >
-              <ImageBackground
-                source={CATEGORY_COVERS[category.id]}
-                style={styles.cover}
-                imageStyle={styles.coverImage}
-              >
-                {coverContent}
-              </ImageBackground>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.entryActions}>
-        {!compactLandscape ? (
-          <Button
-            label="Surprise me"
-            variant="secondary"
-            onPress={() => pickPhoto()}
-            accessibilityHint={
-              loading
-                ? 'Cancels the current search and finds a surprise photo instead'
-                : undefined
-            }
-          />
-        ) : null}
-        <Button
-          label="Use my photo"
-          variant="secondary"
-          onPress={() => void useOwnPhoto()}
-          accessibilityHint="Opens your photo library to cut one of your own photographs"
-        />
-      </View>
-
-      {loadingMessage ? (
-        <Text
-          style={styles.status}
-          accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
-        >
-          {loadingMessage}
-        </Text>
-      ) : null}
-
-      {error && !compactLandscape ? (
-        <View style={styles.errorGroup}>
+  const surprisePending = pending === 'surprise';
+  const footer = (
+    <View style={styles.footerContent}>
+      {error ? (
+        <View style={styles.errorRow}>
           <Text
             style={styles.error}
             accessibilityLiveRegion={androidAccessibilityLiveRegion('polite')}
           >
             {error}
           </Text>
-          <Button
-            label="Try again"
-            variant="secondary"
+          <Pressable
             onPress={retryLastPhoto}
+            accessibilityRole="button"
+            accessibilityLabel={galleryRetryAccessibilityLabel(
+              lastAttemptRef.current,
+            )}
             accessibilityHint={galleryRetryAccessibilityHint(
               lastAttemptRef.current,
             )}
-          />
+            hitSlop={12}
+          >
+            <Text style={styles.retry}>Try again</Text>
+          </Pressable>
         </View>
       ) : null}
+      <View
+        style={[
+          styles.entryActions,
+          fontScale >= 1.4 && styles.entryActionsStacked,
+        ]}
+      >
+        <View style={styles.entryAction}>
+          <Button
+            label={surprisePending ? 'Finding…' : 'Surprise me'}
+            variant="secondary"
+            block
+            disabled={surprisePending}
+            onPress={() => void pickPhoto()}
+            accessibilityHint="Finds a random photograph and opens puzzle setup"
+          />
+        </View>
+        <View style={styles.entryAction}>
+          <Button
+            label="Use my photo"
+            variant="primary"
+            block
+            onPress={() => void useOwnPhoto()}
+            accessibilityHint="Opens your photo library to cut one of your own photographs"
+          />
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <Screen
+      scroll
+      style={compactLandscape ? styles.landscapeContent : styles.content}
+      footer={footer}
+      footerStyle={styles.footer}
+    >
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        Themes
+      </Text>
+      <View style={[styles.grid, compactLandscape && styles.gridLandscape]}>
+        {PUZZLE_CATEGORIES.map((category) => (
+          <Pressable
+            key={category.id}
+            accessibilityRole="button"
+            accessibilityLabel={category.label}
+            accessibilityHint="Shows photographs from this theme"
+            style={({ pressed }) => [
+              styles.card,
+              compactLandscape && [
+                styles.cardLandscape,
+                { width: cardWidth ?? undefined },
+              ],
+              useSingleColumnCards && styles.cardSingleColumn,
+              pressed && styles.cardPressed,
+            ]}
+            onPress={() =>
+              navigation.navigate('ThemePhotos', { categoryId: category.id })
+            }
+          >
+            <ImageBackground
+              source={CATEGORY_COVERS[category.id]}
+              style={styles.cover}
+              imageStyle={styles.coverImage}
+            >
+              {/* Keeps the label legible whatever the photograph does. */}
+              <View style={styles.scrim} />
+              <Text style={styles.cardLabel}>{category.label}</Text>
+            </ImageBackground>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        Plays offline
+      </Text>
+      <Text style={styles.sectionDetail}>
+        Built into Frume, so they work with no connection.
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.offlineScroller}
+        contentContainerStyle={styles.offlineRow}
+      >
+        {BUNDLED_PHOTOS.map((photo) => (
+          <Pressable
+            key={photo.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${photo.title} by ${photo.attribution.photographerName}`}
+            accessibilityHint="Plays offline. Opens puzzle setup."
+            disabled={loading}
+            onPress={() => useBundledPhoto(photo)}
+            style={({ pressed }) => [
+              styles.offlineItem,
+              pressed && styles.cardPressed,
+            ]}
+          >
+            <Image
+              source={bundledAssetForId(photo.id)}
+              style={styles.offlineThumb}
+              accessibilityLabel={photo.accessibilityLabel}
+            />
+            <Text style={styles.offlineName} numberOfLines={1}>
+              {photo.title}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    paddingTop: spacing.lg,
+  },
   landscapeContent: {
     maxWidth: 1_080,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
-  landscapeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  titleGroup: {
-    flexShrink: 1,
-  },
-  landscapeErrorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    columnGap: spacing.md,
-    minHeight: 20,
-  },
-  landscapeError: {
-    flexShrink: 1,
-    color: colors.danger,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  landscapeRetry: {
-    color: colors.accent,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  title: {
+  sectionTitle: {
     color: colors.textPrimary,
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '700',
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  subtitleLandscape: {
-    marginBottom: 0,
-  },
-  offlineSection: {
-    marginBottom: spacing.xl,
-  },
-  offlineTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  offlineDetail: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
-  offlineRow: {
-    gap: spacing.md,
-  },
-  offlineItem: {
-    width: 132,
-    gap: spacing.xs,
-  },
-  offlineThumb: {
-    width: 132,
-    height: 88,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-  },
-  offlineName: {
+  sectionDetail: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 14,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl,
   },
   gridLandscape: {
     gap: spacing.sm,
-    marginBottom: 0,
+    marginBottom: spacing.xl,
   },
   card: {
     flexGrow: 1,
@@ -669,7 +424,6 @@ const styles = StyleSheet.create({
   },
   cover: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'flex-end',
     padding: spacing.md,
   },
@@ -678,36 +432,75 @@ const styles = StyleSheet.create({
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 10, 8, 0.56)',
+    backgroundColor: 'rgba(12, 10, 8, 0.38)',
   },
   cardLabel: {
     flexShrink: 1,
     maxWidth: '100%',
     color: '#fff',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
-    textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowRadius: 8,
   },
-  entryActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    alignItems: 'center',
+  // Bleeds to the screen edges so the last thumbnail visibly runs off: the
+  // row reads as something to swipe, not as three photos and some padding.
+  offlineScroller: {
+    marginHorizontal: -spacing.xl,
   },
-  status: {
+  offlineRow: {
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  offlineItem: {
+    width: 148,
+    gap: spacing.xs,
+  },
+  offlineThumb: {
+    width: 148,
+    height: 104,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  offlineName: {
     color: colors.textSecondary,
     fontSize: 13,
-    lineHeight: 19,
-    marginTop: spacing.lg,
+  },
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  footerContent: {
+    gap: spacing.sm,
+  },
+  entryActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  entryActionsStacked: {
+    flexDirection: 'column',
+  },
+  entryAction: {
+    flex: 1,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    columnGap: spacing.md,
   },
   error: {
+    flexShrink: 1,
     color: colors.danger,
+    fontSize: 14,
   },
-  errorGroup: {
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginTop: spacing.lg,
+  retry: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
