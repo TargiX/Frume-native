@@ -32,7 +32,14 @@ export function validateMobileAuditReport(report) {
     : {};
   const names = Object.keys(vulnerabilities).sort();
   const expectedNames = [...REVIEWED_MOBILE_VULNERABILITY_CHAIN].sort();
-  if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
+  // npm sometimes reports only the vulnerable leaf instead of every Metro
+  // package that depends on it. That narrower view of the same reviewed
+  // advisories is accepted; any package outside the reviewed chain, or a chain
+  // without the image-size leaf, still fails.
+  if (
+    !names.includes('image-size') ||
+    names.some((name) => !REVIEWED_MOBILE_VULNERABILITY_CHAIN.has(name))
+  ) {
     throw new Error(
       `Mobile dependency audit changed. Reviewed chain: ${expectedNames.join(', ')}. Observed: ${names.join(', ') || 'none'}.`,
     );
@@ -64,8 +71,8 @@ export function validateMobileAuditReport(report) {
     counts.critical !== 0 ||
     counts.moderate !== 0 ||
     counts.low !== 0 ||
-    counts.high !== expectedNames.length ||
-    counts.total !== expectedNames.length
+    counts.high !== names.length ||
+    counts.total !== names.length
   ) {
     throw new Error('Mobile dependency audit severity/count contract changed.');
   }
