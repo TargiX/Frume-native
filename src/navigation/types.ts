@@ -4,6 +4,8 @@ export type PlayStackParamList = {
   PlayHome: undefined;
   AboutSupport: undefined;
   Gallery: undefined;
+  /** One theme's photographs to choose from. */
+  ThemePhotos: { categoryId: string };
   Library: undefined;
   Difficulty: {
     imageUri: string;

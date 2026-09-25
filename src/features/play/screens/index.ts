@@ -3,3 +3,4 @@ export { DifficultyScreen } from './DifficultyScreen';
 export { GalleryScreen } from './GalleryScreen';
 export { GameScreen } from './GameScreen';
 export { PlayHomeScreen } from './PlayHomeScreen';
+export { ThemePhotosScreen } from './ThemePhotosScreen';

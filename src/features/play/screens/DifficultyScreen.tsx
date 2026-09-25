@@ -117,6 +117,15 @@ const ATTRIBUTION_HIT_SLOP = {
   left: spacing.xs,
 } as const;
 
+const SIZE_MOODS: Record<PuzzleDifficulty, string> = {
+  '3x3': 'A warm-up',
+  '4x4': 'A little pause',
+  '5x5': 'A cup of tea',
+  '7x7': 'Settle in',
+  '10x10': 'Take your time',
+  '14x14': 'A long evening',
+};
+
 type PlayableCutterId = Exclude<PuzzleCutterId, 'fractal'>;
 
 const PREMIUM_CUT_DETAILS: Record<PremiumCutCatalogId, string> = {
@@ -211,8 +220,6 @@ export function DifficultyScreen({ navigation, route }: Props) {
     persistenceError,
   } = usePuzzleSessionContext();
   const { isPremium } = usePremiumAccess();
-  const [showAllCuts, setShowAllCuts] = useState(false);
-  const [showAllSizes, setShowAllSizes] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<PuzzleDifficulty>('4x4');
   const [selectedCutter, setSelectedCutter] =
@@ -221,6 +228,9 @@ export function DifficultyScreen({ navigation, route }: Props) {
     useState<PuzzleGuideMode>('cuts');
   const [rotatePieces, setRotatePieces] = useState(false);
   const sizesForCut = availableSizes(selectedCutter);
+  const visibleSizes = SIZE_OPTIONS.filter((option) =>
+    sizesForCut.includes(option.id),
+  );
   /**
    * The cuts are a contact sheet: samples laid out to be compared, each with
    * its name under it and no card around it. Three to a row fits the set on
@@ -818,12 +828,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
         Choose a cut
       </Text>
       <View style={styles.cutOptions} accessibilityRole="radiogroup">
-        {CUT_STYLES.filter(
-          (option) =>
-            showAllCuts ||
-            ['classic', 'organic', 'biomorphic'].includes(option.id) ||
-            selectedCutter === option.id,
-        ).map((option) => {
+        {CUT_STYLES.map((option) => {
           const active = selectedCutter === option.id;
           const locked = isPremiumCutter(option.id) && !isPremium;
           const status = locked
@@ -929,11 +934,6 @@ export function DifficultyScreen({ navigation, route }: Props) {
         </Text>
       ) : null}
 
-      <Button
-        label={showAllCuts ? 'Fewer cut styles' : 'Explore all cut styles'}
-        variant="ghost"
-        onPress={() => setShowAllCuts((value) => !value)}
-      />
       <Text style={styles.title} accessibilityRole="header">
         Choose a size
       </Text>
@@ -952,13 +952,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       ) : null}
 
       <View style={styles.difficultyOptions} accessibilityRole="radiogroup">
-        {SIZE_OPTIONS.filter(
-          (option) =>
-            sizesForCut.includes(option.id) &&
-            (showAllSizes ||
-              ['4x4', '7x7', '10x10'].includes(option.id) ||
-              selectedDifficulty === option.id),
-        ).map((option) => {
+        {visibleSizes.map((option) => {
           const active = selectedDifficulty === option.id;
           const { rows, columns } = DIFFICULTY_GRID[option.id];
 
@@ -999,25 +993,12 @@ export function DifficultyScreen({ navigation, route }: Props) {
                   />
                 ) : null}
               </View>
-              <Text style={styles.optionDetail}>
-                {option.id === '4x4'
-                  ? 'A little pause'
-                  : option.id === '7x7'
-                    ? 'Settle in'
-                    : option.id === '10x10'
-                      ? 'Take your time'
-                      : `${rows} × ${columns}`}
-              </Text>
+              <Text style={styles.optionDetail}>{SIZE_MOODS[option.id]}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      <Button
-        label={showAllSizes ? 'Fewer sizes' : 'See every size'}
-        variant="ghost"
-        onPress={() => setShowAllSizes((value) => !value)}
-      />
       <Text style={styles.title} accessibilityRole="header">
         Board help
       </Text>
