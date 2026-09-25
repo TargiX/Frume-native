@@ -490,6 +490,19 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     }
     trayHeight = value.trayHeight;
   }
+  // Absent on puzzles saved before the shelf could rest on the bottom edge;
+  // those restore with the fixed gap.
+  let trayGap: number | undefined;
+  if (value.trayGap !== undefined) {
+    if (
+      typeof value.trayGap !== 'number' ||
+      !Number.isFinite(value.trayGap) ||
+      value.trayGap < 0
+    ) {
+      return null;
+    }
+    trayGap = value.trayGap;
+  }
   // Absent on puzzles saved before pieces could come out rotated; those
   // restore upright, exactly as they were saved.
   let piecesRotatable: boolean | undefined;
@@ -508,6 +521,7 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     boardSize,
     ...(traySurfaceExtent !== undefined ? { traySurfaceExtent } : {}),
     ...(trayHeight !== undefined ? { trayHeight } : {}),
+    ...(trayGap !== undefined ? { trayGap } : {}),
     ...(piecesRotatable !== undefined ? { piecesRotatable } : {}),
     pieces,
   };

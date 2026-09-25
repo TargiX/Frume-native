@@ -1,15 +1,20 @@
 import {
-  MAX_TRAY_HEIGHT,
   MIN_TRAY_HEIGHT,
   MIN_TRAY_WIDTH,
   TRAY_BOARD_GAP,
   TRAY_HEIGHT_RATIO,
   trayDepth,
   TRAY_WIDTH_RATIO,
+  TWO_ROW_TRAY_MIN_PIECES,
 } from '../../../puzzle/engine/tray';
 import type { PuzzleTrayPlacement } from '../../../puzzle/types';
 
 export const TABLE_INSET = 16;
+/**
+ * Height the floating HUD (progress pill and menu button) takes out of the top
+ * of the play area, measured from the table inset, plus a little air.
+ */
+export const HUD_CLEARANCE = 44;
 
 export type PlayLayout = {
   /** Solve area. The tray sits below in portrait and to the right in landscape. */
@@ -29,6 +34,7 @@ export type PlayLayout = {
    * keeps the width its board gives it.
    */
   trayHeight?: number;
+  trayGap?: number;
   trayPlacement: PuzzleTrayPlacement;
 };
 
@@ -109,20 +115,34 @@ export function computePlayLayout(
       (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
     ) * depth;
   // A wide photo on a tall phone runs out of width first and leaves table
-  // standing empty under the shelf. That height goes to the shelf instead, so
-  // its pieces can wait larger; the board keeps exactly the size it had. A
+  // standing empty. When there is room for a whole second row, a puzzle past a
+  // handful of pieces gets one: more of the pile in view, each piece a little
+  // smaller than on the board. The board keeps exactly the size it had, and a
   // board limited by height has nothing left over and keeps its fitted shelf.
+  const rowHeight = fittedTrayHeight / depth;
   const spareHeight = splittableHeight - boardHeight - fittedTrayHeight;
-  const trayHeight = Math.max(
-    fittedTrayHeight,
-    Math.min(fittedTrayHeight + spareHeight, MAX_TRAY_HEIGHT * depth),
-  );
+  const trayHeight =
+    depth === 1 &&
+    pieceCount >= TWO_ROW_TRAY_MIN_PIECES &&
+    spareHeight >= rowHeight
+      ? rowHeight * 2
+      : fittedTrayHeight;
+
+  // Whatever table is still left over goes between the board and the shelf,
+  // so the shelf rests on the bottom edge of the screen rather than hanging
+  // under the board. The board is centred in the space above the shelf once
+  // it has cleared the HUD; a board with too little room to clear it keeps
+  // the fixed gap and takes all of the room above itself instead.
+  const leftover = Math.max(0, splittableHeight - boardHeight - trayHeight);
+  const trayGap =
+    TRAY_BOARD_GAP + Math.max(0, leftover - HUD_CLEARANCE) / 2;
 
   return {
     surfaceWidth: boardWidth,
-    surfaceHeight: boardHeight + TRAY_BOARD_GAP + trayHeight,
+    surfaceHeight: boardHeight + trayGap + trayHeight,
     trayRunExtent: maxSurfaceWidth,
     trayHeight,
+    trayGap,
     boardWidth,
     boardHeight,
     trayPlacement,

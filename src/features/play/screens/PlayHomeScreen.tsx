@@ -178,6 +178,7 @@ export function PlayHomeScreen({ navigation }: Props) {
         boardMaxHeight: layout.boardHeight,
         traySurfaceExtent: layout.trayRunExtent,
         trayHeight: layout.trayHeight,
+        trayGap: layout.trayGap,
         trayPlacement: layout.trayPlacement,
       });
       if (started && actionGuard.isCurrent(requestId)) {

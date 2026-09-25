@@ -581,16 +581,24 @@ export function PuzzleBoard({
     surfaceInset,
     viewportWidth,
   );
-  const workspaceInsetY = resolveWorkspaceInset(
-    surfaceHeight,
+  // A bottom shelf rests on the bottom edge of the table: the spare height of
+  // a short workspace goes above the surface, never under the shelf. Nothing
+  // plays below the shelf, so it needs no overflow margin there; its surface
+  // runs on past the edge and reads as a drawer rather than a floating strip.
+  const workspaceInsetBottom =
+    trayPlacement === 'bottom'
+      ? 0
+      : resolveWorkspaceInset(surfaceHeight, surfaceInset, viewportHeight);
+  const workspaceInsetTop = Math.max(
     surfaceInset,
-    viewportHeight,
+    (viewportHeight ?? 0) - surfaceHeight - workspaceInsetBottom,
   );
   const workspaceWidth = surfaceWidth + workspaceInsetX * 2;
-  const workspaceHeight = surfaceHeight + workspaceInsetY * 2;
+  const workspaceHeight =
+    surfaceHeight + workspaceInsetTop + workspaceInsetBottom;
   // Where the board's own (0, 0) lands inside the drawn workspace.
   const originX = workspaceInsetX + surfaceOriginX;
-  const originY = workspaceInsetY + surfaceOriginY;
+  const originY = workspaceInsetTop + surfaceOriginY;
   const traySurfaceFrame = useMemo(
     () =>
       resolveTraySurfaceFrame(

@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  MAX_TRAY_HEIGHT,
   MIN_TRAY_HEIGHT,
   TRAY_BOARD_GAP,
   TRAY_HEIGHT_RATIO,
+  trayDepth,
 } from '../../../puzzle/engine/tray';
 import {
   computePlayLayout,
   computeSafeAreaPlayLayout,
+  HUD_CLEARANCE,
   TABLE_INSET,
 } from './boardLayout';
 
@@ -92,7 +93,7 @@ describe('computePlayLayout', () => {
     );
   });
 
-  it('gives a width-limited board’s spare table to the shelf, not the board', () => {
+  it('rests the shelf on the bottom edge and centres the board below the HUD', () => {
     // A 3:2 photo cut into 49 on a 402×874 phone: the board runs out of width
     // with half the table still empty below it.
     const insets = { top: 62, right: 0, bottom: 34, left: 0 };
@@ -100,24 +101,46 @@ describe('computePlayLayout', () => {
 
     expect(layout.boardWidth).toBeCloseTo(402 - TABLE_INSET * 2);
     expect(layout.boardHeight).toBeCloseTo((402 - TABLE_INSET * 2) / (3 / 2));
-    // Two rows, each as deep as a row is allowed to grow.
-    expect(layout.trayHeight).toBeCloseTo(MAX_TRAY_HEIGHT * 2);
-    expect(layout.surfaceHeight).toBeCloseTo(
-      layout.boardHeight + TRAY_BOARD_GAP + MAX_TRAY_HEIGHT * 2,
+    // The shelf keeps the two rows a 49-piece puzzle is dealt into.
+    const trayHeight = MIN_TRAY_HEIGHT * trayDepth(49);
+    expect(layout.trayHeight).toBeCloseTo(trayHeight);
+    // The rest of the table sits between board and shelf.
+    const table = 874 - insets.top - insets.bottom - TABLE_INSET * 2;
+    const leftover = table - TRAY_BOARD_GAP - layout.boardHeight - trayHeight;
+    expect(layout.trayGap).toBeCloseTo(
+      TRAY_BOARD_GAP + (leftover - HUD_CLEARANCE) / 2,
     );
-    expect(layout.surfaceHeight).toBeLessThanOrEqual(
-      874 - insets.top - insets.bottom - TABLE_INSET * 2,
+    expect(layout.surfaceHeight).toBeCloseTo(
+      layout.boardHeight + (layout.trayGap ?? 0) + trayHeight,
+    );
+    // Above the surface: exactly the HUD plus the same air as below the board.
+    expect(table - layout.surfaceHeight).toBeCloseTo(
+      HUD_CLEARANCE + ((layout.trayGap ?? 0) - TRAY_BOARD_GAP),
     );
   });
 
-  it('fills the table exactly when there is less spare than a full row', () => {
+  it('gives a small puzzle a second shelf row when the table has room', () => {
+    const insets = { top: 62, right: 0, bottom: 34, left: 0 };
+    const sixteen = computeSafeAreaPlayLayout(402, 874, insets, 3 / 2, 16);
+    const nine = computeSafeAreaPlayLayout(402, 874, insets, 3 / 2, 9);
+
+    expect(sixteen.trayHeight).toBeCloseTo(MIN_TRAY_HEIGHT * 2);
+    expect(nine.trayHeight).toBeCloseTo(MIN_TRAY_HEIGHT);
+  });
+
+  it('keeps the fixed gap when a board has no room to clear the HUD', () => {
+    const layout = computePlayLayout(390, 600, 3 / 4, 16);
+
+    expect(layout.trayGap).toBeCloseTo(TRAY_BOARD_GAP);
+  });
+
+  it('keeps one row when there is less spare than a full row', () => {
     const layout = computePlayLayout(402, 410, 3 / 2, 16);
 
     expect(layout.trayPlacement).toBe('bottom');
     expect(layout.boardWidth).toBeCloseTo(402 - TABLE_INSET * 2);
-    expect(layout.trayHeight).toBeGreaterThan(MIN_TRAY_HEIGHT);
-    expect(layout.trayHeight).toBeLessThan(MAX_TRAY_HEIGHT);
-    expect(layout.surfaceHeight).toBeCloseTo(410 - TABLE_INSET * 2);
+    expect(layout.trayHeight).toBeCloseTo(MIN_TRAY_HEIGHT);
+    expect(layout.surfaceHeight).toBeLessThanOrEqual(410 - TABLE_INSET * 2);
   });
 
   it('keeps the fitted shelf when the board is limited by height', () => {

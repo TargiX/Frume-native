@@ -11,7 +11,7 @@ import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
 import { shouldSnap } from './snap';
 import { buildShuffledPieceStates } from './shuffle';
 import { getTraySlotPosition } from './tray';
-import { arrangeTrayForFilter } from './trayFilter';
+import { arrangeTrayForFilter, compactTrayRow } from './trayFilter';
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -194,8 +194,8 @@ export class PuzzleEngine {
 
   /**
    * Lifts a piece out of the tray onto the play surface. The tray slot is kept
-   * so the piece can be dropped back, and no other piece is touched — the row
-   * never closes the gap.
+   * so the piece can be dropped back, and no other piece is touched while it
+   * is in the player's hand; the row closes the gap once it is released.
    */
   takeFromTray(pieceId: string, position: Point): void {
     const pieceState = this.state.pieces[pieceId];
@@ -561,6 +561,9 @@ export class PuzzleEngine {
           ? { pieceId, kind: connectedWithNeighbor ? 'connect' : 'seat' }
           : null,
     });
+    // The piece has been let go, so the waiting row closes the gap it left
+    // instead of keeping empty slots the player has to scroll past.
+    this.compactTray();
     if (snapped) this.checkCompletion();
     else this.recoverLoosePieces();
     // Recovery clears stale feedback; the connection itself remains meaningful.
@@ -832,6 +835,22 @@ export class PuzzleEngine {
         [pieceId]: { ...current, ...patch },
       },
     });
+  }
+
+  private compactTray(): void {
+    const compacted = compactTrayRow(this.state.layout, this.state.pieces);
+    if (!compacted) {
+      return;
+    }
+    const arranged =
+      this.state.trayFilter !== 'all'
+        ? arrangeTrayForFilter(
+            this.state.layout,
+            compacted,
+            this.state.trayFilter,
+          )
+        : null;
+    this.patch({ pieces: arranged ?? compacted });
   }
 
   private patch(partial: Partial<PuzzleEngineState>): void {

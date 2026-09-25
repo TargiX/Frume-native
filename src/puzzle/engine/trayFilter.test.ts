@@ -5,6 +5,7 @@ import type { PuzzleLayout, PuzzlePieceDefinition } from '../types/layout';
 import { getTraySlotPosition } from './tray';
 import {
   arrangeTrayForFilter,
+  compactTrayRow,
   edgePieceIds,
   isPieceHiddenByTrayFilter,
   supportsEdgeTrayFilter,
@@ -212,5 +213,43 @@ describe('arrangeTrayForFilter', () => {
     const arranged = arrangeTrayForFilter(layout, pieces, 'edges')!;
 
     expect(arrangeTrayForFilter(layout, arranged, 'edges')).toBeNull();
+  });
+});
+
+describe('compactTrayRow', () => {
+  it('moves waiting pieces into the gaps and keeps the slot permutation', () => {
+    const layout = gridLayout(2, 2);
+    const pieces: Record<string, PieceRuntimeState> = {
+      'p-0-0': { ...waiting('p-0-0', 0), inTray: false, locked: true },
+      'p-0-1': waiting('p-0-1', 1),
+      'p-1-0': { ...waiting('p-1-0', 2), inTray: false },
+      'p-1-1': waiting('p-1-1', 3),
+    };
+
+    const compacted = compactTrayRow(layout, pieces)!;
+
+    expect(compacted['p-0-1'].traySlot).toBe(0);
+    expect(compacted['p-1-1'].traySlot).toBe(1);
+    expect(compacted['p-0-1'].position).toEqual(
+      getTraySlotPosition(layout, 0, layout.pieces[1]),
+    );
+    // Pieces out of the tray take the slots after the row and do not move.
+    expect(compacted['p-0-0'].position).toEqual(pieces['p-0-0'].position);
+    expect(compacted['p-1-0'].position).toEqual(pieces['p-1-0'].position);
+    expect(
+      Object.values(compacted)
+        .map((piece) => piece.traySlot)
+        .sort(),
+    ).toEqual([0, 1, 2, 3]);
+  });
+
+  it('returns null when the row has no gaps', () => {
+    const layout = gridLayout(1, 2);
+    const pieces = {
+      'p-0-0': waiting('p-0-0', 0),
+      'p-0-1': { ...waiting('p-0-1', 1), inTray: false, locked: true },
+    };
+
+    expect(compactTrayRow(layout, pieces)).toBeNull();
   });
 });
