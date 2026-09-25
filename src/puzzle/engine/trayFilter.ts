@@ -119,3 +119,53 @@ export function arrangeTrayForFilter(
   });
   return changed ? next : null;
 }
+
+/**
+ * Closes the gaps a released piece leaves in the waiting row.
+ *
+ * Waiting pieces take the lowest slots in the order they already had, and
+ * every piece out of the tray — seated or loose on the table — takes the
+ * slots after them, so the global slot permutation persistence validates
+ * stays intact. A piece lifted but still in the player's hand is left alone
+ * by the caller, which only compacts once a piece has been let go; a loose
+ * piece dropped back later rejoins the end of the row.
+ *
+ * Returns null when the row has no gaps, letting the caller skip a patch.
+ */
+export function compactTrayRow(
+  layout: PuzzleLayout,
+  pieces: Record<string, PieceRuntimeState>,
+): Record<string, PieceRuntimeState> | null {
+  const bySlot = layout.pieces
+    .filter((definition) => pieces[definition.id] !== undefined)
+    .sort((a, b) => pieces[a.id].traySlot - pieces[b.id].traySlot);
+  const waiting = bySlot.filter((definition) => {
+    const piece = pieces[definition.id];
+    return piece.inTray && !piece.locked;
+  });
+  const others = bySlot.filter((definition) => {
+    const piece = pieces[definition.id];
+    return !(piece.inTray && !piece.locked);
+  });
+  const slots = bySlot.map((definition) => pieces[definition.id].traySlot);
+
+  let changed = false;
+  const next = { ...pieces };
+  [...waiting, ...others].forEach((definition, index) => {
+    const slot = slots[index];
+    const current = next[definition.id];
+    if (current.traySlot === slot) {
+      return;
+    }
+    changed = true;
+    next[definition.id] = current.inTray
+      ? {
+          ...current,
+          traySlot: slot,
+          position: getTraySlotPosition(layout, slot, definition),
+          rotation: slot % 2 === 0 ? TRAY_ROTATION : -TRAY_ROTATION,
+        }
+      : { ...current, traySlot: slot };
+  });
+  return changed ? next : null;
+}

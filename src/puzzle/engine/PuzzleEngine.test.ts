@@ -75,9 +75,13 @@ describe('PuzzleEngine recoverability', () => {
       position: puzzleLayout.pieces[0].correctPosition,
       rotation: puzzleLayout.pieces[0].correctRotation,
     });
-    expect(engine.getState().pieces['piece-b']).toEqual(
-      before.pieces['piece-b'],
-    );
+    // The waiting row closes the gap the assisted piece left.
+    expect(engine.getState().pieces['piece-b']).toEqual({
+      ...before.pieces['piece-b'],
+      traySlot: 0,
+      position: getTraySlotPosition(puzzleLayout, 0, puzzleLayout.pieces[1]),
+      rotation: 1.6,
+    });
   });
 
   it('uses the same assist method for a requested loose piece and no-ops once placed', () => {
@@ -166,12 +170,13 @@ describe('PuzzleEngine recoverability', () => {
   it('returns every loose piece to its stable tray slot without moving locked pieces', () => {
     const puzzleLayout = layout();
     const engine = new PuzzleEngine(puzzleLayout);
-    const looseTraySlot = engine.getState().pieces['piece-b'].traySlot;
 
     engine.takeFromTray('piece-a', { x: 10, y: 10 });
     engine.releasePiece('piece-a');
     engine.takeFromTray('piece-b', { x: 88, y: 32 });
     engine.releasePiece('piece-b');
+    // Released pieces keep the slot the compacted row gave them.
+    const looseTraySlot = engine.getState().pieces['piece-b'].traySlot;
 
     engine.returnAllLoosePiecesToTray();
 
@@ -205,10 +210,10 @@ describe('PuzzleEngine recoverability', () => {
     };
     const initialLayout = { ...layout(), cutDescriptor };
     const engine = new PuzzleEngine(initialLayout);
-    const traySlot = engine.getState().pieces['piece-a'].traySlot;
-    const waitingTraySlot = engine.getState().pieces['piece-b'].traySlot;
     engine.takeFromTray('piece-a', { x: 65, y: 55 });
     engine.releasePiece('piece-a');
+    const traySlot = engine.getState().pieces['piece-a'].traySlot;
+    const waitingTraySlot = engine.getState().pieces['piece-b'].traySlot;
 
     const resizedPieces = initialLayout.pieces.map((definition) => ({
       ...definition,
