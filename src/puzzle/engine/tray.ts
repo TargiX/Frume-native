@@ -112,11 +112,15 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
 
   // A bottom shelf the layout made deep enough for extra rows is dealt into
   // them; otherwise the piece count alone decides, as it always has.
+  const fittedRowHeight = Math.max(
+    MIN_TRAY_HEIGHT,
+    (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+  );
   const lanes =
     placement === 'bottom'
       ? Math.max(
           trayLanes(layout.pieces.length),
-          Math.floor((layout.trayHeight ?? 0) / MIN_TRAY_HEIGHT + 1e-6),
+          Math.floor((layout.trayHeight ?? 0) / fittedRowHeight + 1e-6),
         )
       : trayLanes(layout.pieces.length);
 

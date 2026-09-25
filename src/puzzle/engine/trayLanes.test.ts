@@ -116,6 +116,19 @@ describe('a deeper bottom shelf', () => {
     }
   });
 
+  it('does not split one tall fitted row into two', () => {
+    // A tall board fits a single row deeper than two minimum rows.
+    const layout: PuzzleLayout = {
+      ...layoutOf(9),
+      boardSize: { width: 300, height: 900 },
+    };
+    const fitted = getTrayMetrics(layout);
+
+    expect(getTrayMetrics({ ...layout, trayHeight: fitted.height }).lanes).toBe(
+      1,
+    );
+  });
+
   it('never makes the shelf shallower than the board alone gives it', () => {
     const fitted = getTrayMetrics(layoutOf(49));
     const saved = getTrayMetrics({ ...layoutOf(49), trayHeight: 10 });

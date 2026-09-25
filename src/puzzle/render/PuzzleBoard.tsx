@@ -589,10 +589,16 @@ export function PuzzleBoard({
     trayPlacement === 'bottom'
       ? 0
       : resolveWorkspaceInset(surfaceHeight, surfaceInset, viewportHeight);
-  const workspaceInsetTop = Math.max(
-    surfaceInset,
-    (viewportHeight ?? 0) - surfaceHeight - workspaceInsetBottom,
-  );
+  // A bottom-shelf workspace is never taller than the viewport: a board that
+  // fills the height gives up its top overflow margin rather than pushing the
+  // shelf below the bottom edge when the frame is centred.
+  const workspaceInsetTop =
+    trayPlacement === 'bottom' && viewportHeight !== undefined
+      ? Math.max(0, viewportHeight - surfaceHeight)
+      : Math.max(
+          surfaceInset,
+          (viewportHeight ?? 0) - surfaceHeight - workspaceInsetBottom,
+        );
   const workspaceWidth = surfaceWidth + workspaceInsetX * 2;
   const workspaceHeight =
     surfaceHeight + workspaceInsetTop + workspaceInsetBottom;
