@@ -1219,6 +1219,29 @@ function simulatePhaseField(
       downPixels[pixel] = y + 1 < height ? pixel + width : pixel;
     }
   }
+  // The 5-point Laplacian is anisotropic at the scale of the interface: a
+  // front one cell thick grows fastest along the grid axes, so fingers come out
+  // aligned to the lattice instead of wherever the seam points. The 9-point
+  // (Mehrstellen) stencil cancels that leading error term. Its stiffest mode is
+  // 16/3 over dx^2 against the 5-point 8, so the time step stays stable.
+  const isotropic = numerics.isotropicStencil === true;
+  const isotropicLaplacian = (field: Float32Array, pixel: number) => {
+    const left = leftPixels[pixel];
+    const right = rightPixels[pixel];
+    return (
+      (4 *
+        (field[left] +
+          field[right] +
+          field[upPixels[pixel]] +
+          field[downPixels[pixel]]) +
+        field[upPixels[left]] +
+        field[upPixels[right]] +
+        field[downPixels[left]] +
+        field[downPixels[right]] -
+        20 * field[pixel]) /
+      6
+    );
+  };
 
   // Free melt around the board: the border pieces have nothing to push against
   // there, so they grow outward into it and the puzzle's own outer edge ends up
@@ -1760,13 +1783,14 @@ function simulatePhaseField(
         for (let x = minX; x <= maxX; x += 1) {
           const pixel = rowOffset + x;
           const value = phi[pixel];
-          const laplacian =
-            (phi[leftPixels[pixel]] +
-              phi[rightPixels[pixel]] +
-              phi[upPixels[pixel]] +
-              phi[downPixels[pixel]] -
-              4 * value) *
-            invdx2;
+          const laplacian = isotropic
+            ? isotropicLaplacian(phi, pixel) * invdx2
+            : (phi[leftPixels[pixel]] +
+                phi[rightPixels[pixel]] +
+                phi[upPixels[pixel]] +
+                phi[downPixels[pixel]] -
+                4 * value) *
+              invdx2;
           let next = value;
           if (value > 0 || laplacian !== 0) {
             // Steinbach's pairwise potential folded into shared sums. Our
@@ -1938,13 +1962,14 @@ function simulatePhaseField(
           // a permanent maximum growth force along the whole perimeter --
           // invisible over a few hundred steps, fatal to the border pieces over
           // tens of thousands.
-          const laplacian =
-            (temperature[leftPixels[pixel]] +
-              temperature[rightPixels[pixel]] +
-              temperature[upPixels[pixel]] +
-              temperature[downPixels[pixel]] -
-              4 * temperature[pixel]) *
-            invdx2;
+          const laplacian = isotropic
+            ? isotropicLaplacian(temperature, pixel) * invdx2
+            : (temperature[leftPixels[pixel]] +
+                temperature[rightPixels[pixel]] +
+                temperature[upPixels[pixel]] +
+                temperature[downPixels[pixel]] -
+                4 * temperature[pixel]) *
+              invdx2;
           let relax = 0;
           if (bathCoupling > 0) {
             // The bath follows the CURRENT front, not the starting cell: this
