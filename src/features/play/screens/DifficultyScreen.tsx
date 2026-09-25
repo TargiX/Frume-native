@@ -233,7 +233,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
   const cutTileWidth =
     (cutContentWidth - spacing.md * (cutColumns - 1)) / cutColumns;
   const [showPremium, setShowPremium] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+  // Keyed by URI rather than toggled by load events: iOS can deliver
+  // onLoadStart after onLoadEnd for a cached photograph, which left the
+  // spinner spinning over a preview that had already drawn.
+  const [loadedImageUri, setLoadedImageUri] = useState<string | null>(null);
+  const imageLoading = loadedImageUri !== imageUri;
   const [imageError, setImageError] = useState(false);
   const [starting, setStarting] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
@@ -416,7 +420,6 @@ export function DifficultyScreen({ navigation, route }: Props) {
         return;
       }
       setImageError(false);
-      setImageLoading(true);
       navigation.setParams(buildDifficultyRouteParams(result, categoryId));
     } catch (requestError) {
       if (
@@ -711,13 +714,11 @@ export function DifficultyScreen({ navigation, route }: Props) {
               ? `${categoryLabel} puzzle photograph`
               : 'Puzzle photograph')
           }
-          onLoadStart={() => {
-            setImageLoading(true);
-            setImageError(false);
-          }}
-          onLoadEnd={() => setImageLoading(false)}
+          onLoadStart={() => setImageError(false)}
+          onLoad={() => setLoadedImageUri(imageUri)}
+          onLoadEnd={() => setLoadedImageUri(imageUri)}
           onError={() => {
-            setImageLoading(false);
+            setLoadedImageUri(imageUri);
             setImageError(true);
           }}
         />
