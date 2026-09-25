@@ -57,6 +57,7 @@ const params = {
   boardMaxWidth: 320,
   boardMaxHeight: 240,
   traySurfaceExtent: 480,
+  trayHeight: 120,
 };
 
 describe('preparePuzzleSession', () => {
@@ -139,6 +140,7 @@ describe('preparePuzzleSession', () => {
       boardMaxWidth: params.boardMaxWidth,
       boardMaxHeight: params.boardMaxHeight,
       traySurfaceExtent: params.traySurfaceExtent,
+      trayHeight: params.trayHeight,
       trayPlacement: 'bottom',
     });
   });

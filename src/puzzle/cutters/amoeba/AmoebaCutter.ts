@@ -84,6 +84,7 @@ export const AmoebaCutter: PuzzleCutter = {
       image,
       boardSize: { width, height },
       traySurfaceExtent: options.traySurfaceExtent,
+      trayHeight: options.trayHeight,
       pieces: biomorphicPiecesFrom(
         'amoeba-coral',
         cutDescriptor.rows,

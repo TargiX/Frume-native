@@ -1,4 +1,5 @@
 import {
+  MAX_TRAY_HEIGHT,
   MIN_TRAY_HEIGHT,
   MIN_TRAY_WIDTH,
   TRAY_BOARD_GAP,
@@ -23,6 +24,11 @@ export type PlayLayout = {
    * and uses the whole width of the table instead.
    */
   trayRunExtent: number;
+  /**
+   * How deep the bottom shelf is. Absent in landscape, where the side shelf
+   * keeps the width its board gives it.
+   */
+  trayHeight?: number;
   trayPlacement: PuzzleTrayPlacement;
 };
 
@@ -97,16 +103,26 @@ export function computePlayLayout(
   );
   const boardWidth = Math.min(maxSurfaceWidth, maxBoardHeight * safeAspect);
   const boardHeight = boardWidth / safeAspect;
-  const trayHeight =
+  const fittedTrayHeight =
     Math.max(
       MIN_TRAY_HEIGHT,
       (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
     ) * depth;
+  // A wide photo on a tall phone runs out of width first and leaves table
+  // standing empty under the shelf. That height goes to the shelf instead, so
+  // its pieces can wait larger; the board keeps exactly the size it had. A
+  // board limited by height has nothing left over and keeps its fitted shelf.
+  const spareHeight = splittableHeight - boardHeight - fittedTrayHeight;
+  const trayHeight = Math.max(
+    fittedTrayHeight,
+    Math.min(fittedTrayHeight + spareHeight, MAX_TRAY_HEIGHT * depth),
+  );
 
   return {
     surfaceWidth: boardWidth,
     surfaceHeight: boardHeight + TRAY_BOARD_GAP + trayHeight,
     trayRunExtent: maxSurfaceWidth,
+    trayHeight,
     boardWidth,
     boardHeight,
     trayPlacement,

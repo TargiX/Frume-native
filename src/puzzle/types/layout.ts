@@ -130,6 +130,13 @@ export type PuzzleLayout = {
    */
   traySurfaceExtent?: number;
   /**
+   * How deep a bottom shelf is. A wide photo on a tall phone is limited by the
+   * width and leaves table standing empty; the layout gives that height to the
+   * shelf so its pieces can wait larger. Absent beside the board in landscape
+   * and on puzzles saved before, which keep the depth the board alone gives.
+   */
+  trayHeight?: number;
+  /**
    * The quarter-turn challenge chosen at setup: loose pieces come out of the
    * tray rotated and must be turned upright before they seat. Absent on
    * puzzles saved before the option existed — those play exactly as saved.

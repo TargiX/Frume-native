@@ -23,6 +23,7 @@ export const ClassicCutter: PuzzleCutter = {
       image,
       boardSize: { width: boardWidth, height: boardHeight },
       traySurfaceExtent: options.traySurfaceExtent,
+      trayHeight: options.trayHeight,
       pieces: generateClassicGridPieces(rows, columns, boardWidth, boardHeight),
     };
   },

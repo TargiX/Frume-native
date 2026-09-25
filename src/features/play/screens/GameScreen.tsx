@@ -375,6 +375,9 @@ export function GameScreen({ navigation }: Props) {
       Math.abs(
         (session.layout.traySurfaceExtent ?? 0) - playLayout.trayRunExtent,
       ) < 0.5 &&
+      Math.abs(
+        (session.layout.trayHeight ?? 0) - (playLayout.trayHeight ?? 0),
+      ) < 0.5 &&
       (session.layout.trayPlacement ?? 'bottom') === playLayout.trayPlacement
     ) {
       return;
@@ -383,6 +386,7 @@ export function GameScreen({ navigation }: Props) {
       boardMaxWidth: playLayout.boardWidth,
       boardMaxHeight: playLayout.boardHeight,
       traySurfaceExtent: playLayout.trayRunExtent,
+      trayHeight: playLayout.trayHeight,
       trayPlacement: playLayout.trayPlacement,
     });
   }, [
@@ -390,10 +394,12 @@ export function GameScreen({ navigation }: Props) {
     currentBoardWidth,
     playLayout.boardHeight,
     playLayout.boardWidth,
+    playLayout.trayHeight,
     playLayout.trayPlacement,
     playLayout.trayRunExtent,
     resizeSession,
     session?.engine,
+    session?.layout.trayHeight,
     session?.layout.trayPlacement,
     session?.layout.traySurfaceExtent,
   ]);
@@ -488,6 +494,7 @@ export function GameScreen({ navigation }: Props) {
           boardMaxWidth: nextLayout.boardWidth,
           boardMaxHeight: nextLayout.boardHeight,
           traySurfaceExtent: nextLayout.trayRunExtent,
+          trayHeight: nextLayout.trayHeight,
           trayPlacement: nextLayout.trayPlacement,
         }),
         {

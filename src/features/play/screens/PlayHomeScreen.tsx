@@ -177,6 +177,7 @@ export function PlayHomeScreen({ navigation }: Props) {
         boardMaxWidth: layout.boardWidth,
         boardMaxHeight: layout.boardHeight,
         traySurfaceExtent: layout.trayRunExtent,
+        trayHeight: layout.trayHeight,
         trayPlacement: layout.trayPlacement,
       });
       if (started && actionGuard.isCurrent(requestId)) {

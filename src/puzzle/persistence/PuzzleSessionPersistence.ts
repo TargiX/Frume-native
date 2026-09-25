@@ -477,6 +477,19 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     }
     traySurfaceExtent = value.traySurfaceExtent;
   }
+  // Absent on puzzles saved before the shelf could take spare table; those
+  // restore with the depth their board gives, exactly as they were saved.
+  let trayHeight: number | undefined;
+  if (value.trayHeight !== undefined) {
+    if (
+      typeof value.trayHeight !== 'number' ||
+      !Number.isFinite(value.trayHeight) ||
+      value.trayHeight <= 0
+    ) {
+      return null;
+    }
+    trayHeight = value.trayHeight;
+  }
   // Absent on puzzles saved before pieces could come out rotated; those
   // restore upright, exactly as they were saved.
   let piecesRotatable: boolean | undefined;
@@ -494,6 +507,7 @@ function parseLayout(value: unknown): PuzzleLayout | null {
     image,
     boardSize,
     ...(traySurfaceExtent !== undefined ? { traySurfaceExtent } : {}),
+    ...(trayHeight !== undefined ? { trayHeight } : {}),
     ...(piecesRotatable !== undefined ? { piecesRotatable } : {}),
     pieces,
   };

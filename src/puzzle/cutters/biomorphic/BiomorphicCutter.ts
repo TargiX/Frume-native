@@ -91,6 +91,7 @@ export const BiomorphicCutter: PuzzleCutter = {
       image,
       boardSize: { width, height },
       traySurfaceExtent: options.traySurfaceExtent,
+      trayHeight: options.trayHeight,
       pieces:
         cutDescriptor.version === LEGACY_BIOMORPHIC_CUT_VERSION
           ? generateBiomorphicPieces(

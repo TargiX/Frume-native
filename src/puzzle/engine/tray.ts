@@ -12,6 +12,19 @@ const TRAY_PADDING = 12;
 export const TRAY_HEIGHT_RATIO = 0.15;
 /** Keeps large Easy pieces comfortably tappable while they wait in the tray. */
 export const MIN_TRAY_HEIGHT = 76;
+/**
+ * Deepest one row of the bottom shelf grows when a width-limited board leaves
+ * the table spare height. About 1.6× the minimum: room for a waiting piece to
+ * read at a comfortable size, not so much that the shelf outweighs the board.
+ */
+export const MAX_TRAY_HEIGHT = 120;
+/**
+ * How much larger than on the board a piece may wait in the bottom shelf. A
+ * wide photo on a tall phone cuts into small pieces; a deep shelf shows them
+ * half again as large, and they settle to board size as they are lifted. Any
+ * more and that settle reads as the piece jumping out of the finger.
+ */
+export const MAX_TRAY_PIECE_SCALE = 1.5;
 /** Landscape counterpart to MIN_TRAY_HEIGHT. */
 export const MIN_TRAY_WIDTH = 76;
 /** Share of a landscape play surface given to the side tray. */
@@ -130,13 +143,20 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
     };
   }
 
-  const height =
+  // The layout may have handed the shelf table the board could not use; it is
+  // never shallower than the board alone would make it.
+  const height = Math.max(
     Math.max(
       MIN_TRAY_HEIGHT,
       (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
-    ) * trayDepth(layout.pieces.length);
+    ) * trayDepth(layout.pieces.length),
+    layout.trayHeight ?? 0,
+  );
   const laneHeight = height / lanes;
-  const scale = Math.min(1, (laneHeight - TRAY_PADDING * 2) / largest.height);
+  const scale = Math.min(
+    MAX_TRAY_PIECE_SCALE,
+    (laneHeight - TRAY_PADDING * 2) / largest.height,
+  );
 
   // Uniform slots sized to the widest piece: every piece then sits centred in
   // an identical cell, so the row is evenly spaced whatever order it is dealt
