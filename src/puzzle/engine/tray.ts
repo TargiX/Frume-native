@@ -13,18 +13,17 @@ export const TRAY_HEIGHT_RATIO = 0.15;
 /** Keeps large Easy pieces comfortably tappable while they wait in the tray. */
 export const MIN_TRAY_HEIGHT = 76;
 /**
- * Deepest one row of the bottom shelf grows when a width-limited board leaves
- * the table spare height. About 1.6× the minimum: room for a waiting piece to
- * read at a comfortable size, not so much that the shelf outweighs the board.
+ * Pieces never wait larger than they sit on the board: the shelf shows them a
+ * little smaller, and they grow to full size under the finger as they are
+ * lifted. That small-in-the-shelf, full-size-in-hand change is part of the feel.
  */
-export const MAX_TRAY_HEIGHT = 120;
+export const MAX_TRAY_PIECE_SCALE = 1;
 /**
- * How much larger than on the board a piece may wait in the bottom shelf. A
- * wide photo on a tall phone cuts into small pieces; a deep shelf shows them
- * half again as large, and they settle to board size as they are lifted. Any
- * more and that settle reads as the piece jumping out of the finger.
+ * A puzzle past this many pieces is dealt into two shelf rows whenever the
+ * table has the height for them: twice as many pieces in view without
+ * scrolling, each a little smaller than on the board.
  */
-export const MAX_TRAY_PIECE_SCALE = 1.5;
+export const TWO_ROW_TRAY_MIN_PIECES = 10;
 /** Landscape counterpart to MIN_TRAY_HEIGHT. */
 export const MIN_TRAY_WIDTH = 76;
 /** Share of a landscape play surface given to the side tray. */
@@ -111,7 +110,19 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   const runOrigin =
     (runExtent - (placement === 'right' ? boardHeight : boardWidth)) / -2;
 
-  const lanes = trayLanes(layout.pieces.length);
+  // A bottom shelf the layout made deep enough for extra rows is dealt into
+  // them; otherwise the piece count alone decides, as it always has.
+  const fittedRowHeight = Math.max(
+    MIN_TRAY_HEIGHT,
+    (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+  );
+  const lanes =
+    placement === 'bottom'
+      ? Math.max(
+          trayLanes(layout.pieces.length),
+          Math.floor((layout.trayHeight ?? 0) / fittedRowHeight + 1e-6),
+        )
+      : trayLanes(layout.pieces.length);
 
   if (placement === 'right') {
     const width =
@@ -171,7 +182,9 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   return {
     placement,
     left: runOrigin,
-    top: boardHeight + TRAY_BOARD_GAP,
+    // The layout may also hand spare table to the gap so the shelf rests on
+    // the bottom edge; it is never tighter than the fixed gap.
+    top: boardHeight + Math.max(TRAY_BOARD_GAP, layout.trayGap ?? 0),
     width: runExtent,
     height,
     scale,

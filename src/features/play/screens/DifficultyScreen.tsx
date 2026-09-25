@@ -506,6 +506,7 @@ export function DifficultyScreen({ navigation, route }: Props) {
       boardMaxHeight: playLayout.boardHeight,
       traySurfaceExtent: playLayout.trayRunExtent,
       trayHeight: playLayout.trayHeight,
+      trayGap: playLayout.trayGap,
       trayPlacement: playLayout.trayPlacement,
     },
     expectedSession: session,

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   getTrayMetrics,
   getTraySlotPosition,
-  MAX_TRAY_HEIGHT,
   MAX_TRAY_PIECE_SCALE,
+  MIN_TRAY_HEIGHT,
   trayDepth,
   trayLanes,
 } from './tray';
@@ -95,22 +95,38 @@ describe('tray slots across lanes', () => {
 });
 
 describe('a deeper bottom shelf', () => {
-  it('draws waiting pieces larger, but no more than half again', () => {
-    const layout = { ...layoutOf(49), trayHeight: MAX_TRAY_HEIGHT * 2 };
+  it('deals a small puzzle into two rows when the layout makes room', () => {
+    const oneRow = getTrayMetrics(layoutOf(16));
+    const layout = { ...layoutOf(16), trayHeight: MIN_TRAY_HEIGHT * 2 };
     const metrics = getTrayMetrics(layout);
 
-    expect(metrics.height).toBe(MAX_TRAY_HEIGHT * 2);
-    expect(getTrayMetrics(layoutOf(49)).scale).toBeLessThan(metrics.scale);
-    expect(metrics.scale).toBe(MAX_TRAY_PIECE_SCALE);
+    expect(oneRow.lanes).toBe(1);
+    expect(metrics.lanes).toBe(2);
+    // Waiting pieces are never drawn larger than on the board.
+    expect(metrics.scale).toBeLessThanOrEqual(MAX_TRAY_PIECE_SCALE);
+    expect(MAX_TRAY_PIECE_SCALE).toBe(1);
 
-    // Scaled around its centre, the larger piece still sits inside its row.
-    for (const slot of [0, 1, 48]) {
+    // Scaled around its centre, each piece still sits inside its row.
+    for (const slot of [0, 1, 15]) {
       const position = getTraySlotPosition(layout, slot, piece(String(slot)));
       const drawn = 40 * metrics.scale;
       const top = position.y + 20 - drawn / 2;
       expect(top).toBeGreaterThanOrEqual(metrics.top - 1);
       expect(top + drawn).toBeLessThanOrEqual(metrics.top + metrics.height + 1);
     }
+  });
+
+  it('does not split one tall fitted row into two', () => {
+    // A tall board fits a single row deeper than two minimum rows.
+    const layout: PuzzleLayout = {
+      ...layoutOf(9),
+      boardSize: { width: 300, height: 900 },
+    };
+    const fitted = getTrayMetrics(layout);
+
+    expect(getTrayMetrics({ ...layout, trayHeight: fitted.height }).lanes).toBe(
+      1,
+    );
   });
 
   it('never makes the shelf shallower than the board alone gives it', () => {

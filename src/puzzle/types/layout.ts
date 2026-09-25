@@ -136,6 +136,8 @@ export type PuzzleLayout = {
    * and on puzzles saved before, which keep the depth the board alone gives.
    */
   trayHeight?: number;
+  /** Table between a bottom shelf and the board; defaults to the fixed gap. */
+  trayGap?: number;
   /**
    * The quarter-turn challenge chosen at setup: loose pieces come out of the
    * tray rotated and must be turned upright before they seat. Absent on

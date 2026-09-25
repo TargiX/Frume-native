@@ -5,7 +5,9 @@ import {
 } from './surfacePalette';
 
 export const PHOTO_GLASS_BLUR_RADIUS = 24;
-export const PHOTO_GLASS_TINT = 'rgba(17, 14, 12, 0.44)';
+// Dark enough that a bright photograph reads as a dim table, not a second picture
+// competing with the board.
+export const PHOTO_GLASS_TINT = 'rgba(17, 14, 12, 0.62)';
 export const PHOTO_GLASS_VIGNETTE: string[] = [
   'rgba(255, 255, 255, 0.14)',
   'rgba(0, 0, 0, 0.3)',

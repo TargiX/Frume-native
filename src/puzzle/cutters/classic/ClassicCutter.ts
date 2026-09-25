@@ -24,6 +24,7 @@ export const ClassicCutter: PuzzleCutter = {
       boardSize: { width: boardWidth, height: boardHeight },
       traySurfaceExtent: options.traySurfaceExtent,
       trayHeight: options.trayHeight,
+      trayGap: options.trayGap,
       pieces: generateClassicGridPieces(rows, columns, boardWidth, boardHeight),
     };
   },

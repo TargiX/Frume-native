@@ -67,6 +67,7 @@ import {
   loadHowToPlaySeen,
   saveHowToPlaySeen,
 } from '../utils/howToPlayPreference';
+import { resolveTrayMaterial } from '../../../puzzle/render/photoGlassStyle';
 import { recordCompletionForReview } from '../../../review/reviewPrompt';
 import { completionPrimaryAction, shouldRunGameTimer } from './gameLifecycle';
 import {
@@ -378,6 +379,8 @@ export function GameScreen({ navigation }: Props) {
       Math.abs(
         (session.layout.trayHeight ?? 0) - (playLayout.trayHeight ?? 0),
       ) < 0.5 &&
+      Math.abs((session.layout.trayGap ?? 0) - (playLayout.trayGap ?? 0)) <
+        0.5 &&
       (session.layout.trayPlacement ?? 'bottom') === playLayout.trayPlacement
     ) {
       return;
@@ -387,6 +390,7 @@ export function GameScreen({ navigation }: Props) {
       boardMaxHeight: playLayout.boardHeight,
       traySurfaceExtent: playLayout.trayRunExtent,
       trayHeight: playLayout.trayHeight,
+      trayGap: playLayout.trayGap,
       trayPlacement: playLayout.trayPlacement,
     });
   }, [
@@ -394,11 +398,13 @@ export function GameScreen({ navigation }: Props) {
     currentBoardWidth,
     playLayout.boardHeight,
     playLayout.boardWidth,
+    playLayout.trayGap,
     playLayout.trayHeight,
     playLayout.trayPlacement,
     playLayout.trayRunExtent,
     resizeSession,
     session?.engine,
+    session?.layout.trayGap,
     session?.layout.trayHeight,
     session?.layout.trayPlacement,
     session?.layout.traySurfaceExtent,
@@ -495,6 +501,7 @@ export function GameScreen({ navigation }: Props) {
           boardMaxHeight: nextLayout.boardHeight,
           traySurfaceExtent: nextLayout.trayRunExtent,
           trayHeight: nextLayout.trayHeight,
+          trayGap: nextLayout.trayGap,
           trayPlacement: nextLayout.trayPlacement,
         }),
         {
@@ -715,6 +722,21 @@ export function GameScreen({ navigation }: Props) {
           hapticsEnabled={hapticFeedbackAllowed}
         />
       </View>
+      {playLayout.trayPlacement === 'bottom' ? (
+        // The shelf's material carries on under the table inset and the home
+        // indicator, so the drawer meets the bottom edge of the phone instead
+        // of stopping short above a strip of table.
+        <View
+          pointerEvents="none"
+          style={[
+            styles.trayDrawerFooter,
+            {
+              height: insets.bottom + TABLE_INSET,
+              backgroundColor: resolveTrayMaterial(tableAppearance).bottom,
+            },
+          ]}
+        />
+      ) : null}
       {isCompleted ? (
         <PuzzleCelebration
           elapsedMs={elapsedMs}
@@ -841,6 +863,12 @@ const styles = StyleSheet.create({
     // The board carries its own depth now that a zoomed board fills the whole
     // table: a shadow on this frame would outline the empty table around it.
     elevation: 0,
+  },
+  trayDrawerFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   hudLayer: {
     ...StyleSheet.absoluteFillObject,
