@@ -23,6 +23,9 @@ vi.mock('react-native-purchases', () => ({
 
 import { DISCOVERY_IMAGE } from '../discovery';
 import { PuzzleEngine } from '../engine';
+import { getCutter } from '../cutters';
+import { clearBakedCutLibrary, installBakedCutLibraries } from '../cutters/biomorphic/bakedCutSource';
+import { BAKED_CUT_LIBRARY_V1 } from '../cutters/biomorphic/bakedLibrary.v1';
 import type {
   PuzzleCutter,
   PuzzleEngineSnapshot,
@@ -61,6 +64,32 @@ const params = {
 };
 
 describe('preparePuzzleSession', () => {
+  it.each(['biomorphic', 'living-spectrum', 'crystal', 'crystal-quartered', 'amoeba', 'amoeba-columnar'] as const)(
+    'randomizes a fresh %s play and retains the saved seed on restore', async (cutterId) => {
+      installBakedCutLibraries({ 1: BAKED_CUT_LIBRARY_V1, 2: BAKED_CUT_LIBRARY_V1 }, 2);
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.15);
+      try {
+        const first = await preparePuzzleSession({ ...params, cutterId }, getCutter, true);
+        random.mockReturnValue(0.85);
+        const second = await preparePuzzleSession({ ...params, cutterId }, getCutter, true);
+        expect(first.success).toBe(true);
+        expect(second.success).toBe(true);
+        if (!first.success || !second.success) throw new Error('Expected playable sessions');
+        const descriptor = first.session.layout.cutDescriptor!;
+        expect(descriptor.bakedLibraryVersion).toBe(2);
+        expect(second.session.layout.cutDescriptor!.seed).not.toBe(descriptor.seed);
+        const restored = await getCutter(cutterId).generate(params.image, {
+          ...params, cutDescriptor: JSON.parse(JSON.stringify(descriptor)),
+        });
+        expect(restored.cutDescriptor).toEqual(descriptor);
+        expect(restored.pieces).toEqual(first.session.layout.pieces);
+      } finally {
+        random.mockRestore();
+        clearBakedCutLibrary();
+      }
+    },
+  );
+
   it('fails closed before generating an Organic puzzle without verified access', async () => {
     const resolveCutter = vi.fn();
 

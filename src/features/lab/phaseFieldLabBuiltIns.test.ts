@@ -4,6 +4,13 @@ import { parsePhaseFieldLabSettings } from "../../puzzle/cutters/biomorphic/phas
 import { PHASE_FIELD_LAB_BUILT_INS } from "./phaseFieldLabBuiltIns";
 
 describe("PHASE_FIELD_LAB_BUILT_INS", () => {
+  it('loads both experimental families on the same starting sites', () => {
+    const organic = PHASE_FIELD_LAB_BUILT_INS.find(preset => preset.id === 'organic-v1')!;
+    const rounded = PHASE_FIELD_LAB_BUILT_INS.find(preset => preset.id === 'rounded-v1')!;
+    expect(organic.settings.seed).toBe(rounded.settings.seed);
+    expect(organic.settings.numerics.dx).toBeCloseTo(0.012, 12);
+    expect(rounded.settings.profile.lambda1).toBeGreaterThan(organic.settings.profile.lambda1);
+  });
   it("ships only settings the lab's own validator accepts", () => {
     // A built-in that fails to parse would blow up on load, since the screen
     // re-serializes settings the moment a preset is selected.

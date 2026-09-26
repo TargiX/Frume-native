@@ -10,7 +10,7 @@ import {
   canonicalizeBiomorphicSeed,
   generateBiomorphicPieces,
 } from './generateBiomorphic';
-import { biomorphicPiecesFrom } from './bakedCutSource';
+import { bakedLibraryDescriptorFields, biomorphicPiecesFrom } from './bakedCutSource';
 import { generateBiomorphicPhaseFieldPieces } from './generateBiomorphicPhaseField';
 
 const BIOMORPHIC_CUT_VERSION = 2;
@@ -64,6 +64,7 @@ function descriptorFromOptions(
   return {
     cutterId: 'biomorphic',
     version: BIOMORPHIC_CUT_VERSION,
+    ...bakedLibraryDescriptorFields(),
     seed: canonicalizeBiomorphicSeed(sourceSeed),
     rows,
     columns,
@@ -117,6 +118,7 @@ export const BiomorphicCutter: PuzzleCutter = {
                   height,
                   cutDescriptor.seed,
                 ),
+              cutDescriptor.bakedLibraryVersion,
             ),
     };
   },

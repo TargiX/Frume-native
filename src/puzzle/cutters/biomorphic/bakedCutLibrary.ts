@@ -45,9 +45,10 @@ export function hashSeed(seed: string): number {
 /**
  * The cut a seed lands on, and how it is turned.
  *
- * Turning multiplies what a finite library can serve by four at no cost in
- * bytes, so a player has to reach the thirty-third puzzle of one style and
- * size before a board repeats rather than the ninth.
+ * Turning provides four orientations per square-board entry. This is a hash
+ * lookup, not a shuffle bag: repeats can occur before every entry is seen.
+ * Growing the pool changes this mapping, so saved descriptors need a stable
+ * pool version or variant identity before live libraries are expanded.
  */
 export function pickBakedCut(
   library: BakedCutLibrary,

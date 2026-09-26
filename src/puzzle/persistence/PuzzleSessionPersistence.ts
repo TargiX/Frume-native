@@ -20,8 +20,11 @@ import {
 } from '../types/cutter';
 
 const LEGACY_PUZZLE_SESSION_SCHEMA_VERSION = 1;
-const PREVIOUS_PUZZLE_SESSION_SCHEMA_VERSION = 2;
-export const PUZZLE_SESSION_SCHEMA_VERSION = 3;
+const ACTIVE_TIMER_SCHEMA_VERSION = 2;
+const GUIDE_MODE_SCHEMA_VERSION = 3;
+// Readers predating catalog identity must reject new saves instead of dropping
+// the catalog field and rebuilding a different cut when the board is resized.
+export const PUZZLE_SESSION_SCHEMA_VERSION = 4;
 export const PUZZLE_SESSION_STORAGE_KEY = '@frume/puzzle-session';
 export const PUZZLE_SESSION_CORRUPTION_STORAGE_KEY =
   '@frume/puzzle-session-corruption';
@@ -348,7 +351,10 @@ function parseCutDescriptor(value: unknown): PuzzleCutDescriptor | null {
     !isPositiveInteger(value.version) ||
     !isBoundedString(value.seed) ||
     !isPositiveInteger(value.rows) ||
-    !isPositiveInteger(value.columns)
+    !isPositiveInteger(value.columns) ||
+    (value.bakedLibraryVersion !== undefined &&
+      (!isPositiveInteger(value.bakedLibraryVersion) ||
+        !Number.isSafeInteger(value.bakedLibraryVersion)))
   ) {
     return null;
   }
@@ -356,6 +362,9 @@ function parseCutDescriptor(value: unknown): PuzzleCutDescriptor | null {
   return {
     cutterId,
     version: value.version,
+    ...(value.bakedLibraryVersion === undefined
+      ? {}
+      : { bakedLibraryVersion: value.bakedLibraryVersion as number }),
     seed: value.seed,
     rows: value.rows,
     columns: value.columns,
@@ -744,7 +753,8 @@ function parsePersistedSession(value: unknown): PersistedPuzzleSession | null {
   if (
     !isRecord(value) ||
     (value.version !== LEGACY_PUZZLE_SESSION_SCHEMA_VERSION &&
-      value.version !== PREVIOUS_PUZZLE_SESSION_SCHEMA_VERSION &&
+      value.version !== ACTIVE_TIMER_SCHEMA_VERSION &&
+      value.version !== GUIDE_MODE_SCHEMA_VERSION &&
       value.version !== PUZZLE_SESSION_SCHEMA_VERSION) ||
     !isFiniteNumber(value.savedAt) ||
     value.savedAt < 0
@@ -754,7 +764,7 @@ function parsePersistedSession(value: unknown): PersistedPuzzleSession | null {
   const cutterId = parseCutterId(value.cutterId);
   const difficulty = parseDifficulty(value.difficulty);
   const guideMode =
-    value.version < PUZZLE_SESSION_SCHEMA_VERSION
+    value.version < GUIDE_MODE_SCHEMA_VERSION
       ? DEFAULT_PUZZLE_GUIDE_MODE
       : parseGuideMode(value.guideMode);
   const engine = parseEngine(value.engine, value.version, value.savedAt);

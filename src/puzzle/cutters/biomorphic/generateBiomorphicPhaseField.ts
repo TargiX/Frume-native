@@ -687,6 +687,7 @@ function createPhaseTopologyProjector(
   const pixelCount = width * height;
   const labels = new Int16Array(pixelCount);
   const strongest = new Float32Array(pixelCount);
+  const fieldOwners = new Int16Array(pixelCount);
   const componentIds = new Int32Array(pixelCount);
   const repaired = new Int16Array(pixelCount);
   const queue = new Int32Array(pixelCount);
@@ -718,6 +719,11 @@ function createPhaseTopologyProjector(
         }
       }
     }
+    // Keep the exact argmax before the seed anchors override labels. Repair
+    // below writes only the current pixel, so ownership at every later pixel
+    // still equals this snapshot. Re-scanning all phases per pixel was both
+    // redundant and expensive on large boards (strided reads across fields).
+    fieldOwners.set(labels);
 
     // Every physical piece keeps its original seed as an immutable topology
     // anchor. The phase may deform around it, but cannot vanish or be replaced
@@ -837,19 +843,9 @@ function createPhaseTopologyProjector(
     let changed = 0;
     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
       const repairedOwner = repaired[pixel];
-      // `labels` contains the forced seed anchors used by the topology solve.
-      // At an anchor its label can therefore differ from the actual strongest
-      // phase field. Compare against the fields themselves; otherwise the
-      // projector reports a connected partition but the next argmax brings
-      // the detached pre-anchor island straight back.
-      let previousOwner = 0;
-      let previousMaximum = -Infinity;
-      for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex += 1) {
-        if (phis[phaseIndex][pixel] > previousMaximum) {
-          previousMaximum = phis[phaseIndex][pixel];
-          previousOwner = phaseIndex;
-        }
-      }
+      // Use field ownership, not the forced anchor labels. Preserve the old
+      // zero-owner fallback if no field beats -Infinity.
+      const previousOwner = fieldOwners[pixel] < 0 ? 0 : fieldOwners[pixel];
       if (previousOwner === repairedOwner) continue;
       changed += 1;
       let competingMaximum = 0;
@@ -3484,6 +3480,7 @@ export function createBiomorphicPhaseFieldTopology(
    */
   profile?: BiomorphicPhaseFieldProfile,
   numerics: BiomorphicPhaseFieldNumerics = BIOMORPHIC_PHASE_FIELD_NUMERICS,
+  observeExtraction?: (attempt: { smoothingPasses: number; safe: boolean; error?: string }) => void,
 ): BiomorphicTopology {
   assertDimensions(rows, columns);
   const simulation = simulatePhaseField(
@@ -3503,9 +3500,12 @@ export function createBiomorphicPhaseFieldTopology(
         simulation,
         smoothingPasses,
       );
-      if (isBiomorphicTopologySafe(topology)) return topology;
+      const safe = isBiomorphicTopologySafe(topology);
+      observeExtraction?.({ smoothingPasses, safe });
+      if (safe) return topology;
     } catch (error) {
       lastError = error;
+      observeExtraction?.({ smoothingPasses, safe: false, error: error instanceof Error ? error.message : String(error) });
     }
   }
 

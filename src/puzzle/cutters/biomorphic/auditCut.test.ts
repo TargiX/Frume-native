@@ -1,78 +1,22 @@
 import { describe, expect, it } from 'vitest';
-
+import crystalTip from '../../../../assets/cuts/crystal-six/4x4/2.json';
+import { decodeBakedCut, type BakedCut } from './bakedCut';
 import { auditCut } from './auditCut';
-import {
-  createBiomorphicTopology,
-  type BiomorphicEdge,
-  type BiomorphicPoint,
-  type BiomorphicTopology,
-} from './generateBiomorphic';
-
-function line(points: readonly BiomorphicPoint[]): BiomorphicEdge['segments'] {
-  return points.slice(1).map((end, index) => ({
-    kind: 'line' as const,
-    start: points[index],
-    end,
-  }));
-}
-
-/**
- * A 1x2 board split by one seam from the top edge to the bottom edge, so each
- * case is a seam whose answer is known by construction.
- */
-function splitBoard(seam: readonly BiomorphicPoint[]): BiomorphicTopology {
-  const top = seam[0];
-  const bottom = seam[seam.length - 1];
-  const edge = (
-    id: string,
-    points: readonly BiomorphicPoint[],
-    owners: string[],
-  ): BiomorphicEdge => ({
-    id,
-    segments: line(points),
-    ownerIds: owners,
-    exterior: owners.length === 1,
-  });
-  const seamEdge = edge('seam', seam, ['left', 'right']);
-  const leftEdges = [
-    edge('lt', [{ x: 0, y: 0 }, top], ['left']),
-    seamEdge,
-    edge('lb', [bottom, { x: 0, y: 1 }], ['left']),
-    edge('ll', [{ x: 0, y: 1 }, { x: 0, y: 0 }], ['left']),
-  ];
-  const rightEdges = [
-    edge('rt', [top, { x: 1, y: 0 }], ['right']),
-    edge('rr', [{ x: 1, y: 0 }, { x: 1, y: 1 }], ['right']),
-    edge('rb', [{ x: 1, y: 1 }, bottom], ['right']),
-    seamEdge,
-  ];
-  const cell = (
-    id: string,
-    index: number,
-    edges: BiomorphicEdge[],
-    seamDirection: 1 | -1,
-  ) => ({
-    id,
-    index,
-    row: 0,
-    col: index,
-    site: { x: index === 0 ? 0.25 : 0.75, y: 0.5 },
-    vertices: [],
-    edgeTraversals: edges.map((item) => ({
-      edge: item,
-      direction: item === seamEdge ? seamDirection : (1 as const),
-    })),
-    neighborIds: [index === 0 ? 'right' : 'left'],
-  });
-  return {
-    rows: 1,
-    columns: 2,
-    cells: [cell('left', 0, leftEdges, 1), cell('right', 1, rightEdges, -1)],
-    edges: [...leftEdges, ...rightEdges.filter((item) => item !== seamEdge)],
-  };
-}
+import { createBiomorphicTopology } from './generateBiomorphic';
+import { splitBoard } from './cutTestFixtures';
 
 describe('auditCut', () => {
+  it('reports a pointed Crystal junction separately from a narrow connecting neck', () => {
+    const cut = decodeBakedCut(crystalTip as unknown as BakedCut);
+    const options = { pinchGap: 0.01, minCornerAngle: 0, flatness: 0.00005 };
+    expect(auditCut(cut, options).pinches.length).toBeGreaterThan(0);
+    const audit = auditCut(cut, { ...options, separateJunctionTips: true });
+    expect(audit.pinches.some(p => p.piece === 9), JSON.stringify({ pinches: audit.pinches, tips: audit.junctionTips })).toBe(false);
+    expect(audit.junctionTips.some(p => p.piece === 9)).toBe(true);
+    // Two other pieces share a real local cusp; separating the junction must
+    // not hide those independent findings.
+    expect(audit.pinches.map(p => p.piece)).toEqual([1, 3]);
+  });
   it('passes a straight seam', () => {
     const audit = auditCut(
       splitBoard([
@@ -127,5 +71,66 @@ describe('auditCut', () => {
     const audit = auditCut(createBiomorphicTopology(4, 4, 'audit'));
     expect(audit.crossings).toEqual([]);
     expect(audit.coverage).toBeCloseTo(1, 3);
+  });
+
+  it('detects a real crossing even next to a permitted junction', () => {
+    const topology = splitBoard([
+      { x: 0.5, y: 0 }, { x: 0.51, y: 0.012 },
+      { x: 0.5, y: 0.012 }, { x: 0.51, y: 0.002 },
+      { x: 0.6, y: 0.3 }, { x: 0.5, y: 1 },
+    ]);
+    for (const separateJunctionTips of [false, true]) {
+      const audit = auditCut(topology, { separateJunctionTips });
+      expect(audit.crossings.length).toBeGreaterThan(0);
+      expect(audit.clean).toBe(false);
+    }
+  });
+
+  it('rejects a seam that retraces an earlier segment', () => {
+    const audit = auditCut(splitBoard([
+      { x: 0.5, y: 0 }, { x: 0.5, y: 0.6 },
+      { x: 0.5, y: 0.4 }, { x: 0.6, y: 0.8 }, { x: 0.5, y: 1 },
+    ]));
+    expect(audit.crossings.length).toBeGreaterThan(0);
+    expect(audit.clean).toBe(false);
+  });
+
+  it('rejects a non-adjacent contact at a sampled vertex', () => {
+    const audit = auditCut(splitBoard([
+      { x: 0.5, y: 0 }, { x: 0.5, y: 0.4 },
+      { x: 0.7, y: 0.6 }, { x: 0.3, y: 0.6 },
+      { x: 0.5, y: 0.4 }, { x: 0.5, y: 1 },
+    ]));
+    expect(audit.crossings.length).toBeGreaterThan(0);
+  });
+
+  it('rejects inconsistent edge ownership even when the outlines look valid', () => {
+    const topology = splitBoard([{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }]);
+    topology.edges[1].ownerIds = ['left', 'missing'];
+    expect(auditCut(topology).clean).toBe(false);
+  });
+
+  it('does not certify a crossing from the area sum', () => {
+    const audit = auditCut(splitBoard([
+      { x: 0.5, y: 0 }, { x: 0.5, y: 0.6 },
+      { x: 0.7, y: 0.4 }, { x: 0.3, y: 0.4 }, { x: 0.5, y: 1 },
+    ]));
+    expect(audit.coverage).toBeCloseTo(1, 10);
+    expect(audit.clean).toBe(false);
+  });
+
+  it('flags an acute wedge where a seam joins the frame', () => {
+    const audit = auditCut(splitBoard([
+      { x: 0.5, y: 0 }, { x: 0.9, y: 0.01 }, { x: 0.5, y: 1 },
+    ]));
+    expect(audit.sharpCorners.some(c => c.angle < 2)).toBe(true);
+    expect(audit.clean).toBe(false);
+  });
+
+  it('refuses non-finite control points', () => {
+    const topology = splitBoard([{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }]);
+    topology.edges[1].segments = [{ kind: 'cubic', start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 },
+      control1: { x: NaN, y: 0.2 }, control2: { x: 0.5, y: 0.8 } }];
+    expect(auditCut(topology).clean).toBe(false);
   });
 });

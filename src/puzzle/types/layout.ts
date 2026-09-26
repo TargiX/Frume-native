@@ -34,6 +34,8 @@ export type PuzzleGuideMode = 'none' | 'grid' | 'cuts' | 'image';
 export type PuzzleCutDescriptor = {
   cutterId: PuzzleCutterId;
   version: number;
+  /** Immutable baked pool. Absent on historical saves, which use catalog 1. */
+  bakedLibraryVersion?: number;
   seed: string;
   rows: number;
   columns: number;

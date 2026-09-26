@@ -1,291 +1,214 @@
-import {
-  sampleBiomorphicPieceOutline,
-  signedBiomorphicArea,
-  type BiomorphicPoint,
-  type BiomorphicTopology,
-} from './generateBiomorphic';
+import { signedBiomorphicArea, type BiomorphicPoint as Point, type BiomorphicTopology } from './generateBiomorphic';
+import { closestLines, distance, flattenEdge, forNearbyPairs, insidePolygon, lineContact, mix, samePoint, type FlatPoint } from './cutGeometry';
 
-/**
- * What a player would see go wrong with a cut, measured on the final curves
- * rather than on the simulation lattice.
- *
- * The lattice checks (connectivity, holes, `measureCutThickness`) run before
- * the seams are vectorised and smoothed, and smoothing is exactly where two
- * fingers that were a sample apart get drawn across each other. So this looks
- * at the curves the game will draw:
- *
- *  - a crossing, where two seams intersect anywhere but at the junction they
- *    share: the pieces overlap on screen;
- *  - a pinch, where one piece's outline comes back within `pinchGap` of
- *    itself after running a long way round: a neck or a finger squeezed by its
- *    neighbours, the "перехлёст" that reads as a mistake even when nothing
- *    actually crosses;
- *  - a piece whose area is far from the rest, which is where corners and
- *    borders went wrong before.
- */
 export type CutAuditOptions = {
-  /** Curve samples per cubic; the renderer's own density is plenty. */
+  /** Deprecated: curves now use an error bound rather than fixed sampling. */
   samplesPerCurve?: number;
-  /** Narrowest acceptable gap, as a fraction of one grid cell's side. */
+  /** Flattening error as a fraction of the smaller grid-cell side. */
+  flatness?: number;
   pinchGap?: number;
-  /** Area outside [min, max] of the ideal piece area is flagged. */
+  /** Minimum interior angle at a seam junction, in degrees. */
+  minCornerAngle?: number;
+  /** Report short acute wedges at a shared endpoint separately from necks. */
+  separateJunctionTips?: boolean;
   areaRange?: readonly [number, number];
 };
-
+export type CutLocation = { edge: string; knot: number; point: Point };
+export type CutPinch = {
+  piece: number; at: Point; width: number; kind: 'neck' | 'gap' | 'tip';
+  sides: readonly [CutLocation, CutLocation];
+};
 export type CutAudit = {
-  crossings: BiomorphicPoint[];
-  pinches: { piece: number; at: BiomorphicPoint; width: number }[];
+  crossings: Point[];
+  crossingEdges: string[];
+  pinches: CutPinch[];
+  /** Intentional pointed junctions, when the caller enables their separation. */
+  junctionTips: CutPinch[];
   oddAreas: { piece: number; ratio: number }[];
-  /** Narrowest gap found on each piece, as a fraction of a grid cell. */
+  sharpCorners: { piece: number; at: Point; angle: number }[];
+  /** Narrowest neck/gap candidate; excludes separately reported pointed tips. */
   narrowestPerPiece: number[];
-  /** Total area covered; anything but 1 means pieces overlap or leave gaps. */
+  /** Sum of outline areas, not a polygon union; never a standalone certificate. */
   coverage: number;
+  topologyErrors: string[];
+  /** Maximum approximation error in unit-board coordinates. */
+  curveTolerance: number;
   clean: boolean;
 };
+type Segment = { a: FlatPoint; b: FlatPoint; edge: string; index: number; last: number };
 
-type Segment = { a: BiomorphicPoint; b: BiomorphicPoint; edge: number };
+/** Shape validity, independent of a style's chosen thickness/angle targets. */
+export function hasValidCutPartition(audit: CutAudit): boolean {
+  return audit.topologyErrors.length === 0 && audit.crossings.length === 0 && Math.abs(audit.coverage - 1) < 1e-6;
+}
 
-function sampleEdge(
-  segments: BiomorphicTopology['edges'][number]['segments'],
-  perCurve: number,
-): BiomorphicPoint[] {
-  const points: BiomorphicPoint[] = [segments[0].start];
-  for (const segment of segments) {
-    if (segment.kind === 'line') {
-      points.push(segment.end);
-      continue;
-    }
-    const { start: p0, control1: p1, control2: p2, end: p3 } = segment;
-    for (let step = 1; step <= perCurve; step += 1) {
-      const t = step / perCurve;
-      const u = 1 - t;
-      points.push({
-        x:
-          u * u * u * p0.x +
-          3 * u * u * t * p1.x +
-          3 * u * t * t * p2.x +
-          t * t * t * p3.x,
-        y:
-          u * u * u * p0.y +
-          3 * u * u * t * p1.y +
-          3 * u * t * t * p2.y +
-          t * t * t * p3.y,
-      });
-    }
+function permittedContact(a: Segment, b: Segment, point: Point): boolean {
+  if (a.edge === b.edge) return Math.abs(a.index - b.index) === 1 &&
+    ((samePoint(a.a, point) || samePoint(a.b, point)) && (samePoint(b.a, point) || samePoint(b.b, point)));
+  const endpoint = (s: Segment) => (s.index === 0 && samePoint(s.a, point)) || (s.index === s.last && samePoint(s.b, point));
+  return endpoint(a) && endpoint(b);
+}
+
+function isPointedJunction(a: CutLocation, b: CutLocation, edges: Map<string, BiomorphicTopology['edges'][number]>,
+  shortArc: number, cellSide: number): boolean {
+  if (a.edge === b.edge || shortArc > cellSide * 0.2) return false;
+  const first = edges.get(a.edge)!, second = edges.get(b.edge)!;
+  const ends = (edge: typeof first) => [
+    { point: edge.segments[0].start, knot: 0 },
+    { point: edge.segments[edge.segments.length - 1].end, knot: edge.segments.length },
+  ];
+  for (const x of ends(first)) for (const y of ends(second)) {
+    // Both candidates must be in the first incident curve,
+    // within a small neighborhood of this actual common junction. A returning
+    // branch or a remote close pass must still be inspected as a neck/gap.
+    if (!samePoint(x.point, y.point) || Math.abs(a.knot - x.knot) > 1 || Math.abs(b.knot - y.knot) > 1 ||
+        distance(a.point, x.point) > cellSide * 0.1 || distance(b.point, x.point) > cellSide * 0.1) continue;
+    const ax = a.point.x - x.point.x, ay = a.point.y - x.point.y;
+    const bx = b.point.x - x.point.x, by = b.point.y - x.point.y;
+    const angle = Math.atan2(Math.abs(ax * by - ay * bx), ax * bx + ay * by) * 180 / Math.PI;
+    if (angle > 0 && angle < 20) return true;
   }
-  return points;
+  return false;
 }
 
-function intersection(
-  p: BiomorphicPoint,
-  p2: BiomorphicPoint,
-  q: BiomorphicPoint,
-  q2: BiomorphicPoint,
-): BiomorphicPoint | null {
-  const rx = p2.x - p.x;
-  const ry = p2.y - p.y;
-  const sx = q2.x - q.x;
-  const sy = q2.y - q.y;
-  const denominator = rx * sy - ry * sx;
-  if (Math.abs(denominator) < 1e-14) return null;
-  const qpx = q.x - p.x;
-  const qpy = q.y - p.y;
-  const t = (qpx * sy - qpy * sx) / denominator;
-  const u = (qpx * ry - qpy * rx) / denominator;
-  if (t <= 0 || t >= 1 || u <= 0 || u >= 1) return null;
-  return { x: p.x + t * rx, y: p.y + t * ry };
-}
-
-/** Uniform-grid buckets over the unit board. */
-function bucketsFor<T>(
-  items: readonly T[],
-  bounds: (item: T) => [number, number, number, number],
-  cell: number,
-): Map<number, number[]> {
-  const buckets = new Map<number, number[]>();
-  const size = Math.ceil(1 / cell) + 2;
-  items.forEach((item, index) => {
-    const [minX, minY, maxX, maxY] = bounds(item);
-    for (
-      let bx = Math.floor(minX / cell);
-      bx <= Math.floor(maxX / cell);
-      bx += 1
-    ) {
-      for (
-        let by = Math.floor(minY / cell);
-        by <= Math.floor(maxY / cell);
-        by += 1
-      ) {
-        const key = (by + 1) * size + (bx + 1);
-        const bucket = buckets.get(key);
-        if (bucket) bucket.push(index);
-        else buckets.set(key, [index]);
-      }
-    }
-  });
-  return buckets;
-}
-
-function findCrossings(
-  topology: BiomorphicTopology,
-  perCurve: number,
-): BiomorphicPoint[] {
-  const segments: Segment[] = [];
-  const junctions: BiomorphicPoint[] = [];
-  topology.edges.forEach((edge, edgeIndex) => {
-    const points = sampleEdge(edge.segments, perCurve);
-    junctions.push(points[0], points[points.length - 1]);
-    for (let index = 1; index < points.length; index += 1) {
-      segments.push({ a: points[index - 1], b: points[index], edge: edgeIndex });
-    }
-  });
-  const cell = 1 / (Math.max(topology.rows, topology.columns) * 8);
-  const buckets = bucketsFor(
-    segments,
-    ({ a, b }) => [
-      Math.min(a.x, b.x),
-      Math.min(a.y, b.y),
-      Math.max(a.x, b.x),
-      Math.max(a.y, b.y),
-    ],
-    cell,
-  );
-  // Seams meet at junctions by design; a hit that close to one is the shared
-  // endpoint seen through sampling, not a crossing.
-  const junctionTolerance = cell * 0.25;
-  const nearJunction = (point: BiomorphicPoint) =>
-    junctions.some(
-      (junction) =>
-        Math.hypot(junction.x - point.x, junction.y - point.y) <
-        junctionTolerance,
-    );
-  const seen = new Set<string>();
-  const crossings: BiomorphicPoint[] = [];
-  for (const bucket of buckets.values()) {
-    for (let i = 0; i < bucket.length; i += 1) {
-      for (let j = i + 1; j < bucket.length; j += 1) {
-        const first = segments[bucket[i]];
-        const second = segments[bucket[j]];
-        // Consecutive samples of one seam share an endpoint.
-        if (
-          first.edge === second.edge &&
-          Math.abs(bucket[i] - bucket[j]) <= 1
-        ) {
-          continue;
-        }
-        const key = `${Math.min(bucket[i], bucket[j])}:${Math.max(bucket[i], bucket[j])}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const hit = intersection(first.a, first.b, second.a, second.b);
-        if (hit && !nearJunction(hit)) crossings.push(hit);
-      }
-    }
-  }
-  return crossings;
-}
-
-/**
- * Narrowest place on one outline: two samples close in space but far apart
- * along the outline. The arc condition keeps an ordinary bend from counting:
- * a smooth curve is always close to its own neighbouring samples.
- */
-function narrowestPinch(
-  outline: readonly BiomorphicPoint[],
-  cellSide: number,
-): { width: number; at: BiomorphicPoint } {
-  const count = outline.length;
-  const arc = new Float64Array(count + 1);
-  for (let index = 1; index <= count; index += 1) {
-    const from = outline[index - 1];
-    const to = outline[index % count];
-    arc[index] = arc[index - 1] + Math.hypot(to.x - from.x, to.y - from.y);
-  }
-  const perimeter = arc[count];
-  const probe = cellSide * 0.5;
-  const buckets = bucketsFor(
-    outline,
-    ({ x, y }) => [x, y, x, y],
-    probe,
-  );
-  const size = Math.ceil(1 / probe) + 2;
-  let width = Infinity;
-  let at: BiomorphicPoint = outline[0];
-  outline.forEach((point, index) => {
-    const bx = Math.floor(point.x / probe);
-    const by = Math.floor(point.y / probe);
-    for (let dx = -1; dx <= 1; dx += 1) {
-      for (let dy = -1; dy <= 1; dy += 1) {
-        const bucket = buckets.get((by + dy + 1) * size + (bx + dx + 1));
-        if (!bucket) continue;
-        for (const other of bucket) {
-          if (other <= index) continue;
-          const distance = Math.hypot(
-            outline[other].x - point.x,
-            outline[other].y - point.y,
-          );
-          const along = Math.abs(arc[other] - arc[index]);
-          const around = Math.min(along, perimeter - along);
-          // Half a turn of a circle of this diameter is pi/2 * d; a neck is
-          // anything that took far longer than that to come back.
-          if (around > distance * 4 && distance < width) {
-            width = distance;
-            at = {
-              x: (point.x + outline[other].x) / 2,
-              y: (point.y + outline[other].y) / 2,
-            };
-          }
-        }
-      }
-    }
-  });
-  return { width: width / cellSide, at };
-}
-
-export function auditCut(
-  topology: BiomorphicTopology,
-  {
-    samplesPerCurve = 6,
-    pinchGap = 0.06,
-    areaRange = [0.35, 2.4],
-  }: CutAuditOptions = {},
-): CutAudit {
-  const cellSide = Math.min(1 / topology.rows, 1 / topology.columns);
-  const idealArea = 1 / topology.cells.length;
-  const pinches: CutAudit['pinches'] = [];
-  const oddAreas: CutAudit['oddAreas'] = [];
-  const narrowestPerPiece: number[] = [];
+/** Validate the rectangular partition, not merely the sum of its areas. */
+export function auditCut(topology: BiomorphicTopology, options: CutAuditOptions = {}): CutAudit {
+  const { flatness = 0.0005, pinchGap = 0.06, minCornerAngle = 20, areaRange = [0.35, 2.4] } = options;
+  if (!Number.isFinite(flatness) || flatness <= 0 || !Number.isFinite(pinchGap) || pinchGap < 0 ||
+      !Number.isFinite(minCornerAngle) || minCornerAngle < 0 || minCornerAngle > 90 ||
+      !areaRange.every(Number.isFinite) || areaRange[0] < 0 || areaRange[1] < areaRange[0]) throw new Error('Invalid cut audit tolerances');
+  const cellSide = 1 / Math.max(topology.rows, topology.columns), curveTolerance = cellSide * flatness;
+  const topologyErrors: string[] = [], crossings: Point[] = [], crossingEdges = new Set<string>();
+  const pinches: CutPinch[] = [], junctionTips: CutPinch[] = [], oddAreas: CutAudit['oddAreas'] = [], narrowestPerPiece: number[] = [];
+  const sharpCorners: CutAudit['sharpCorners'] = [];
   let coverage = 0;
-
-  topology.cells.forEach((cell) => {
-    const outline = sampleBiomorphicPieceOutline(
-      topology,
-      cell.index,
-      samplesPerCurve,
-    );
-    const area = Math.abs(signedBiomorphicArea(outline));
-    coverage += area;
-    const ratio = area / idealArea;
-    if (ratio < areaRange[0] || ratio > areaRange[1]) {
-      oddAreas.push({ piece: cell.index, ratio });
+  const result = (): CutAudit => ({ crossings, crossingEdges: [...crossingEdges], pinches, junctionTips, oddAreas, sharpCorners, narrowestPerPiece,
+    coverage, topologyErrors, curveTolerance, clean: topologyErrors.length === 0 && crossings.length === 0 &&
+    pinches.length === 0 && oddAreas.length === 0 && sharpCorners.length === 0 && Math.abs(coverage - 1) < 1e-6 });
+  if (!Number.isInteger(topology.rows) || !Number.isInteger(topology.columns) || topology.rows < 1 || topology.columns < 1 ||
+      topology.cells.length !== topology.rows * topology.columns) {
+    topologyErrors.push('Invalid dimensions or piece count'); return result();
+  }
+  const flattened = new Map<string, FlatPoint[]>(), edgeById = new Map(topology.edges.map(e => [e.id, e]));
+  const uses = new Map<string, { owner: string; direction: number }[]>();
+  if (edgeById.size !== topology.edges.length) topologyErrors.push('Duplicate edge IDs');
+  if (new Set(topology.cells.map(c => c.id)).size !== topology.cells.length) topologyErrors.push('Duplicate piece IDs');
+  if (new Set(topology.cells.map(c => c.index)).size !== topology.cells.length) topologyErrors.push('Duplicate piece indices');
+  const segments: Segment[] = [], frame: [number, number][][] = [[], [], [], []];
+  for (const edge of topology.edges) {
+    try {
+      const points = flattenEdge(edge, curveTolerance);
+      flattened.set(edge.id, points);
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        if (samePoint(a, b)) { topologyErrors.push(`Zero-length segment: ${edge.id}`); continue; }
+        if ([a, b].some(p => p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)) topologyErrors.push(`Outside board: ${edge.id}`);
+        segments.push({ a, b, edge: edge.id, index: i - 1, last: points.length - 2 });
+        if (edge.exterior) {
+          const side = a.x === 0 && b.x === 0 ? 0 : a.x === 1 && b.x === 1 ? 1 :
+            a.y === 0 && b.y === 0 ? 2 : a.y === 1 && b.y === 1 ? 3 : -1;
+          if (side < 0) topologyErrors.push(`Exterior edge off frame: ${edge.id}`);
+          else frame[side].push(side < 2 ? [Math.min(a.y, b.y), Math.max(a.y, b.y)] : [Math.min(a.x, b.x), Math.max(a.x, b.x)]);
+        }
+      }
+    } catch (error) { topologyErrors.push(String(error)); }
+  }
+  if (topologyErrors.length) return result();
+  for (const intervals of frame) {
+    intervals.sort((a, b) => a[0] - b[0]);
+    let end = 0;
+    for (const interval of intervals) {
+      if (Math.abs(interval[0] - end) > 1e-9) topologyErrors.push('Frame has a gap or duplicate coverage');
+      end = interval[1];
     }
-    const pinch = narrowestPinch(outline, cellSide);
-    narrowestPerPiece.push(pinch.width);
-    if (pinch.width < pinchGap) {
-      pinches.push({ piece: cell.index, at: pinch.at, width: pinch.width });
+    if (Math.abs(end - 1) > 1e-9) topologyErrors.push('Incomplete board frame');
+  }
+  forNearbyPairs(segments, cellSide / 8, 0, (a, b) => {
+    const hit = lineContact(a, b);
+    if (hit && (hit.overlap || !permittedContact(a, b, hit.point))) {
+      crossings.push(hit.point); crossingEdges.add(a.edge); crossingEdges.add(b.edge);
     }
   });
-
-  const crossings = findCrossings(topology, samplesPerCurve);
-  return {
-    crossings,
-    pinches,
-    oddAreas,
-    narrowestPerPiece,
-    coverage,
-    clean:
-      crossings.length === 0 &&
-      pinches.length === 0 &&
-      oddAreas.length === 0 &&
-      Math.abs(coverage - 1) < 1e-3,
-  };
+  for (const cell of topology.cells) {
+    const outline: Point[] = [], ring: (Segment & { arc: number; length: number })[] = [];
+    let arc = 0;
+    for (const { edge, direction } of cell.edgeTraversals) {
+      if (edgeById.get(edge.id) !== edge || (direction !== 1 && direction !== -1)) {
+        topologyErrors.push(`Invalid traversal in ${cell.id}`); continue;
+      }
+      const edgeUses = uses.get(edge.id) ?? [];
+      edgeUses.push({ owner: cell.id, direction }); uses.set(edge.id, edgeUses);
+      const flat = flattened.get(edge.id)!, points = direction === 1 ? flat : [...flat].reverse();
+      if (outline.length && !samePoint(outline[outline.length - 1], points[0])) topologyErrors.push(`Open contour: ${cell.id}`);
+      if (!outline.length) outline.push(points[0]);
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i], length = distance(a, b);
+        ring.push({ a, b, edge: edge.id, index: i - 1, last: points.length - 2, arc, length });
+        arc += length; outline.push(b);
+      }
+    }
+    if (outline.length < 4 || !samePoint(outline[0], outline[outline.length - 1])) {
+      topologyErrors.push(`Unclosed piece: ${cell.id}`); continue;
+    }
+    outline.pop();
+    ring.forEach((segment, index) => {
+      const previous = ring[(index + ring.length - 1) % ring.length];
+      if (previous.edge === segment.edge) return;
+      const ux = previous.b.x - previous.a.x, uy = previous.b.y - previous.a.y;
+      const vx = segment.b.x - segment.a.x, vy = segment.b.y - segment.a.y;
+      const angle = (Math.PI - Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)) * 180 / Math.PI;
+      if (angle < minCornerAngle) sharpCorners.push({ piece: cell.index, at: segment.a, angle });
+    });
+    const neighbors = new Set(cell.edgeTraversals.flatMap(t => t.edge.ownerIds.filter(id => id !== cell.id)));
+    if (new Set(cell.neighborIds).size !== neighbors.size || cell.neighborIds.some(id => !neighbors.has(id))) topologyErrors.push(`Invalid neighbors: ${cell.id}`);
+    const visited = new Set<string>();
+    for (const p of outline) {
+      const key = `${p.x.toFixed(10)},${p.y.toFixed(10)}`;
+      if (visited.has(key)) topologyErrors.push(`Repeated contour vertex: ${cell.id}`);
+      visited.add(key);
+    }
+    const area = signedBiomorphicArea(outline);
+    if (!(area > 0)) topologyErrors.push(`Inverted or empty piece: ${cell.id}`);
+    coverage += Math.abs(area);
+    const ratio = Math.abs(area) * topology.cells.length;
+    if (ratio < areaRange[0] || ratio > areaRange[1]) oddAreas.push({ piece: cell.index, ratio });
+    let narrowest: CutPinch | undefined;
+    let narrowestTip: CutPinch | undefined;
+    const radius = Math.max(pinchGap * cellSide + 2 * curveTolerance, cellSide * 0.1);
+    forNearbyPairs(ring, Math.max(radius, cellSide / 8), radius / 2, (a, b, i, j) => {
+      if (j === i + 1 || (i === 0 && j === ring.length - 1)) return;
+      const dx = Math.max(0, Math.min(a.a.x, a.b.x) - Math.max(b.a.x, b.b.x), Math.min(b.a.x, b.b.x) - Math.max(a.a.x, a.b.x));
+      const dy = Math.max(0, Math.min(a.a.y, a.b.y) - Math.max(b.a.y, b.b.y), Math.min(b.a.y, b.b.y) - Math.max(a.a.y, a.b.y));
+      if (dx * dx + dy * dy > radius * radius) return;
+      const nearest = closestLines(a, b);
+      if (nearest.width > radius || (narrowest && nearest.width >= narrowest.width * cellSide)) return;
+      const along = Math.abs(a.arc + nearest.t * a.length - b.arc - nearest.u * b.length);
+      const shortArc = Math.min(along, arc - along);
+      if (shortArc <= 4 * nearest.width + 2 * curveTolerance) return;
+      const candidate: CutPinch = { piece: cell.index, at: mix(nearest.a, nearest.b, 0.5), width: nearest.width / cellSide, kind: 'neck', sides: [
+        { edge: a.edge, knot: a.a.knot + nearest.t * (a.b.knot - a.a.knot), point: nearest.a },
+        { edge: b.edge, knot: b.a.knot + nearest.u * (b.b.knot - b.a.knot), point: nearest.b },
+      ] };
+      if (options.separateJunctionTips && isPointedJunction(candidate.sides[0], candidate.sides[1], edgeById, shortArc, cellSide)) {
+        if (!narrowestTip || candidate.width < narrowestTip.width) narrowestTip = { ...candidate, kind: 'tip' };
+        return;
+      }
+      if (!narrowest || candidate.width < narrowest.width) narrowest = candidate;
+    });
+    const pinch = narrowest as CutPinch | undefined;
+    narrowestPerPiece.push(pinch?.width ?? Infinity);
+    if (pinch && pinch.width * cellSide < pinchGap * cellSide + 2 * curveTolerance) {
+      pinch.kind = insidePolygon(pinch.at, outline) ? 'neck' : 'gap'; pinches.push(pinch);
+    }
+    const tip = narrowestTip as CutPinch | undefined;
+    if (tip && tip.width * cellSide < pinchGap * cellSide + 2 * curveTolerance) junctionTips.push(tip);
+  }
+  for (const edge of topology.edges) {
+    const edgeUses = uses.get(edge.id) ?? [], expected = edge.exterior ? 1 : 2;
+    if (edge.ownerIds.length !== expected || new Set(edge.ownerIds).size !== expected || edgeUses.length !== expected ||
+        edgeUses.some(u => !edge.ownerIds.includes(u.owner)) || new Set(edgeUses.map(u => u.owner)).size !== expected ||
+        (expected === 2 && edgeUses[0].direction === edgeUses[1].direction)) topologyErrors.push(`Invalid ownership: ${edge.id}`);
+  }
+  if (Math.abs(coverage - 1) >= 1e-6) topologyErrors.push('Outline areas do not sum to the board');
+  return result();
 }

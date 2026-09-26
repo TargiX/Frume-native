@@ -6,7 +6,7 @@ import type {
   PuzzleImageSource,
   PuzzleLayout,
 } from '../../types/layout';
-import { biomorphicPiecesFrom } from './bakedCutSource';
+import { bakedLibraryDescriptorFields, biomorphicPiecesFrom } from './bakedCutSource';
 import type { CutStyleId } from './cutStyles';
 import { canonicalizeBiomorphicSeed } from './generateBiomorphic';
 import {
@@ -87,6 +87,7 @@ export function createPhaseFieldCutter({
     return {
       cutterId,
       version,
+      ...bakedLibraryDescriptorFields(),
       seed: canonicalizeBiomorphicSeed(sourceSeed),
       rows,
       columns,
@@ -128,6 +129,7 @@ export function createPhaseFieldCutter({
               cutDescriptor.seed,
               base,
             ),
+          cutDescriptor.bakedLibraryVersion,
         ),
       };
     },

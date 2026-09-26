@@ -155,6 +155,38 @@ describe('puzzle session persistence codec', () => {
     },
   );
 
+  it('round-trips the baked catalog identity and refuses malformed versions', () => {
+    const source = sessionSnapshot();
+    source.cutterId = 'biomorphic';
+    source.engine.layout.cutterId = 'biomorphic';
+    source.engine.layout.cutDescriptor = { cutterId: 'biomorphic', version: 2,
+      bakedLibraryVersion: 2, seed: 'saved-catalog', rows: 3, columns: 3 };
+    const serialized = serializePuzzleSession(source);
+    expect(JSON.parse(serialized).version).toBe(4);
+    expect(deserializePuzzleSession(serialized)?.engine.layout.cutDescriptor).toEqual(source.engine.layout.cutDescriptor);
+    for (const malformed of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2', null]) {
+      const invalid = JSON.parse(serialized);
+      invalid.engine.layout.cutDescriptor.bakedLibraryVersion = malformed;
+      expect(deserializePuzzleSession(JSON.stringify(invalid))).toBeNull();
+    }
+  });
+
+  it('reads schema 2 and 3 saves without losing their timer or guide mode', () => {
+    const stored = JSON.parse(serializePuzzleSession(sessionSnapshot(), 3_500));
+    stored.version = 3;
+    stored.guideMode = 'none';
+    const third = deserializePuzzleSession(JSON.stringify(stored));
+    expect(third?.guideMode).toBe('none');
+    expect(third?.engine.activeElapsedMs).toBe(2_500);
+    expect(third?.engine.activeStartedAt).toBeNull();
+    stored.version = 2;
+    delete stored.guideMode;
+    const second = deserializePuzzleSession(JSON.stringify(stored));
+    expect(second?.guideMode).toBe('cuts');
+    expect(second?.engine.activeElapsedMs).toBe(2_500);
+    expect(second?.engine.activeStartedAt).toBeNull();
+  });
+
   it('preserves validated photo attribution for resumed games', () => {
     const source = sessionSnapshot();
     const withAttribution: PuzzleSessionSnapshot = {

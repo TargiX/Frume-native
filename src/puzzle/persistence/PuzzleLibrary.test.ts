@@ -38,6 +38,21 @@ function store() {
   };
 }
 describe('puzzle shelf and album', () => {
+  it('keeps legacy shelf IDs and separates the same image in a newer cut catalog', async () => {
+    const storage = store(), library = new PuzzleLibrary(storage);
+    const old = await snapshot('same');
+    old.cutterId = 'amoeba'; old.engine.layout.cutterId = 'amoeba';
+    old.engine.layout.cutDescriptor = { cutterId: 'amoeba', version: 1, seed: 'same-seed', rows: 3, columns: 3 };
+    const historicalId = libraryPuzzleId(old);
+    const explicitLegacy = JSON.parse(JSON.stringify(old)) as PuzzleSessionSnapshot;
+    explicitLegacy.engine.layout.cutDescriptor!.bakedLibraryVersion = 1;
+    expect(libraryPuzzleId(explicitLegacy)).toBe(historicalId);
+    const updated = JSON.parse(JSON.stringify(old)) as PuzzleSessionSnapshot;
+    updated.engine.layout.cutDescriptor!.bakedLibraryVersion = 2;
+    expect(libraryPuzzleId(updated)).not.toBe(historicalId);
+    await library.remember(old); await library.remember(updated);
+    expect(await library.load()).toHaveLength(2);
+  });
   it('persists different games and updates a revisited game without duplication', async () => {
     const storage = store(),
       library = new PuzzleLibrary(storage);

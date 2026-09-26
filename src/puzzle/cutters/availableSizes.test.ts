@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Failure cases use a private catalog copy; historical product pools stay
+// immutable even when a test simulates an incomplete packaged library.
+vi.mock('./biomorphic/bakedLibrary.generated', async importOriginal => {
+  const original = await importOriginal<typeof import('./biomorphic/bakedLibrary.generated')>();
+  return { ...original, BAKED_CUT_LIBRARY: structuredClone(original.BAKED_CUT_LIBRARY) };
+});
 
 import {
   availableSizes,
@@ -28,13 +35,12 @@ describe('availableSizes', () => {
     }
   });
 
-  it('never offers a simulated style a size nobody baked', () => {
-    // 196 pieces is over an hour of solving per cut, so it is deliberately
-    // absent from the library and must stay unavailable.
-    expect(supportsSize('biomorphic', '14x14')).toBe(false);
-    expect(supportsSize('crystal', '14x14')).toBe(false);
-    expect(supportsSize('classic', '14x14')).toBe(true);
-  });
+  it.each(['biomorphic', 'living-spectrum', 'crystal', 'crystal-quartered', 'amoeba', 'amoeba-columnar'] as const)(
+    'offers the new 100- and 196-piece pools for %s', cutter => {
+      expect(supportsSize(cutter, '10x10')).toBe(true);
+      expect(supportsSize(cutter, '14x14')).toBe(true);
+    },
+  );
 });
 
 describe('nearestAvailableSize', () => {
@@ -44,12 +50,14 @@ describe('nearestAvailableSize', () => {
   });
 
   it('moves the choice as little as possible when it does not', () => {
-    // 196 pieces is never baked, so the answer is whatever the style's largest
-    // baked grid happens to be — the last one it offers.
-    const largest = availableSizes('amoeba').at(-1);
-    expect(nearestAvailableSize('amoeba', '14x14')).toBe(largest);
-    expect(nearestAvailableSize('biomorphic', '14x14')).toBe(
-      availableSizes('biomorphic').at(-1),
-    );
+    const original = BAKED_CUT_LIBRARY['amoeba-coral'];
+    try {
+      BAKED_CUT_LIBRARY['amoeba-coral'] = { ...original, '10x10': undefined, '14x14': undefined };
+      expect(supportsSize('amoeba', '14x14')).toBe(false);
+      expect(nearestAvailableSize('amoeba', '14x14')).toBe('7x7');
+      expect(nearestAvailableSize('amoeba', '10x10')).toBe('7x7');
+    } finally {
+      BAKED_CUT_LIBRARY['amoeba-coral'] = original;
+    }
   });
 });

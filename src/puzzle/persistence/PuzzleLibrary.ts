@@ -16,12 +16,16 @@ export function libraryPuzzleId(
   snapshot: PuzzleSessionSnapshot,
   completed = snapshot.engine.status === 'completed',
 ): string {
+  const catalogVersion = snapshot.engine.layout.cutDescriptor?.bakedLibraryVersion ?? 1;
   return JSON.stringify([
     snapshot.engine.layout.image.uri,
     snapshot.cutterId,
     snapshot.difficulty,
     snapshot.engine.layout.cutDescriptor?.seed ?? 'classic',
     completed ? 'album' : 'waiting',
+    // Keep historical shelf IDs byte-for-byte. A new catalog can give the
+    // same image and seed a different cut, which needs its own saved entry.
+    ...(catalogVersion === 1 ? [] : [`baked-library-${catalogVersion}`]),
   ]);
 }
 export class PuzzleLibrary {

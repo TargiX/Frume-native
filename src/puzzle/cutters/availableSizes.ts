@@ -29,8 +29,8 @@ const CUTTER_STYLES: Partial<Record<PuzzleCutterId, CutStyleId>> = {
  * offer the whole ladder. The phase-field styles are simulated: a single large
  * board takes minutes to hours, far past anything that can happen while a
  * player waits, so they are limited to the grids already baked into
- * `assets/cuts`. A style is not gated by price here — every size is free — it
- * simply does not exist at sizes nobody has baked.
+ * the current immutable catalog. Every size is free; a style simply does not
+ * exist at sizes nobody has baked.
  */
 export function availableSizes(
   cutterId: PuzzleCutterId,
