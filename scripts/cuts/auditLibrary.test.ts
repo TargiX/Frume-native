@@ -9,6 +9,7 @@ import { CUT_STYLES } from '../../src/puzzle/cutters/biomorphic/cutStyles';
 import { flattenEdge, distance } from '../../src/puzzle/cutters/biomorphic/cutGeometry';
 import type { BiomorphicTopology } from '../../src/puzzle/cutters/biomorphic/generateBiomorphic';
 import { edgePath } from './renderCut';
+import { bakedCutOnDisk } from '../../src/puzzle/cutters/biomorphic/bakedCutOnDisk';
 
 const output = process.env.FRUME_CUT_LIBRARY_AUDIT_OUT;
 const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
@@ -53,7 +54,8 @@ describe.skipIf(!output)('audit installed phase-field library', () => {
       if (!entriesByGrid) throw new Error(`Installed style missing: ${style.id}`);
       for (const [grid, entries] of Object.entries(entriesByGrid)) {
         let structurallyValid = 0, withinGenericThresholds = 0, contacts = 0, topologyFailures = 0;
-        for (const [index, baked] of (entries ?? []).entries()) {
+        for (const [index, entry] of (entries ?? []).entries()) {
+          const baked = bakedCutOnDisk(entry);
           const id = `${style.id}-${grid}-${index}`;
           const topology = decodeBakedCut(baked), original = auditCut(topology);
           if (grid !== `${topology.rows}x${topology.columns}`) throw new Error(`Misfiled ${id}`);

@@ -1,5 +1,13 @@
 import type { PuzzlePieceDefinition } from "../../types/layout";
-import { topologyFromLibrary, type BakedCutLibrary } from "./bakedCutLibrary";
+import type { BakedCut } from "./bakedCut";
+import {
+  gridKey,
+  isRemoteBakedCut,
+  pickBakedCutIndex,
+  topologyFromLibrary,
+  type BakedCutLibrary,
+  type RemoteBakedCut,
+} from "./bakedCutLibrary";
 import type { CutStyleId } from "./cutStyles";
 import { generateBiomorphicPiecesFromTopology } from "./generateBiomorphic";
 
@@ -51,6 +59,82 @@ export function bakedLibraryDescriptorFields(): { bakedLibraryVersion?: number }
 export function clearBakedCutLibrary(): void {
   installed = {};
   currentVersion = undefined;
+}
+
+/** Fetches, verifies and caches one remote payload. */
+export type RemoteCutLoader = (
+  ref: RemoteBakedCut["remote"],
+) => Promise<BakedCut>;
+
+let remoteLoader: RemoteCutLoader | undefined;
+const inFlight = new Map<string, Promise<void>>();
+
+export function installRemoteCutLoader(loader: RemoteCutLoader | undefined): void {
+  remoteLoader = loader;
+}
+
+/** Raised when a board needs a cut that could not be fetched. */
+export class RemoteCutUnavailableError extends Error {
+  constructor(readonly reason: unknown) {
+    super(
+      "This size downloads its cut the first time. Connect to the internet and try again.",
+    );
+    this.name = "RemoteCutUnavailableError";
+  }
+}
+
+/**
+ * Makes sure the cut a seed lands on is in memory before the synchronous
+ * cutter runs. Bundled cuts return at once; a remote one is loaded (from the
+ * device cache or the network) and swapped into every installed catalog that
+ * shares its key, so a saved puzzle and a new one never fetch it twice.
+ */
+export async function ensureBakedCut(
+  style: CutStyleId,
+  rows: number,
+  columns: number,
+  seed: string,
+  libraryVersion?: number,
+): Promise<void> {
+  const entries = installed[libraryVersion ?? 1]?.[style]?.[gridKey(rows, columns)];
+  if (!entries?.length) return;
+  const entry = entries[pickBakedCutIndex(entries.length, rows, columns, seed).index];
+  if (!isRemoteBakedCut(entry)) return;
+  const { key } = entry.remote;
+  let pending = inFlight.get(key);
+  if (!pending) {
+    const loader = remoteLoader;
+    pending = (async () => {
+      if (!loader) throw new RemoteCutUnavailableError(new Error("No cut loader"));
+      let cut: BakedCut;
+      try {
+        cut = await loader(entry.remote);
+      } catch (error) {
+        throw new RemoteCutUnavailableError(error);
+      }
+      if (cut.rows !== rows || cut.columns !== columns) {
+        throw new Error(`Downloaded cut ${key} is not ${gridKey(rows, columns)}`);
+      }
+      hydrateRemoteCut(key, cut);
+    })().finally(() => inFlight.delete(key));
+    inFlight.set(key, pending);
+  }
+  await pending;
+}
+
+/** Replaces every placeholder for `key` with its payload. */
+export function hydrateRemoteCut(key: string, cut: BakedCut): void {
+  for (const library of Object.values(installed)) {
+    for (const grids of Object.values(library)) {
+      for (const entries of Object.values(grids ?? {})) {
+        entries?.forEach((entry, index) => {
+          if (isRemoteBakedCut(entry) && entry.remote.key === key) {
+            entries[index] = cut;
+          }
+        });
+      }
+    }
+  }
 }
 
 export function hasBakedCut(

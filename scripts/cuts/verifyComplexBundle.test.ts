@@ -15,6 +15,7 @@ import { BIOMORPHIC_PHASE_FIELD_NUMERICS } from '../../src/puzzle/cutters/biomor
 import type { PuzzleCutter, PuzzleSizeId } from '../../src/puzzle/types/cutter';
 import { PuzzleEngine } from '../../src/puzzle/engine/PuzzleEngine';
 import { deserializePuzzleSession, serializePuzzleSession } from '../../src/puzzle/persistence/PuzzleSessionPersistence';
+import { bakedCutOnDisk } from '../../src/puzzle/cutters/biomorphic/bakedCutOnDisk';
 
 const directory = process.env.FRUME_COMPLEX_BUNDLE_REVIEW;
 const cutters: Record<CutStyleId, PuzzleCutter> = {
@@ -80,7 +81,7 @@ describe.skipIf(!directory)('complete complex cut trial bundle', () => {
         const layout = await cutters[style].generate(image, { difficulty: grid as PuzzleSizeId, rows, columns, seed, boardMaxWidth: 330 });
         expect(layout.pieces).toHaveLength(rows * columns);
         expect(layout.cutDescriptor?.bakedLibraryVersion).toBe(2);
-        const expected = generateBiomorphicPiecesFromTopology(decodeBakedCut(entries[variant], turn), layout.boardSize.width, layout.boardSize.height);
+        const expected = generateBiomorphicPiecesFromTopology(decodeBakedCut(bakedCutOnDisk(entries[variant]), turn), layout.boardSize.width, layout.boardSize.height);
         expect(layout.pieces).toEqual(expected);
         expect(layout.pieces.every(piece => !/NaN|Infinity/.test(piece.path))).toBe(true);
         const engine = new PuzzleEngine(layout);
@@ -93,7 +94,7 @@ describe.skipIf(!directory)('complete complex cut trial bundle', () => {
         expect(PuzzleEngine.fromSnapshot(saved!.engine).getSnapshot().pieces).toEqual(engine.getSnapshot().pieces);
         const restored = await cutters[style].generate(image, { difficulty: grid as PuzzleSizeId,
           cutDescriptor: saved!.engine.layout.cutDescriptor, boardMaxWidth: 660 });
-        const resizedExpected = generateBiomorphicPiecesFromTopology(decodeBakedCut(entries[variant], turn), restored.boardSize.width, restored.boardSize.height);
+        const resizedExpected = generateBiomorphicPiecesFromTopology(decodeBakedCut(bakedCutOnDisk(entries[variant]), turn), restored.boardSize.width, restored.boardSize.height);
         expect(restored.cutDescriptor).toEqual(layout.cutDescriptor);
         expect(restored.pieces).toEqual(resizedExpected);
         layouts++; restoredLayouts++;

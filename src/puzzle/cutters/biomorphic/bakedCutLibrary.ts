@@ -20,9 +20,32 @@ import type { BiomorphicTopology } from "./generateBiomorphic";
  * decision from how one is chosen.
  */
 
+/**
+ * A cut too large to ship inside the app: the catalog records where it lives
+ * and the hash it must have, and it is fetched the first time a board needs
+ * it. Until then the slot still counts towards the pool, so which variant a
+ * seed lands on never depends on what happens to be downloaded.
+ */
+export type RemoteBakedCut = {
+  readonly remote: { readonly key: string; readonly sha256: string };
+};
+
+export type BakedCutEntry = BakedCut | RemoteBakedCut;
+
 export type BakedCutLibrary = Partial<
-  Record<CutStyleId, Partial<Record<string, readonly BakedCut[]>>>
+  Record<CutStyleId, Partial<Record<string, BakedCutEntry[]>>>
 >;
+
+export function isRemoteBakedCut(entry: BakedCutEntry): entry is RemoteBakedCut {
+  return 'remote' in entry;
+}
+
+export class RemoteCutNotLoadedError extends Error {
+  constructor(readonly ref: RemoteBakedCut['remote']) {
+    super(`Baked cut ${ref.key} has not been downloaded`);
+    this.name = 'RemoteCutNotLoadedError';
+  }
+}
 
 export function gridKey(rows: number, columns: number): string {
   return `${rows}x${columns}`;
@@ -63,12 +86,25 @@ export function pickBakedCut(
       `No baked ${style} cut for a ${gridKey(rows, columns)} board`,
     );
   }
+  const { index, turns } = pickBakedCutIndex(entries.length, rows, columns, seed);
+  const entry = entries[index];
+  if (isRemoteBakedCut(entry)) throw new RemoteCutNotLoadedError(entry.remote);
+  return { cut: entry, turns };
+}
+
+/** Which slot of a pool of `count` a seed lands on, and how it is turned. */
+export function pickBakedCutIndex(
+  count: number,
+  rows: number,
+  columns: number,
+  seed: string,
+): { index: number; turns: BakedCutQuarterTurns } {
   // A quarter turn of an oblong board would not fit the grid asked for.
   const turnCount = rows === columns ? 4 : 2;
-  const variant = hashSeed(seed) % (entries.length * turnCount);
+  const variant = hashSeed(seed) % (count * turnCount);
   return {
-    cut: entries[variant % entries.length],
-    turns: (Math.floor(variant / entries.length) *
+    index: variant % count,
+    turns: (Math.floor(variant / count) *
       (turnCount === 2 ? 2 : 1)) as BakedCutQuarterTurns,
   };
 }

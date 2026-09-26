@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { bakedCutOnDisk } from './bakedCutOnDisk';
 import { BAKED_CUT_LIBRARY_V1 } from './bakedLibrary.v1';
 import { BAKED_CUT_LIBRARY_V2 } from './bakedLibrary.v2';
 import { BAKED_CUT_LIBRARIES, BAKED_CUT_LIBRARY, BAKED_CUT_LIBRARY_VERSION } from './bakedLibrary.generated';
@@ -17,7 +18,9 @@ describe('historical catalog identity', () => {
     groups.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
     let count = 0;
     for (const { key, entries } of groups) entries?.forEach((cut, index) => {
-      hash.update(JSON.stringify([key, index, cut]) + '\n'); count++;
+      // Remote entries hash as their payload, so moving a board out of the
+      // bundle can never pass for a change of geometry.
+      hash.update(JSON.stringify([key, index, bakedCutOnDisk(cut)]) + '\n'); count++;
     });
     expect(count).toBe(catalog.count);
     expect(hash.digest('hex')).toBe(catalog.fingerprint);

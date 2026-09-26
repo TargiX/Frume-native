@@ -87,7 +87,9 @@ export async function withPhotoApiRequestDeadline<T>(
   }
 }
 
-export function buildPhotoApiUrl(endpoint: 'photo' | 'track'): string {
+export function buildPhotoApiUrl(
+  endpoint: 'photo' | 'track' | `cuts/${string}`,
+): string {
   const configuredUrl = process.env.EXPO_PUBLIC_PHOTO_API_URL?.trim();
   if (!configuredUrl) {
     throw new PhotoApiError(

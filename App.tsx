@@ -17,7 +17,15 @@ import { isPhaseFieldLabUrl, PhaseFieldLabScreen } from './src/features/lab';
 import { RootNavigator } from './src/navigation';
 import { PremiumAccessProvider } from './src/premium';
 import { PuzzleSessionProvider } from './src/puzzle/context';
-import { installBakedCutLibraries } from './src/puzzle/cutters/biomorphic/bakedCutSource';
+import {
+  installBakedCutLibraries,
+  installRemoteCutLoader,
+} from './src/puzzle/cutters/biomorphic/bakedCutSource';
+import {
+  createRemoteCutLoader,
+  expoCutFileStore,
+  fetchCutText,
+} from './src/puzzle/cutters/biomorphic/remoteCutLoader';
 import {
   BAKED_CUT_LIBRARIES,
   BAKED_CUT_LIBRARY_VERSION,
@@ -32,6 +40,11 @@ import 'react-native-url-polyfill/auto';
 // be requested before any component has mounted, and falling back to the solver
 // for it would freeze the app on its very first board.
 installBakedCutLibraries(BAKED_CUT_LIBRARIES, BAKED_CUT_LIBRARY_VERSION);
+// The 100- and 196-piece cuts are too large to ship; they come from the photo
+// API the first time they are played and stay on the device after that.
+installRemoteCutLoader(
+  createRemoteCutLoader({ store: expoCutFileStore, fetchText: fetchCutText }),
+);
 
 export default function App() {
   const isPhaseFieldLab =

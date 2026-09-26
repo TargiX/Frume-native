@@ -10,7 +10,11 @@ import {
   canonicalizeBiomorphicSeed,
   generateBiomorphicPieces,
 } from './generateBiomorphic';
-import { bakedLibraryDescriptorFields, biomorphicPiecesFrom } from './bakedCutSource';
+import {
+  bakedLibraryDescriptorFields,
+  biomorphicPiecesFrom,
+  ensureBakedCut,
+} from './bakedCutSource';
 import { generateBiomorphicPhaseFieldPieces } from './generateBiomorphicPhaseField';
 
 const BIOMORPHIC_CUT_VERSION = 2;
@@ -84,6 +88,15 @@ export const BiomorphicCutter: PuzzleCutter = {
   ): Promise<PuzzleLayout> {
     const cutDescriptor = descriptorFromOptions(image, options);
     const { width, height } = resolveBoardSize(image, options);
+    if (cutDescriptor.version !== LEGACY_BIOMORPHIC_CUT_VERSION) {
+      await ensureBakedCut(
+        'living-fringe',
+        cutDescriptor.rows,
+        cutDescriptor.columns,
+        cutDescriptor.seed,
+        cutDescriptor.bakedLibraryVersion,
+      );
+    }
 
     return {
       cutterId: 'biomorphic',

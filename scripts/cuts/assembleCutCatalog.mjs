@@ -7,6 +7,7 @@ const version = Number(versionText), baseVersion = Number(baseText);
 if (!assetPath || !Number.isSafeInteger(version) || !Number.isSafeInteger(baseVersion) || baseVersion < 1 || version <= baseVersion) {
   throw new Error('Usage: node assembleCutCatalog.mjs <new-version> <base-version> <reviewed-asset-root>');
 }
+const REMOTE_MIN_PIECES = 100;
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const directory = 'src/puzzle/cutters/biomorphic';
 const root = resolve(assetPath), assetManifestRaw = readFileSync(`${root}/manifest.json`, 'utf8');
@@ -41,7 +42,13 @@ const catalog = { version, predecessor: baseVersion, assetManifest: relative(res
 const byStyle = new Map();
 for (const [key, files] of Object.entries(sorted)) {
   const [style, grid] = key.split('/'); const grids = byStyle.get(style) ?? [];
-  const required = files.map(file => `require(${JSON.stringify(relative(resolve(directory), resolve(file.file)))}) as BakedCut`);
+  // Boards of REMOTE_MIN_PIECES and up are served by the photo API from R2
+  // (key = path under assets/) and fetched the first time they are played;
+  // the smaller ones ship in the app so a first puzzle never needs a network.
+  const [rows, columns] = grid.split('x').map(Number);
+  const required = files.map(file => rows * columns >= REMOTE_MIN_PIECES
+    ? `{ remote: { key: ${JSON.stringify(relative(resolve('assets'), resolve(file.file)))}, sha256: ${JSON.stringify(file.sha256)} } }`
+    : `require(${JSON.stringify(relative(resolve(directory), resolve(file.file)))}) as BakedCut`);
   grids.push(`    ${JSON.stringify(grid)}: [${required.join(', ')}],`); byStyle.set(style, grids);
 }
 const module = `// Frozen catalog ${version}. Add a new version to change pools or geometry.\nimport type { BakedCut } from './bakedCut';\nimport type { BakedCutLibrary } from './bakedCutLibrary';\n\nexport const BAKED_CUT_LIBRARY_V${version}: BakedCutLibrary = {\n${[...byStyle].map(([style,grids]) => `  ${JSON.stringify(style)}: {\n${grids.join('\n')}\n  },`).join('\n')}\n};\n`;

@@ -6,7 +6,11 @@ import type {
   PuzzleLayout,
 } from '../../types/layout';
 import { canonicalizeBiomorphicSeed } from '../biomorphic/generateBiomorphic';
-import { bakedLibraryDescriptorFields, biomorphicPiecesFrom } from '../biomorphic/bakedCutSource';
+import {
+  bakedLibraryDescriptorFields,
+  biomorphicPiecesFrom,
+  ensureBakedCut,
+} from '../biomorphic/bakedCutSource';
 import { generateBiomorphicPhaseFieldPieces } from '../biomorphic/generateBiomorphicPhaseField';
 import { resolveBoardSize } from '../resolveBoardSize';
 
@@ -77,6 +81,13 @@ export const AmoebaCutter: PuzzleCutter = {
   ): Promise<PuzzleLayout> {
     const cutDescriptor = descriptorFromOptions(image, options);
     const { width, height } = resolveBoardSize(image, options);
+    await ensureBakedCut(
+      'amoeba-coral',
+      cutDescriptor.rows,
+      cutDescriptor.columns,
+      cutDescriptor.seed,
+      cutDescriptor.bakedLibraryVersion,
+    );
 
     return {
       cutterId: 'amoeba',
