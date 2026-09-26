@@ -89,8 +89,24 @@ describe('ensureBakedCut', () => {
       ensureBakedCut('living-fringe', 14, 14, 'a', 2),
       ensureBakedCut('living-fringe', 14, 14, 'b', 2),
     ]);
+    await ensureBakedCut('living-fringe', 14, 14, 'c', 2);
     expect(loader).toHaveBeenCalledTimes(1);
-    expect(library['living-fringe']!['14x14']![0]).toMatchObject({ rows: 14 });
+    expect(library['living-fringe']!['14x14']![0]).toEqual({ remote: REF });
+  });
+
+  it('does not mutate the source catalog when remote entries are hydrated', async () => {
+    const library = remoteLibrary();
+    installBakedCutLibraries({ 1: {}, 2: library }, 2);
+    installRemoteCutLoader(async () => JSON.parse(RAW) as BakedCut);
+
+    await ensureBakedCut('living-fringe', 14, 14, 'seed', 2);
+    expect(library['living-fringe']!['14x14']![0]).toEqual({ remote: REF });
+
+    clearBakedCutLibrary();
+    installBakedCutLibraries({ 1: {}, 2: library }, 2);
+    installRemoteCutLoader(async () => JSON.parse(RAW) as BakedCut);
+    await ensureBakedCut('living-fringe', 14, 14, 'seed', 2);
+    expect(library['living-fringe']!['14x14']![0]).toEqual({ remote: REF });
   });
 
   it('reports a failed download as a connection problem the player can act on', async () => {

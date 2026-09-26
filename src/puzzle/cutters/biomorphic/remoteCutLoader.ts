@@ -63,9 +63,19 @@ export const expoCutFileStore: CutFileStore = {
     const directory = new Directory(Paths.document, DIRECTORY_NAME);
     if (!directory.exists) directory.create({ intermediates: true });
     const file = new File(directory, name);
-    if (file.exists) file.delete();
-    file.create();
-    file.write(contents);
+    const staged = new File(directory, `${name}.tmp`);
+    if (staged.exists) staged.delete();
+    staged.create();
+    try {
+      staged.write(contents);
+      // The installed Expo File API does not support overwriting on move. Keep
+      // the old cache entry intact until the complete replacement is staged.
+      if (file.exists) file.delete();
+      staged.move(file);
+    } catch (error) {
+      if (staged.exists) staged.delete();
+      throw error;
+    }
   },
 };
 

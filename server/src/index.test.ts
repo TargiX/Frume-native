@@ -924,6 +924,36 @@ describe('baked cut payloads', () => {
     expect(response.headers.get('Content-Type')).toBe('application/json');
   });
 
+  it('applies the requesting origin after serving a shared cached payload', async () => {
+    const key = 'cuts-v2/living-fringe/10x10/98.json';
+    await testEnv.CUTS!.put(key, BODY);
+    const envWithOrigins = {
+      ...testEnv,
+      ALLOWED_ORIGINS: 'https://first.example,https://second.example',
+    } as Env;
+
+    const first = await worker.fetch(
+      new Request(`https://frume.test/cuts/${key}`, {
+        headers: { Origin: 'https://first.example' },
+      }),
+      envWithOrigins,
+    );
+    const second = await worker.fetch(
+      new Request(`https://frume.test/cuts/${key}`, {
+        headers: { Origin: 'https://second.example' },
+      }),
+      envWithOrigins,
+    );
+
+    expect(first.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://first.example',
+    );
+    expect(second.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://second.example',
+    );
+    expect(second.headers.get('Vary')).toBe('Origin');
+  });
+
   it('answers a missing cut with 404 rather than an error', async () => {
     const response = await worker.fetch(
       new Request('https://frume.test/cuts/cuts-v2/amoeba-coral/14x14/9.json'),

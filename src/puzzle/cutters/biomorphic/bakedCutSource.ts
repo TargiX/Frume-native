@@ -45,7 +45,22 @@ export function installBakedCutLibraries(
   ) {
     throw new Error("Invalid baked cut catalog registration");
   }
-  installed = { ...libraries };
+  installed = Object.fromEntries(
+    Object.entries(libraries).map(([catalogVersion, library]) => [
+      catalogVersion,
+      Object.fromEntries(
+        Object.entries(library).map(([style, grids]) => [
+          style,
+          Object.fromEntries(
+            Object.entries(grids ?? {}).map(([grid, entries]) => [
+              grid,
+              entries ? [...entries] : entries,
+            ]),
+          ),
+        ]),
+      ),
+    ]),
+  );
   currentVersion = version;
 }
 

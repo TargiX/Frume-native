@@ -2058,23 +2058,34 @@ async function handleCut(
     method: 'GET',
   });
   const cached = await cache?.match(cacheKey);
-  if (cached) return request.method === 'HEAD' ? new Response(null, cached) : cached;
+  if (cached) return withCutCors(cached, request, env);
   const object = await env.CUTS.get(key);
   if (!object) return json<ErrorBody>({ error: 'Not found' }, request, env, 404);
-  const response = new Response(object.body, {
+  const payload = new Response(object.body, {
     headers: {
-      ...corsHeaders(request, env),
       'Content-Type': 'application/json',
       'Cache-Control': 'public, max-age=31536000, immutable',
       ETag: object.httpEtag,
     },
   });
   if (cache) {
-    const stored = cache.put(cacheKey, response.clone());
+    const stored = cache.put(cacheKey, payload.clone());
     if (ctx) ctx.waitUntil(stored);
     else await stored;
   }
-  return request.method === 'HEAD' ? new Response(null, response) : response;
+  return withCutCors(payload, request, env);
+}
+
+function withCutCors(response: Response, request: Request, env: Env): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(corsHeaders(request, env))) {
+    headers.set(name, value);
+  }
+  return new Response(request.method === 'HEAD' ? null : response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 const worker = {
