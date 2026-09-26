@@ -1,0 +1,1712 @@
+{
+  "purpose": "Reviewed complex cut payloads for an immutable versioned catalog.",
+  "generatedAt": "2026-09-26T09:06:00.754Z",
+  "installedReviewSourceFingerprint": "37a9182648e41248f3607a394ce9d036f304be8977d13a38b55f2eadec9657b8",
+  "largeReviewSourceFingerprint": "d05b24fbaa94d7aa77db497186b9a3e89473386b6b55054e0e7c8f1397ac42d6",
+  "gameVerificationSourceFingerprint": "110a840479f631b8568c280f8774aecdb971eaa17e3ea39e7e39fbcc0713ee86",
+  "generationPlan": {
+    "sourceFingerprint": "c7e9fd2ec1c6cfc1cf5ea4e6467e9fd605d60ed99ef3a01462c7ac19326dd97f",
+    "generatorSha256": "792b690d43c789dd71202e93cde3ef99e5eff49116e9982dc388931f651bf083",
+    "styles": [
+      "living-fringe",
+      "living-spectrum",
+      "crystal-six",
+      "crystal-four",
+      "amoeba-coral",
+      "amoeba-columnar"
+    ],
+    "grids": [
+      [
+        10,
+        10,
+        2
+      ],
+      [
+        14,
+        14,
+        2
+      ]
+    ],
+    "seedOffset": 0
+  },
+  "bakeRecipes": [
+    {
+      "style": "living-fringe",
+      "profile": {
+        "iterations": 3000,
+        "interfaceEpsilon": 0.008,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.95,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0.05,
+        "anisotropy": {
+          "delta": 0,
+          "symmetry": 6
+        },
+        "pieceVariation": 0,
+        "spectrumHarmonics": 2,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 16,
+        "u1": 6,
+        "lambda2": 8,
+        "u2": 3,
+        "warpWavelengths": [
+          128,
+          70
+        ],
+        "warpAmplitudes": [
+          13,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 1,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "living-fringe-ROWSxCOLUMNS-VARIANT"
+    },
+    {
+      "style": "living-spectrum",
+      "profile": {
+        "iterations": 3000,
+        "interfaceEpsilon": 0.008,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.95,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0.05,
+        "anisotropy": {
+          "delta": 0,
+          "symmetry": 6
+        },
+        "pieceVariation": 0.5,
+        "spectrumHarmonics": 5,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 16,
+        "u1": 6,
+        "lambda2": 8,
+        "u2": 3,
+        "warpWavelengths": [
+          128,
+          70
+        ],
+        "warpAmplitudes": [
+          13,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 1,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "living-spectrum-ROWSxCOLUMNS-VARIANT"
+    },
+    {
+      "style": "crystal-six",
+      "profile": {
+        "iterations": 3000,
+        "interfaceEpsilon": 0.008,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.95,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0.08,
+        "anisotropy": {
+          "delta": 0.3,
+          "symmetry": 6
+        },
+        "pieceVariation": 0,
+        "spectrumHarmonics": 2,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 16,
+        "u1": 6,
+        "lambda2": 8,
+        "u2": 3,
+        "warpWavelengths": [
+          128,
+          70
+        ],
+        "warpAmplitudes": [
+          13,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 1,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "crystal-six-ROWSxCOLUMNS-VARIANT"
+    },
+    {
+      "style": "crystal-four",
+      "profile": {
+        "iterations": 3000,
+        "interfaceEpsilon": 0.008,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.95,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0.08,
+        "anisotropy": {
+          "delta": 0.5,
+          "symmetry": 4
+        },
+        "pieceVariation": 0,
+        "spectrumHarmonics": 2,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 16,
+        "u1": 6,
+        "lambda2": 8,
+        "u2": 3,
+        "warpWavelengths": [
+          128,
+          70
+        ],
+        "warpAmplitudes": [
+          13,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 1,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "crystal-four-ROWSxCOLUMNS-VARIANT"
+    },
+    {
+      "style": "amoeba-coral",
+      "profile": {
+        "iterations": 800,
+        "interfaceEpsilon": 0.012,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.9,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0,
+        "anisotropy": {
+          "delta": 0,
+          "symmetry": 6
+        },
+        "pieceVariation": 0,
+        "spectrumHarmonics": 2,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 40,
+        "u1": 8,
+        "lambda2": 4,
+        "u2": 1,
+        "warpWavelengths": [
+          94,
+          50
+        ],
+        "warpAmplitudes": [
+          12,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 1,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "amoeba-coral-ROWSxCOLUMNS-VARIANT"
+    },
+    {
+      "style": "amoeba-columnar",
+      "profile": {
+        "iterations": 800,
+        "interfaceEpsilon": 0.012,
+        "supercooling": 0.3,
+        "gamma": 35,
+        "alpha": 0.9,
+        "latentHeat": 1,
+        "bathCoupling": 0,
+        "tipNoise": 0,
+        "anisotropy": {
+          "delta": 0,
+          "symmetry": 6
+        },
+        "pieceVariation": 0,
+        "spectrumHarmonics": 2,
+        "spectrumFalloff": 1,
+        "freeRim": 0,
+        "minNeck": 0.06,
+        "areaConservation": 0,
+        "lambda1": 40,
+        "u1": 8,
+        "lambda2": 4,
+        "u2": 1,
+        "warpWavelengths": [
+          94,
+          50
+        ],
+        "warpAmplitudes": [
+          12,
+          8
+        ],
+        "seedLayout": {
+          "mode": "blue-noise",
+          "stretch": 0.5,
+          "jitter": 0.34
+        }
+      },
+      "numerics": {
+        "samplesPerPiece": 96,
+        "dx": 0.024,
+        "dt": 0.00012,
+        "tau": 0.0003,
+        "activeThreshold": 0.0001,
+        "boundingBoxMargin": 4,
+        "thermalBoxMargin": 24,
+        "connectivityRadius": 2,
+        "topologyProjectionEvery": 1,
+        "smoothingPasses": 1
+      },
+      "seedPattern": "amoeba-columnar-ROWSxCOLUMNS-VARIANT"
+    }
+  ],
+  "independentNewGeometries": 24,
+  "correctedExistingGeometries": 20,
+  "appLayoutsChecked": 96,
+  "restoredLayoutsChecked": 96,
+  "options": {
+    "pinchGap": 0.01,
+    "flatness": 0.00005,
+    "minCornerAngle": 0,
+    "separateJunctionTips": true,
+    "maxMovement": 0.015,
+    "maxPasses": 64
+  },
+  "entries": [
+    {
+      "id": "amoeba-columnar-7x7-2",
+      "kind": "local-correction",
+      "style": "amoeba-columnar",
+      "grid": "7x7",
+      "variant": 2,
+      "file": "amoeba-columnar/7x7/2.json",
+      "bytes": 42926,
+      "inputSha256": "516b4977afb1c9e2548e0ae0fc21a713c77ff6455d57de34744eae127805423b",
+      "outputSha256": "d93a7e387c3f5246c47c965c5332d52c56bf48e43c7e2ef2e9dfade3a57720bb",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.000000478418304,
+        "maximumEdgeLengthChange": 0.000036467188282873764,
+        "maximumPieceAreaChange": 0.000038457356922705355,
+        "maximumCurveMovement": 0.00028024066003194713,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-35-39-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-four-5x5-6",
+      "kind": "local-correction",
+      "style": "crystal-four",
+      "grid": "5x5",
+      "variant": 6,
+      "file": "crystal-four/5x5/6.json",
+      "bytes": 25324,
+      "inputSha256": "51da51cef718bb49396f33f09e289ba5d9f9e16fad61ceed5176f262eb1e8ab5",
+      "outputSha256": "0ab81072d9385241dc89a5c5b7332d618264f13ef30b2e68d1f099d6dd1b5d47",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.99995998173739,
+        "maximumEdgeLengthChange": 0.0017611634128277265,
+        "maximumPieceAreaChange": 0.00036789074173496084,
+        "maximumCurveMovement": 0.003539075811907124,
+        "changedKnots": 7,
+        "changedEdges": [
+          "shared-5-10-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-four-7x7-1",
+      "kind": "local-correction",
+      "style": "crystal-four",
+      "grid": "7x7",
+      "variant": 1,
+      "file": "crystal-four/7x7/1.json",
+      "bytes": 52606,
+      "inputSha256": "e8d80904cf61881473364b125f601fa14b6108f9865432094b055095164e9c3f",
+      "outputSha256": "a99d37cc77583692d403f304ad5d86395f7f7c6bbbafd73a72b5c2a188417060",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.999994646218366,
+        "maximumEdgeLengthChange": 0.0005800291281217174,
+        "maximumPieceAreaChange": 0.0003085689325886612,
+        "maximumCurveMovement": 0.00443337102417678,
+        "changedKnots": 10,
+        "changedEdges": [
+          "shared-10-15-0",
+          "shared-6-15-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-3x3-2",
+      "kind": "local-correction",
+      "style": "crystal-six",
+      "grid": "3x3",
+      "variant": 2,
+      "file": "crystal-six/3x3/2.json",
+      "bytes": 8752,
+      "inputSha256": "22ebe95f8aec60d1332c51365323c3d479e1aafa2c2f48c7a2171f25aa388606",
+      "outputSha256": "993718f837422840b945d2a203376edb24ed4bee059481b1e4859c65cf9fec0f",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.000007676080935,
+        "maximumEdgeLengthChange": 0.00010606982484895333,
+        "maximumPieceAreaChange": 0.00015288068074967298,
+        "maximumCurveMovement": 0.0004834058136873459,
+        "changedKnots": 6,
+        "changedEdges": [
+          "shared-0-1-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-4x4-2",
+      "kind": "local-correction",
+      "style": "crystal-six",
+      "grid": "4x4",
+      "variant": 2,
+      "file": "crystal-six/4x4/2.json",
+      "bytes": 17016,
+      "inputSha256": "6b29948b3388b592f12568f04135aba5e5f5d34678f174d4f9ef95d2551621e4",
+      "outputSha256": "9252e80a535217790d37717cc5436bfe4007e842eaedbfac437df5605b68c816",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 1,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000072231045607,
+        "maximumEdgeLengthChange": 0.00013097608892587154,
+        "maximumPieceAreaChange": 0.0003863818108955641,
+        "maximumCurveMovement": 0.0012258629138741433,
+        "changedKnots": 7,
+        "changedEdges": [
+          "shared-1-3-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-5x5-4",
+      "kind": "local-correction",
+      "style": "crystal-six",
+      "grid": "5x5",
+      "variant": 4,
+      "file": "crystal-six/5x5/4.json",
+      "bytes": 26803,
+      "inputSha256": "17fb18da2f68b248b9bae073789927a12668fa360a65c1d41e8a9c76b486b7e6",
+      "outputSha256": "be6199ac993c9cc49e11a2a4dc561618c4c503541e70f249f83b805bb35a9494",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000030410224665,
+        "maximumEdgeLengthChange": 0.000071498590664687,
+        "maximumPieceAreaChange": 0.00025156734266076897,
+        "maximumCurveMovement": 0.0007217300494394641,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-1-3-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-7x7-2",
+      "kind": "local-correction",
+      "style": "crystal-six",
+      "grid": "7x7",
+      "variant": 2,
+      "file": "crystal-six/7x7/2.json",
+      "bytes": 55090,
+      "inputSha256": "9150d4509f3f83d3356f77d58b5dc5661d9576141187675129005ad5c1e6e0e2",
+      "outputSha256": "7425cf247b9eab32b445b50ebe7696a921a170f734863a66d942ad4a0ccee9a3",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999953296657925,
+        "maximumEdgeLengthChange": 0.000451030802180008,
+        "maximumPieceAreaChange": 0.00016747475955086744,
+        "maximumCurveMovement": 0.007744665700261888,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-30-36-0"
+        ]
+      }
+    },
+    {
+      "id": "living-fringe-3x3-3",
+      "kind": "local-correction",
+      "style": "living-fringe",
+      "grid": "3x3",
+      "variant": 3,
+      "file": "living-fringe/3x3/3.json",
+      "bytes": 9662,
+      "inputSha256": "a3f5b6471f313cca0264049e2504e5a601b21f18ce8c3b67f653a67352df778c",
+      "outputSha256": "00fb9d9cfb4a62c9b9d59f85eca21b1e71c10771eb486d585af72723e857326a",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000057698445124,
+        "maximumEdgeLengthChange": 0.00005902880658914533,
+        "maximumPieceAreaChange": 0.00016111197663057353,
+        "maximumCurveMovement": 0.00042969405661098803,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-3-6-0"
+        ]
+      }
+    },
+    {
+      "id": "living-fringe-4x4-1",
+      "kind": "local-correction",
+      "style": "living-fringe",
+      "grid": "4x4",
+      "variant": 1,
+      "file": "living-fringe/4x4/1.json",
+      "bytes": 17696,
+      "inputSha256": "fc1cd96339878f94103a727bac76cceb81d38c6e5f48f05b07ffa3c8555d5c30",
+      "outputSha256": "7b4792d83f709a50a6b1a22e82cde2255e048f9f5fc6dbb266967788d625d5ae",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000031021139082,
+        "maximumEdgeLengthChange": 0.00005507246512603814,
+        "maximumPieceAreaChange": 0.00010885423337736455,
+        "maximumCurveMovement": 0.00043562115117450474,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-3-8-0"
+        ]
+      }
+    },
+    {
+      "id": "living-fringe-5x5-1",
+      "kind": "local-correction",
+      "style": "living-fringe",
+      "grid": "5x5",
+      "variant": 1,
+      "file": "living-fringe/5x5/1.json",
+      "bytes": 28482,
+      "inputSha256": "34b81239290fe7de61e6d95c5c736fd023af607777636641230fec48c2bb6190",
+      "outputSha256": "016cfc44a77e5e6c10ee9060d196ef4e906eab25ae355c0ab070c9d6a75b4003",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000028667143446,
+        "maximumEdgeLengthChange": 0.00011376786684169637,
+        "maximumPieceAreaChange": 0.00013003803116928142,
+        "maximumCurveMovement": 0.00044759797563645454,
+        "changedKnots": 7,
+        "changedEdges": [
+          "shared-12-16-0"
+        ]
+      }
+    },
+    {
+      "id": "living-fringe-5x5-3",
+      "kind": "local-correction",
+      "style": "living-fringe",
+      "grid": "5x5",
+      "variant": 3,
+      "file": "living-fringe/5x5/3.json",
+      "bytes": 28529,
+      "inputSha256": "826695804ee67b54cab5c6346793afea3ec4475c0dd019264dd2dbb347ecf5d6",
+      "outputSha256": "e9b515b7296a9e43535cca3d0b25f8296b297b7435acd5255b2971c6c325c92b",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000012389000241,
+        "maximumEdgeLengthChange": 0.000040658731927711855,
+        "maximumPieceAreaChange": 0.00015534838976039023,
+        "maximumCurveMovement": 0.00048207777322826703,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-0-7-0"
+        ]
+      }
+    },
+    {
+      "id": "living-fringe-7x7-1",
+      "kind": "local-correction",
+      "style": "living-fringe",
+      "grid": "7x7",
+      "variant": 1,
+      "file": "living-fringe/7x7/1.json",
+      "bytes": 57525,
+      "inputSha256": "bf4c0bd27d0ac8b952f3839597fc59283e269121973f73ca35f58cfd510ce635",
+      "outputSha256": "90112841761a804d4217ae23ecd9f8ef234a00bbbbad494ef625b6b3e7b8934f",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.999989673457669,
+        "maximumEdgeLengthChange": 0.0011689265246618286,
+        "maximumPieceAreaChange": 0.0001291607572113454,
+        "maximumCurveMovement": 0.004986156623985809,
+        "changedKnots": 8,
+        "changedEdges": [
+          "shared-21-26-0",
+          "shared-22-26-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-3x3-3",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "3x3",
+      "variant": 3,
+      "file": "living-spectrum/3x3/3.json",
+      "bytes": 9201,
+      "inputSha256": "322b5776c8faf2addd431e08beca8bca6d3841fa1f9d61bb57e5b3a0f82e9082",
+      "outputSha256": "4f3f0dfbaed79c30b718635fd06a3f23e8e3b3f9e333ea9cbb000783e78fbfb6",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000085576608664,
+        "maximumEdgeLengthChange": 0.00010796039578608863,
+        "maximumPieceAreaChange": 0.000203951469872371,
+        "maximumCurveMovement": 0.0004863806467724985,
+        "changedKnots": 6,
+        "changedEdges": [
+          "shared-7-8-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-3x3-4",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "3x3",
+      "variant": 4,
+      "file": "living-spectrum/3x3/4.json",
+      "bytes": 9452,
+      "inputSha256": "27a3281ffd3c3b2dfc92e24940f4834355eec398c86513cd75b7b433bd58d44d",
+      "outputSha256": "d5795f0d38a4e9a3e06c162d385ebb8288d448efe97b882e9e25bfee2ee6bd77",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.000015781435297,
+        "maximumEdgeLengthChange": 0.00017951192039711295,
+        "maximumPieceAreaChange": 0.0004364141561075674,
+        "maximumCurveMovement": 0.0012353704127565646,
+        "changedKnots": 6,
+        "changedEdges": [
+          "shared-3-6-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-3x3-6",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "3x3",
+      "variant": 6,
+      "file": "living-spectrum/3x3/6.json",
+      "bytes": 9553,
+      "inputSha256": "1b4b23b5bd661f7993ced400098914fb0037e2d320185eca9e55040d6f111428",
+      "outputSha256": "05a56a0d06d4bac023e7546ff667408bed539cd5db981887c85f860efa1f9afc",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999972176646581,
+        "maximumEdgeLengthChange": 0.00004694774075042485,
+        "maximumPieceAreaChange": 0.00003579368656569937,
+        "maximumCurveMovement": 0.00021104766369126374,
+        "changedKnots": 2,
+        "changedEdges": [
+          "shared-2-5-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-5x5-1",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "5x5",
+      "variant": 1,
+      "file": "living-spectrum/5x5/1.json",
+      "bytes": 28532,
+      "inputSha256": "4a8a856bd6bc8579b09b74ffe3b8d693ba15a6176632a942743e978446957589",
+      "outputSha256": "33feefec5c4dc7182ccc265dba56faa16fcde5b07408457f959275ae9ee91526",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000078090551952,
+        "maximumEdgeLengthChange": 0.00018519848124354255,
+        "maximumPieceAreaChange": 0.0005386554651157921,
+        "maximumCurveMovement": 0.0015323286423426534,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-18-22-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-5x5-6",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "5x5",
+      "variant": 6,
+      "file": "living-spectrum/5x5/6.json",
+      "bytes": 27960,
+      "inputSha256": "2a2d6d7daee63e3ea9b325c1e898e450663145b2a132390d4e43635e674d6edc",
+      "outputSha256": "ae1e4f5e14e5088423ad36da312b666ceb187ab65f99806839a342f3be522576",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000047837234707,
+        "maximumEdgeLengthChange": 0.00014513488133482966,
+        "maximumPieceAreaChange": 0.00027273109928158124,
+        "maximumCurveMovement": 0.0008056763561455679,
+        "changedKnots": 6,
+        "changedEdges": [
+          "shared-14-19-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-7x7-1",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "7x7",
+      "variant": 1,
+      "file": "living-spectrum/7x7/1.json",
+      "bytes": 56621,
+      "inputSha256": "6b835c2a3f09c960c42b8525492acb39200b7c5060f421cabb1bbfdcf560eafd",
+      "outputSha256": "9ba4f6c7974992830e3d2fad6481499988c7ed1e3a10a65e3ac8af4c37a654a6",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.000001081265008,
+        "maximumEdgeLengthChange": 0.00012688668922322677,
+        "maximumPieceAreaChange": 0.00014419615588039114,
+        "maximumCurveMovement": 0.0005013097327126737,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-34-35-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-7x7-2",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "7x7",
+      "variant": 2,
+      "file": "living-spectrum/7x7/2.json",
+      "bytes": 56278,
+      "inputSha256": "4aaa57b13bd14fb667c19b7ccf97ec241b8c7c420bf25f485579252b38d5ca98",
+      "outputSha256": "63e6fb938a6584d2a953e9eb0a6890fd3e5c97f135023e514b64a9afd2e55a36",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000013319480705,
+        "maximumEdgeLengthChange": 0.00004325708164842901,
+        "maximumPieceAreaChange": 0.00015140117823314592,
+        "maximumCurveMovement": 0.0005013097327134508,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-21-28-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-7x7-3",
+      "kind": "local-correction",
+      "style": "living-spectrum",
+      "grid": "7x7",
+      "variant": 3,
+      "file": "living-spectrum/7x7/3.json",
+      "bytes": 56352,
+      "inputSha256": "bf0260ea4e3979115e4c9ec7d70c70cb64c0944afe955b6ced4783b1267dbe2b",
+      "outputSha256": "b29bbb6c47c7a697a90b9ff5c3f0f093194825112cff7998662ec6b64bbb804c",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000023688699795,
+        "maximumEdgeLengthChange": 0.00016500436913524652,
+        "maximumPieceAreaChange": 0.0003521773792203032,
+        "maximumCurveMovement": 0.0008772920322471789,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-15-22-0"
+        ]
+      }
+    },
+    {
+      "id": "amoeba-columnar-10x10-0",
+      "kind": "new-size",
+      "style": "amoeba-columnar",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "amoeba-columnar/10x10/0.json",
+      "bytes": 81518,
+      "inputSha256": "7b6ed9be5549825d5312d58b4c49a2461c37a299c2e719a723e9e919341cfa54",
+      "outputSha256": "7b6ed9be5549825d5312d58b4c49a2461c37a299c2e719a723e9e919341cfa54",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-columnar-10x10-1",
+      "kind": "new-size",
+      "style": "amoeba-columnar",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "amoeba-columnar/10x10/1.json",
+      "bytes": 90479,
+      "inputSha256": "57fe8db2a9b5eee271b80947428f4b698aa304f8915717fcfad14f122fb188b3",
+      "outputSha256": "57fe8db2a9b5eee271b80947428f4b698aa304f8915717fcfad14f122fb188b3",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-columnar-14x14-0",
+      "kind": "new-size",
+      "style": "amoeba-columnar",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "amoeba-columnar/14x14/0.json",
+      "bytes": 181288,
+      "inputSha256": "be685dda5381c0776a0c048207f1dcbfab737c3322fc136813d38a72f46912c2",
+      "outputSha256": "be685dda5381c0776a0c048207f1dcbfab737c3322fc136813d38a72f46912c2",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-columnar-14x14-1",
+      "kind": "new-size",
+      "style": "amoeba-columnar",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "amoeba-columnar/14x14/1.json",
+      "bytes": 180111,
+      "inputSha256": "7bd204266c9901f84ff2120bcb5f775a6eb5ee905829331e8330143edb500f67",
+      "outputSha256": "7bd204266c9901f84ff2120bcb5f775a6eb5ee905829331e8330143edb500f67",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-coral-10x10-0",
+      "kind": "new-size",
+      "style": "amoeba-coral",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "amoeba-coral/10x10/0.json",
+      "bytes": 88822,
+      "inputSha256": "1fe567fc6f1c94e0db166918e7b352de76eada2410f73cb713f480a4d7a4158d",
+      "outputSha256": "1fe567fc6f1c94e0db166918e7b352de76eada2410f73cb713f480a4d7a4158d",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-coral-10x10-1",
+      "kind": "new-size",
+      "style": "amoeba-coral",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "amoeba-coral/10x10/1.json",
+      "bytes": 88901,
+      "inputSha256": "681c0fb7d0adb7a888139950adf4c5eb15d930d5e9b6f5b32a3eaf4372811fa0",
+      "outputSha256": "681c0fb7d0adb7a888139950adf4c5eb15d930d5e9b6f5b32a3eaf4372811fa0",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-coral-14x14-0",
+      "kind": "new-size",
+      "style": "amoeba-coral",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "amoeba-coral/14x14/0.json",
+      "bytes": 163485,
+      "inputSha256": "1eea81c1f3e71f27725e9b8532ff6ae8a6a541234e18ff012c878f93aa989da9",
+      "outputSha256": "1eea81c1f3e71f27725e9b8532ff6ae8a6a541234e18ff012c878f93aa989da9",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "amoeba-coral-14x14-1",
+      "kind": "new-size",
+      "style": "amoeba-coral",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "amoeba-coral/14x14/1.json",
+      "bytes": 179307,
+      "inputSha256": "de586cf8bbe8ef46198fc41bf0c1acc5f9efb774f5bc996adfe809e0f3a710ce",
+      "outputSha256": "de586cf8bbe8ef46198fc41bf0c1acc5f9efb774f5bc996adfe809e0f3a710ce",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "crystal-four-10x10-0",
+      "kind": "new-size",
+      "style": "crystal-four",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "crystal-four/10x10/0.json",
+      "bytes": 110300,
+      "inputSha256": "296acf5b2878bdcc90086c911cc790c49abd4d294a72f9dd31f90db20e63ac20",
+      "outputSha256": "76ed659199c7bb4d42d6ea5c6e9a0a2b821b2322b7ce73ed77527c8345cc74f6",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 1,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999931662072863,
+        "maximumEdgeLengthChange": 0.001563125126120557,
+        "maximumPieceAreaChange": 0.00028960196961080875,
+        "maximumCurveMovement": 0.002743749408280897,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-64-73-0",
+          "shared-72-73-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-four-10x10-1",
+      "kind": "new-size",
+      "style": "crystal-four",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "crystal-four/10x10/1.json",
+      "bytes": 110118,
+      "inputSha256": "2f2b08385157cfbc04db8bb882224916028a6073c51c0012889fc422bc3294aa",
+      "outputSha256": "8c8e6f8fa2c9ff3018d53f836f996555ab7bee26868fdb8276776f2b49e6f09f",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000028790311855,
+        "maximumEdgeLengthChange": 0.0007742627865687801,
+        "maximumPieceAreaChange": 0.0002440080945215195,
+        "maximumCurveMovement": 0.004566015209659973,
+        "changedKnots": 9,
+        "changedEdges": [
+          "shared-28-36-0",
+          "shared-32-36-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-four-14x14-0",
+      "kind": "new-size",
+      "style": "crystal-four",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "crystal-four/14x14/0.json",
+      "bytes": 221652,
+      "inputSha256": "f13b90d6d89f0659ce27854eb412c62330676fd726979d37c7086255b3eae26e",
+      "outputSha256": "98cd1adb6cba4f095ac0c0598d82927b3b6665a3cea9babbd4fe25233f1ae6ca",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999999378762111,
+        "maximumEdgeLengthChange": 0.000018251822649917315,
+        "maximumPieceAreaChange": 0.00013631760609000843,
+        "maximumCurveMovement": 0.0005013097327127951,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-0-9-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-four-14x14-1",
+      "kind": "new-size",
+      "style": "crystal-four",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "crystal-four/14x14/1.json",
+      "bytes": 219318,
+      "inputSha256": "da9d9a1703f6154faffde323d25303a608d0e35a9aba80e56996ae1dbf9f7e8a",
+      "outputSha256": "bd39980137f23669871d80bfd8b10ea87e47e0622fc7fc39b340747569f79998",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999973570563694,
+        "maximumEdgeLengthChange": 0.0013167394082760353,
+        "maximumPieceAreaChange": 0.0003638489034344852,
+        "maximumCurveMovement": 0.005869026728720026,
+        "changedKnots": 3,
+        "changedEdges": [
+          "shared-59-71-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-10x10-0",
+      "kind": "new-size",
+      "style": "crystal-six",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "crystal-six/10x10/0.json",
+      "bytes": 114902,
+      "inputSha256": "dc77c7b61e064543e28e737f322246328079829dd4ee95984164f94abec811c9",
+      "outputSha256": "f3702c3e4e3ee3f3bfbe05bdbc8862b73187012fb66311e26d512737cf8cefce",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000005119795699,
+        "maximumEdgeLengthChange": 0.000060779225893092814,
+        "maximumPieceAreaChange": 0.0001658719818904003,
+        "maximumCurveMovement": 0.0005661716316366564,
+        "changedKnots": 5,
+        "changedEdges": [
+          "shared-6-7-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-10x10-1",
+      "kind": "new-size",
+      "style": "crystal-six",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "crystal-six/10x10/1.json",
+      "bytes": 114371,
+      "inputSha256": "2c857e85586f93ed54f39f72249451a419be383b7740d54151fcc972a3f6a765",
+      "outputSha256": "f23bcfc05deb2d6cc4fd38110b13028bc3e378cce26d9f9441b4f354c1e2601d",
+      "before": {
+        "affectedPieces": 1,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.000000358020927,
+        "maximumEdgeLengthChange": 0.00010578319584508833,
+        "maximumPieceAreaChange": 0.00011502146780202616,
+        "maximumCurveMovement": 0.004039571730118773,
+        "changedKnots": 3,
+        "changedEdges": [
+          "shared-60-72-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-14x14-0",
+      "kind": "new-size",
+      "style": "crystal-six",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "crystal-six/14x14/0.json",
+      "bytes": 231444,
+      "inputSha256": "42e4e976fe30eb6be6237717555aba7c7a9eced513eccc6c4261c0bf5557b796",
+      "outputSha256": "772d10ce437aa145de27cdafbf839e4e08b4f6b89ed42735c4330a237e9dfa83",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999994377636726,
+        "maximumEdgeLengthChange": 0.0030903109167084164,
+        "maximumPieceAreaChange": 0.0007660143016584195,
+        "maximumCurveMovement": 0.007076727448437218,
+        "changedKnots": 8,
+        "changedEdges": [
+          "shared-170-192-0",
+          "shared-186-189-0"
+        ]
+      }
+    },
+    {
+      "id": "crystal-six-14x14-1",
+      "kind": "new-size",
+      "style": "crystal-six",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "crystal-six/14x14/1.json",
+      "bytes": 229169,
+      "inputSha256": "4a4a4840af3ea54befcbdac7a2fc96a6c9f0f1ace71ef58a4e2107b1f0b5b108",
+      "outputSha256": "4a4a4840af3ea54befcbdac7a2fc96a6c9f0f1ace71ef58a4e2107b1f0b5b108",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-fringe-10x10-0",
+      "kind": "new-size",
+      "style": "living-fringe",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "living-fringe/10x10/0.json",
+      "bytes": 121247,
+      "inputSha256": "0b83edde3e6cafe988220f47029927759b817b7d3753fb9213e6d1ce87e5f3e9",
+      "outputSha256": "0b83edde3e6cafe988220f47029927759b817b7d3753fb9213e6d1ce87e5f3e9",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-fringe-10x10-1",
+      "kind": "new-size",
+      "style": "living-fringe",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "living-fringe/10x10/1.json",
+      "bytes": 120304,
+      "inputSha256": "463855134ea3eda8eeb8b920815db5cb42c6c530e23f1486cab9c29def484e3c",
+      "outputSha256": "463855134ea3eda8eeb8b920815db5cb42c6c530e23f1486cab9c29def484e3c",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-fringe-14x14-0",
+      "kind": "new-size",
+      "style": "living-fringe",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "living-fringe/14x14/0.json",
+      "bytes": 240733,
+      "inputSha256": "b33a9ae25f878cc1f539bbc7d0c876087394aa6b0d0d8fa2ab0e8398a61aab65",
+      "outputSha256": "b33a9ae25f878cc1f539bbc7d0c876087394aa6b0d0d8fa2ab0e8398a61aab65",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-fringe-14x14-1",
+      "kind": "new-size",
+      "style": "living-fringe",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "living-fringe/14x14/1.json",
+      "bytes": 242189,
+      "inputSha256": "a16b63ced45abd6bac8c3b41d58414eeb283d8ce1d57f2e01624c3ba43a025bb",
+      "outputSha256": "371b3d531083a992f8c9a43e17cb5bcae78a7cdd9ac2e6e6bfcd968b748dd983",
+      "before": {
+        "affectedPieces": 2,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1.0000002635886647,
+        "maximumEdgeLengthChange": 0.00007774033739260666,
+        "maximumPieceAreaChange": 0.00019087009593543594,
+        "maximumCurveMovement": 0.0005013097327126737,
+        "changedKnots": 4,
+        "changedEdges": [
+          "shared-169-183-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-10x10-0",
+      "kind": "new-size",
+      "style": "living-spectrum",
+      "grid": "10x10",
+      "variant": 0,
+      "file": "living-spectrum/10x10/0.json",
+      "bytes": 118050,
+      "inputSha256": "9e73a644dd2e375478cfe379693f80a340c13a52169d6b2c6fa3e00f1cef0496",
+      "outputSha256": "9e73a644dd2e375478cfe379693f80a340c13a52169d6b2c6fa3e00f1cef0496",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-spectrum-10x10-1",
+      "kind": "new-size",
+      "style": "living-spectrum",
+      "grid": "10x10",
+      "variant": 1,
+      "file": "living-spectrum/10x10/1.json",
+      "bytes": 117949,
+      "inputSha256": "ed2a525967985e928633f1639c4c1b9a55059da7168c130a7062a1502eeaed6a",
+      "outputSha256": "ed2a525967985e928633f1639c4c1b9a55059da7168c130a7062a1502eeaed6a",
+      "before": {
+        "affectedPieces": 0,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 1,
+        "maximumEdgeLengthChange": 0,
+        "maximumPieceAreaChange": 0,
+        "maximumCurveMovement": 0,
+        "changedKnots": 0,
+        "changedEdges": []
+      }
+    },
+    {
+      "id": "living-spectrum-14x14-0",
+      "kind": "new-size",
+      "style": "living-spectrum",
+      "grid": "14x14",
+      "variant": 0,
+      "file": "living-spectrum/14x14/0.json",
+      "bytes": 235580,
+      "inputSha256": "c80bbcc2dec1becc9aa118d5f251872046951a43ccf8cbedc0dd53f49108909b",
+      "outputSha256": "81c2906e9435c076a74f74e0f0f78f3f317ef9f0c4287ec8844c9617c4338a58",
+      "before": {
+        "affectedPieces": 3,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999981136081441,
+        "maximumEdgeLengthChange": 0.0008685180827250338,
+        "maximumPieceAreaChange": 0.0004572959191813248,
+        "maximumCurveMovement": 0.0015682039938996319,
+        "changedKnots": 19,
+        "changedEdges": [
+          "shared-110-113-0",
+          "shared-110-123-0",
+          "shared-155-166-0"
+        ]
+      }
+    },
+    {
+      "id": "living-spectrum-14x14-1",
+      "kind": "new-size",
+      "style": "living-spectrum",
+      "grid": "14x14",
+      "variant": 1,
+      "file": "living-spectrum/14x14/1.json",
+      "bytes": 238127,
+      "inputSha256": "a6fd5f69b3bab687b4808d31bef1206cb02c033b63eea46ae8fc08a8e2b75eb0",
+      "outputSha256": "9c43782d67109fc7779a06baa9ac2a6eb34b5202afa328ce48a68cc19169dc7d",
+      "before": {
+        "affectedPieces": 4,
+        "contacts": 0
+      },
+      "after": {
+        "affectedPieces": 0,
+        "contacts": 0,
+        "pointedJunctions": 0,
+        "topologyErrors": []
+      },
+      "shapeChange": {
+        "seamLengthRatio": 0.9999992469822481,
+        "maximumEdgeLengthChange": 0.0008681472395307699,
+        "maximumPieceAreaChange": 0.00028125404285783695,
+        "maximumCurveMovement": 0.004316126724940427,
+        "changedKnots": 20,
+        "changedEdges": [
+          "shared-102-106-0",
+          "shared-102-114-0",
+          "shared-175-179-0",
+          "shared-185-192-0"
+        ]
+      }
+    }
+  ]
+}

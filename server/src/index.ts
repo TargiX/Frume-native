@@ -10,6 +10,8 @@ import { DurableObject } from 'cloudflare:workers';
  */
 
 export type Env = {
+  /** Baked cut payloads too large to ship inside the app. Immutable keys. */
+  CUTS?: R2Bucket;
   CATEGORY_POOLS: DurableObjectNamespace<CategoryPhotoPool>;
   TRACKING_GRANTS: DurableObjectNamespace<TrackingGrant>;
   PROVIDER_BUDGET: DurableObjectNamespace<ProviderBudget>;
@@ -2033,8 +2035,65 @@ function readiness(env: Env): {
   };
 }
 
+/**
+ * A baked cut payload: `<asset dir>/<style>/<grid>/<variant>.json`, exactly
+ * the path the catalog records. Catalogs are immutable -- a changed pool gets a
+ * new version and new files -- so a key never changes content and the response
+ * can be cached for a year.
+ */
+export const CUT_KEY_PATTERN =
+  /^cuts(?:-v[1-9]\d*)?\/[a-z]+(?:-[a-z]+)*\/[1-9]\d?x[1-9]\d?\/\d{1,3}\.json$/;
+
+async function handleCut(
+  request: Request,
+  env: Env,
+  key: string,
+  ctx?: ExecutionContext,
+): Promise<Response> {
+  if (!CUT_KEY_PATTERN.test(key) || !env.CUTS) {
+    return json<ErrorBody>({ error: 'Not found' }, request, env, 404);
+  }
+  const cache = (globalThis as { caches?: CacheStorage }).caches?.default;
+  const cacheKey = new Request(new URL(`/cuts/${key}`, request.url), {
+    method: 'GET',
+  });
+  const cached = await cache?.match(cacheKey);
+  if (cached) return withCutCors(cached, request, env);
+  const object = await env.CUTS.get(key);
+  if (!object) return json<ErrorBody>({ error: 'Not found' }, request, env, 404);
+  const payload = new Response(object.body, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ETag: object.httpEtag,
+    },
+  });
+  if (cache) {
+    const stored = cache.put(cacheKey, payload.clone());
+    if (ctx) ctx.waitUntil(stored);
+    else await stored;
+  }
+  return withCutCors(payload, request, env);
+}
+
+function withCutCors(response: Response, request: Request, env: Env): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(corsHeaders(request, env))) {
+    headers.set(name, value);
+  }
+  return new Response(request.method === 'HEAD' ? null : response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 const worker = {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx?: ExecutionContext,
+  ): Promise<Response> {
     if (!isOriginAllowed(request, env)) {
       return json<ErrorBody>(
         { error: 'Origin not allowed' },
@@ -2095,6 +2154,13 @@ const worker = {
         return request.method === 'POST'
           ? await handleTrack(request, env)
           : methodNotAllowed(request, env, 'POST, OPTIONS');
+      }
+      if (pathname.startsWith('/cuts/')) {
+        // Independent of the photo switch: a cut is static geometry, and a
+        // saved puzzle needs it back even while photos are switched off.
+        return request.method === 'GET' || request.method === 'HEAD'
+          ? await handleCut(request, env, pathname.slice('/cuts/'.length), ctx)
+          : methodNotAllowed(request, env, 'GET, HEAD, OPTIONS');
       }
       return json<ErrorBody>({ error: 'Not found' }, request, env, 404);
     } catch (error) {

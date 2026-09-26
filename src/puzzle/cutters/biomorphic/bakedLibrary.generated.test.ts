@@ -5,6 +5,7 @@ import { describeLibrary } from "./bakedCutLibrary";
 import { BAKED_CUT_LIBRARY } from "./bakedLibrary.generated";
 import { CUT_STYLES } from "./cutStyles";
 import { isBiomorphicTopologySafe } from "./generateBiomorphic";
+import { bakedCutOnDisk } from './bakedCutOnDisk';
 
 describe("the shipped cut library", () => {
   it("carries every style the product offers", () => {
@@ -22,7 +23,7 @@ describe("the shipped cut library", () => {
         const [rows, columns] = grid.split("x").map(Number);
         (entries ?? []).forEach((baked, index) => {
           const where = `${style}/${grid}/${index}`;
-          const topology = decodeBakedCut(baked);
+          const topology = decodeBakedCut(bakedCutOnDisk(baked));
           expect(topology.rows, where).toBe(rows);
           expect(topology.columns, where).toBe(columns);
           expect(topology.cells, where).toHaveLength(rows * columns);

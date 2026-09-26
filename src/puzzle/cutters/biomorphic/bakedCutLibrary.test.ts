@@ -12,6 +12,7 @@ import {
 import { createBiomorphicPhaseFieldTopology } from "./generateBiomorphicPhaseField";
 import { BIOMORPHIC_PHASE_FIELD_NUMERICS } from "./phaseFieldLabConfig";
 import { getCutStyle } from "./cutStyles";
+import { bakedCutOnDisk } from './bakedCutOnDisk';
 
 function bake(rows: number, columns: number, seed: string) {
   return encodeBakedCut(
@@ -30,7 +31,7 @@ function bake(rows: number, columns: number, seed: string) {
 function firstBakedCut(library: BakedCutLibrary): BakedCut {
   const entry = library["amoeba-coral"]?.[gridKey(3, 3)]?.[0];
   if (!entry) throw new Error("the test library lost its only entry");
-  return entry;
+  return bakedCutOnDisk(entry);
 }
 
 describe("baked cut library", () => {

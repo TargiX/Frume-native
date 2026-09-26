@@ -127,6 +127,8 @@ export type BiomorphicPhaseFieldNumerics = {
   connectivityRadius: number;
   topologyProjectionEvery: number;
   smoothingPasses: number;
+  /** 9-point Laplacian; off keeps the 5-point stencil every bake used. */
+  isotropicStencil?: boolean;
 };
 
 export type BiomorphicPhaseFieldLabSettings = {

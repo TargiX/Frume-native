@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MAX_TRAY_LANE_EXTENT,
   MIN_TRAY_HEIGHT,
   TRAY_BOARD_GAP,
   TRAY_HEIGHT_RATIO,
@@ -159,5 +160,19 @@ describe('computePlayLayout', () => {
 
     expect(landscape.trayPlacement).toBe('right');
     expect(landscape.trayHeight).toBeUndefined();
+  });
+
+  it('gives a tablet most of the landscape width back to the board', () => {
+    // iPad Pro 13" landscape, 100 pieces: the uncapped lane share handed the
+    // shelf 344pt of 1334 — wider than two lanes of pieces need.
+    const layout = computePlayLayout(1366, 1024, 4 / 3, 100);
+
+    expect(layout.trayPlacement).toBe('right');
+    const trayWidth =
+      layout.surfaceWidth - layout.boardWidth - TRAY_BOARD_GAP;
+    expect(trayWidth).toBeCloseTo(MAX_TRAY_LANE_EXTENT * trayDepth(100));
+    expect(layout.boardWidth).toBeCloseTo(
+      1366 - TABLE_INSET * 2 - TRAY_BOARD_GAP - trayWidth,
+    );
   });
 });

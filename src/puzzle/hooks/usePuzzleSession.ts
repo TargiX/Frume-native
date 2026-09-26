@@ -182,6 +182,7 @@ function haveSameCutDescriptor(
     !!b &&
     a.cutterId === b.cutterId &&
     a.version === b.version &&
+    (a.bakedLibraryVersion ?? 1) === (b.bakedLibraryVersion ?? 1) &&
     a.seed === b.seed &&
     a.rows === b.rows &&
     a.columns === b.columns
@@ -231,6 +232,11 @@ export async function preparePuzzleSession(
       trayHeight,
       trayGap,
       trayPlacement,
+      // A new play gets a new cut even for a previously used photograph.
+      // The cutter persists this seed; restore/resize use that descriptor.
+      ...(cutterId === 'classic' ? {} : {
+        seed: `play-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+      }),
     };
     const generated = await cutter.generate(image, options);
     // Only the classic grid defines what a quarter turn means; a request for

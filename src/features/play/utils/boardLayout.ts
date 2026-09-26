@@ -1,4 +1,5 @@
 import {
+  MAX_TRAY_LANE_EXTENT,
   MIN_TRAY_HEIGHT,
   MIN_TRAY_WIDTH,
   TRAY_BOARD_GAP,
@@ -73,19 +74,29 @@ export function computePlayLayout(
   // top before splitting what is left, or the surface overflows the screen.
   if (trayPlacement === 'right') {
     const splittableWidth = Math.max(1, maxSurfaceWidth - TRAY_BOARD_GAP);
-    const maxBoardWidth = Math.max(
-      1,
-      Math.min(
-        splittableWidth / (1 + (TRAY_WIDTH_RATIO / (1 - TRAY_WIDTH_RATIO)) * depth),
-        splittableWidth - MIN_TRAY_WIDTH * depth,
-      ),
-    );
-    const boardWidth = Math.min(maxBoardWidth, maxSurfaceHeight * safeAspect);
-    const boardHeight = boardWidth / safeAspect;
-    const trayWidth =
+    // The lane's natural share of the board, solved against the split, then
+    // clamped: never narrower than a tappable lane, and never wider than a
+    // piece needs — on a tablet the uncapped share would give the shelf a
+    // quarter of the screen.
+    const laneWidth = Math.min(
+      MAX_TRAY_LANE_EXTENT,
       Math.max(
         MIN_TRAY_WIDTH,
-        (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
+        (splittableWidth * TRAY_WIDTH_RATIO) /
+          (1 - TRAY_WIDTH_RATIO + TRAY_WIDTH_RATIO * depth),
+      ),
+    );
+    const maxBoardWidth = Math.max(1, splittableWidth - laneWidth * depth);
+    const boardWidth = Math.min(maxBoardWidth, maxSurfaceHeight * safeAspect);
+    const boardHeight = boardWidth / safeAspect;
+    // A height-limited board feeds a proportionally narrower shelf.
+    const trayWidth =
+      Math.min(
+        MAX_TRAY_LANE_EXTENT,
+        Math.max(
+          MIN_TRAY_WIDTH,
+          (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
+        ),
       ) * depth;
 
     return {
@@ -110,9 +121,12 @@ export function computePlayLayout(
   const boardWidth = Math.min(maxSurfaceWidth, maxBoardHeight * safeAspect);
   const boardHeight = boardWidth / safeAspect;
   const fittedTrayHeight =
-    Math.max(
-      MIN_TRAY_HEIGHT,
-      (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+    Math.min(
+      MAX_TRAY_LANE_EXTENT,
+      Math.max(
+        MIN_TRAY_HEIGHT,
+        (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+      ),
     ) * depth;
   // A wide photo on a tall phone runs out of width first and leaves table
   // standing empty. When there is room for a whole second row, a puzzle past a

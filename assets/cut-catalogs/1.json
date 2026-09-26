@@ -1,0 +1,726 @@
+{
+  "version": 1,
+  "purpose": "Frozen historical seed-to-cut pools. Versionless descriptors resolve here.",
+  "entries": {
+    "amoeba-columnar/3x3": [
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/0.json",
+        "sha256": "f45faad4856dd603ce1c61af5d6b77040326712cb3ed30baaaff39335f49b138"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/1.json",
+        "sha256": "cabab17a7b7fc22f459a2db2dea379d679438de0373dfbf6a1157f97da9c9b72"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/2.json",
+        "sha256": "a2b61e965979ac6109c6def6044e47e84e3b1af069ced363be1a308da24456b5"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/3.json",
+        "sha256": "ab3a7ab8dec2a32103a30debaace77c49476c21d7eab2677ae813490a233a008"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/4.json",
+        "sha256": "fcde42f5284da6417f001c0d5c7e3a0d38fb4dd676042c78ea7ba38fdee10ba3"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/5.json",
+        "sha256": "eec7fc909804668dbe70580a5c5d95bb44569dde42d8b09971d8823cf5c3f93e"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/6.json",
+        "sha256": "b55e64598a36710c448efad93ed6ce9407287333862ae2a9174be627afbdffd7"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/3x3/7.json",
+        "sha256": "673ffeafb9449e3b9aac9ba9cac7ebdc3f03d684537b3d74f89ed95ea7f15670"
+      }
+    ],
+    "amoeba-columnar/4x4": [
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/0.json",
+        "sha256": "8118d33883477c5230d9d3569498329f6524663ef9e631b0f537c13a7741ad68"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/1.json",
+        "sha256": "15b59651f789337d2677b5d469a2254d2b5bfb6898cc36aaa2b456c29e051ac5"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/2.json",
+        "sha256": "cccca20ef24f7867c3cd8df6161b0930c04b8be464104ca88f27ce4c0a0056f3"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/3.json",
+        "sha256": "e0be4d4660254a20d7ac283c7fcbdfc13bb601e134d3a45aad6e30aaabddba63"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/4.json",
+        "sha256": "2788873de7a886194088f2c6623e5e10a55f3b9731dc7462836884a8b3413593"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/5.json",
+        "sha256": "b4d84ffe48ac72c21426dd0f8a6b065e2dbbbd7dcda4b4db343a73f1a3ecb0f9"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/6.json",
+        "sha256": "ca41cb1c40c517f79ed1400ebbe4813a552157cc88996dc3f1d31cb061bcf331"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/4x4/7.json",
+        "sha256": "d554525bb668cbf275c20ac0c355960b439c24b074ea61a9c46d8718b141f902"
+      }
+    ],
+    "amoeba-columnar/5x5": [
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/0.json",
+        "sha256": "4e25f4407a6df6ca29ce856effcef88c213f67d527086f9a566edce32458b8cb"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/1.json",
+        "sha256": "b704b28be9d438202ed6d14567c822573cf9f2339ce375e12810bded8c5565b0"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/2.json",
+        "sha256": "28af45729cbe1af4c70c322a390597b1902e0aaaf313e2dd79aea242bd2a5f24"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/3.json",
+        "sha256": "b108692963c9dd07158f4d35f1302124d5efda004660dc91808dce45a9f8d943"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/4.json",
+        "sha256": "4a8a96b660b57666ec8debc59262cf4dca129b6b8d4760a066ad6a1dde89d77e"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/5.json",
+        "sha256": "6ea1a1929a7d2c12479c770c084f8da3dfe10a67a9225c8dc5555bda787bd206"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/6.json",
+        "sha256": "4f409c0078a0b68d5bc4730a6c332522b7aaf9a0253be8d0237ba19766215eef"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/5x5/7.json",
+        "sha256": "6ea55a26570f20d2e411c3bc0a4e344e8b36fc5c9e53111c20af87d9625ab503"
+      }
+    ],
+    "amoeba-columnar/7x7": [
+      {
+        "file": "assets/cuts/amoeba-columnar/7x7/0.json",
+        "sha256": "34d1017f632d1d0362501d6506255c6ff20808e713b9dd265a4eab882d2f50c5"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/7x7/1.json",
+        "sha256": "3e3638a158d6cf74b6d2551799caac3fdcc17596399283b28a7c8c500835dbc7"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/7x7/2.json",
+        "sha256": "516b4977afb1c9e2548e0ae0fc21a713c77ff6455d57de34744eae127805423b"
+      },
+      {
+        "file": "assets/cuts/amoeba-columnar/7x7/3.json",
+        "sha256": "6dc557a5bd182aab65915cc10e12619306b4572974c1363fe6e6ca9c4e281646"
+      }
+    ],
+    "amoeba-coral/3x3": [
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/0.json",
+        "sha256": "177d2ee7e2348c7b68caf10da31e8e75b6ef840cab5454f0f324785754d18aa8"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/1.json",
+        "sha256": "1293b95624a0c7ec7a637f416d34a96e59e6968b41437661432b66a6b9564d00"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/2.json",
+        "sha256": "1bd6ac7f65f845aa3cf9a14636bfab738cf1ee3f0700af0e095865f26d55248a"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/3.json",
+        "sha256": "f96931d1113e0f3f7bae0e29912407849c425c8c9d5b04ff82bd8e2921527416"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/4.json",
+        "sha256": "0f4efc61a5286c981900179dc44dbccc602ae3d0e0fdd702669a03829f7c0463"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/5.json",
+        "sha256": "5350e8f15b3dd6f4e7544502117b73a049a09c3748926c7a12c6fc17ef3606b0"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/6.json",
+        "sha256": "a9a4755148d5c6a4fb28d518b75d6e524de8ec6c477aac981a7b5c07560d3d93"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/3x3/7.json",
+        "sha256": "b9a4581e6bd8f118eb2776d7332c0edb2be90be1f37da06bd0dd248b5a7da304"
+      }
+    ],
+    "amoeba-coral/4x4": [
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/0.json",
+        "sha256": "37f657cba9313a23bd8b428bb59527b146efe0a7dd14e9755fdc4d8d2df7f358"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/1.json",
+        "sha256": "590b7963fcb38cdba6d6cb869bdb66667be6485ab4698403e9d68259e27047e1"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/2.json",
+        "sha256": "432f493fdc0f1280d31d89a32c62bd871b4705b6207cb536db7ee9b73bf471ef"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/3.json",
+        "sha256": "568b367f8629ac00aa9f70e4bb5856c50190992fa1cbf7902f159eb367e0e06d"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/4.json",
+        "sha256": "542604c4d24e7b55b08ea8c937a246da74d06b175c8a994d9fafb0b7d0e7045f"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/5.json",
+        "sha256": "58d248c553f81449979d1d9813f7fc4f54bef785b7120994646133b62acdb86e"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/6.json",
+        "sha256": "a4a6e22b318554faa12c2958b4147c060181b3fff889dd07e7884bc1939d5526"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/4x4/7.json",
+        "sha256": "df758afa7f9f6f4c79fbf499b885223e3bfec6d74cf5f7216e125d58ee0c75c9"
+      }
+    ],
+    "amoeba-coral/5x5": [
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/0.json",
+        "sha256": "6d5122bb146abb68ee625fad93db0d151753d616274ac0962b374fa2c4e66aef"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/1.json",
+        "sha256": "cd4afa468560517540b80c40378ee7043628436470af9a11da5aab28f4db009e"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/2.json",
+        "sha256": "22bf99c9823530bc9a542f2a68a7e7e5501bfa44e41a30cadc2a093432ca7297"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/3.json",
+        "sha256": "66250a50e7b241e6ed8dc8a26bb7b31afefe0aded5168c15c97a2e043c3fc1ff"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/4.json",
+        "sha256": "908193dc35831c0c2e8753eb63aed192b3a0bdd880f4e026755e621a67997379"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/5.json",
+        "sha256": "7fd25bfa69116fa6d65e33c1ce64ba52cf6f8614ca1b7b35417915fe236803cf"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/6.json",
+        "sha256": "f5221b923a79d9aa3b8287a3f55131b20f17d7ed77758c3b7a14fdb1c86d3128"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/5x5/7.json",
+        "sha256": "a71c7e79f38ce9394af8f5b6d696aa3ed73f46a5afee16c0044e646e6c132c18"
+      }
+    ],
+    "amoeba-coral/7x7": [
+      {
+        "file": "assets/cuts/amoeba-coral/7x7/0.json",
+        "sha256": "a190f992ec79ed693530a44e4d9a192833ed436e3cae0fdac1813332bc495bea"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/7x7/1.json",
+        "sha256": "e5f0f92d4868e73e4ff42e1f66b794aa86b330f88ebf00c03ebc14b34c19efee"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/7x7/2.json",
+        "sha256": "f6ae227c193f93caae192ad7c3caacf15d058e0f1f840d2cd84a549880c53ec2"
+      },
+      {
+        "file": "assets/cuts/amoeba-coral/7x7/3.json",
+        "sha256": "2a12ad1867375746eb8202c5ddbc31897472e7add93742a352c76173e655e3f7"
+      }
+    ],
+    "crystal-four/3x3": [
+      {
+        "file": "assets/cuts/crystal-four/3x3/0.json",
+        "sha256": "e5004077901e6470f7d170fab6dce703f0d52e2d1ec621b65fca4438ce53e849"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/1.json",
+        "sha256": "e9f849b3b34bd24d1437374fd87c1cbfd6cf96448eb9f528e628a024c76204ad"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/2.json",
+        "sha256": "3400b20042204722b61376d4ad57cd476d1eddb2877997eec6e924a44dbd982f"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/3.json",
+        "sha256": "73ebf5f7b22b78d7f846891831ab44461ac8e76143c94c243c568e990b0948da"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/4.json",
+        "sha256": "bf097b9da500a25529f4a012a04fa4efebe00240a735e1135c719745fe0e13e5"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/5.json",
+        "sha256": "a15546f59fe4162b17f8ddc4ee835bdc43ddeab620e6cbda4569b3fa6f40fae3"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/6.json",
+        "sha256": "dbed669867788b1f4c8a74d57af46ccf2152aa47c3111e6f23c9b9a5e14da65d"
+      },
+      {
+        "file": "assets/cuts/crystal-four/3x3/7.json",
+        "sha256": "2c51977c53bd3048976caec87656349bca744d2fd439eafc1aabc55cbae20397"
+      }
+    ],
+    "crystal-four/4x4": [
+      {
+        "file": "assets/cuts/crystal-four/4x4/0.json",
+        "sha256": "bf30f2575fb76c99e42d6c3ae9e10166348cdd829ed3d044819a6f021e3b605f"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/1.json",
+        "sha256": "4a850e99f06abce052676755ecfd341cb53759e5d73f324756eed93b965e70c1"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/2.json",
+        "sha256": "240033e3dbb6b7c34d774208d0ecab8f924418bf74624875ad64fb89f735c892"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/3.json",
+        "sha256": "70d255d4d496e5ec8b6da39fe8559ab055f440a7ef7f2e76d0dc130c29406840"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/4.json",
+        "sha256": "e7f8f2dd24b7e67ebb30fcf954806e5077a99bebe855eefe2f5ca333903b717e"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/5.json",
+        "sha256": "808ad44a6b10be161e89516f8b1e3d9d4e021fa0d4dca8f42221c63eed77cf19"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/6.json",
+        "sha256": "9c04ab647e99e439d08c67271441a379d42e3a80885102efb9e4e0ddf3ebd52c"
+      },
+      {
+        "file": "assets/cuts/crystal-four/4x4/7.json",
+        "sha256": "a09778cc19556715b7f56fbdb77c7a376312e4620a2d94dfbc948606a45fac43"
+      }
+    ],
+    "crystal-four/5x5": [
+      {
+        "file": "assets/cuts/crystal-four/5x5/0.json",
+        "sha256": "161e54be02b03cdf2b0909f17682bfce760603778496d002442706f6a259140b"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/1.json",
+        "sha256": "4f4ad4741b23211a8d0fc704644e07319e123a9530a790a39eb639088d370331"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/2.json",
+        "sha256": "e2f046b9e6aba30bccacb9cfabc1373f6d9805e13dbf517d440cdb505e605c4a"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/3.json",
+        "sha256": "3068f008ed29d405e5f46fe77cd7bcc3c179b7c436ef407f6b0b1567df1aec66"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/4.json",
+        "sha256": "9fccf1ccef65ae73bcf1dd6e5479986b23346630b9ae9138166677f0a8e9edbe"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/5.json",
+        "sha256": "87a5c7d9b3477f4c02cbdf1a7b421361dfea8ba2a96f3baa52087cbb130e0e5a"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/6.json",
+        "sha256": "51da51cef718bb49396f33f09e289ba5d9f9e16fad61ceed5176f262eb1e8ab5"
+      },
+      {
+        "file": "assets/cuts/crystal-four/5x5/7.json",
+        "sha256": "9d79aa05e7bd8317c048aca8783921bd570b860dee19831c2a4f7b19c6c4ed29"
+      }
+    ],
+    "crystal-four/7x7": [
+      {
+        "file": "assets/cuts/crystal-four/7x7/0.json",
+        "sha256": "0ae5b67e25292eb8d46e1345da791169528af5c6cffb50586c86336a11c85519"
+      },
+      {
+        "file": "assets/cuts/crystal-four/7x7/1.json",
+        "sha256": "e8d80904cf61881473364b125f601fa14b6108f9865432094b055095164e9c3f"
+      },
+      {
+        "file": "assets/cuts/crystal-four/7x7/2.json",
+        "sha256": "f38cca68548d0ce905ffd933629c929db31d1c61a129545aecb0281efb55556b"
+      },
+      {
+        "file": "assets/cuts/crystal-four/7x7/3.json",
+        "sha256": "70decaa76e47c29959dbf0b8c0c45ea16b8bf5fca88559f12d1815ff301f53b8"
+      }
+    ],
+    "crystal-six/3x3": [
+      {
+        "file": "assets/cuts/crystal-six/3x3/0.json",
+        "sha256": "d1873242820935147bdfcee6749b96dcbc3381df3127a08fab5a5bae2b66d3f5"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/1.json",
+        "sha256": "c9fc19b5acddc22d9917dc32cc37c24866b0d1f4c9dd230e860f9dca4811402f"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/2.json",
+        "sha256": "22ebe95f8aec60d1332c51365323c3d479e1aafa2c2f48c7a2171f25aa388606"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/3.json",
+        "sha256": "46ca8a073bf2e20f96e7cc44cb6446a25da3b7c4deeb6e5b14ada106eed98442"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/4.json",
+        "sha256": "9555f84d06b5fd224ba4d7459f951594026934bb04cf1629874b41472bed5586"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/5.json",
+        "sha256": "dbbd54d55e24329ac82fcb404c24fe80c9f477d7cf424a35427d4bf7f6ab4e61"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/6.json",
+        "sha256": "13b135ea729b733c591a3ad2914efa8388c5278817a235730d6bcf042c0231bf"
+      },
+      {
+        "file": "assets/cuts/crystal-six/3x3/7.json",
+        "sha256": "e729366abda826f4a69c702bd5e3396007ab613711c88648ddb6c65195cdec45"
+      }
+    ],
+    "crystal-six/4x4": [
+      {
+        "file": "assets/cuts/crystal-six/4x4/0.json",
+        "sha256": "72489c8a01ef0c9ccc78c5633f5d3da91adb2e0cf6bddb4991b6affd5fb0c995"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/1.json",
+        "sha256": "7b419a18fc22bdff156197cfa4edee16e89c118518d67b223fa6a3d64a9692c9"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/2.json",
+        "sha256": "6b29948b3388b592f12568f04135aba5e5f5d34678f174d4f9ef95d2551621e4"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/3.json",
+        "sha256": "5589efe04497ec162c974d6c842e2d937bbdac802b7481c8facb9ffd769750ae"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/4.json",
+        "sha256": "30fa166b3e038b4b8aa311056a7c164ac710a8f053f0e96e33f06d9f4f8e1231"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/5.json",
+        "sha256": "09472f67f22031ed10c7f412764492e4cbbab7f5f3b6c22b6783cd02150f9378"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/6.json",
+        "sha256": "2d3ff130f12044f52042b2b05a2b87b2b25e653e7b96041c0cdf5dbfc826178f"
+      },
+      {
+        "file": "assets/cuts/crystal-six/4x4/7.json",
+        "sha256": "c75930d63ac558040bb9cbe0dcb7febb063adb2d91e83cb1441d58a3c05fe9b5"
+      }
+    ],
+    "crystal-six/5x5": [
+      {
+        "file": "assets/cuts/crystal-six/5x5/0.json",
+        "sha256": "699f2415354a2a5b46c02ae19476e910b0e1d64e5167bd23be00b91e927a951d"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/1.json",
+        "sha256": "46bc1fb9b26e0d4297c8c07b0e7a2766115596ea17ea8fbfb286617d0db8e1ec"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/2.json",
+        "sha256": "568f916799f428603583744cf84978690c71799c3f17c891b1e4bbaaa24345dc"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/3.json",
+        "sha256": "7e0dec6afadf66c47c30aa6282e0833ddc04cf45f84078a902d5aa89a6fe2610"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/4.json",
+        "sha256": "17fb18da2f68b248b9bae073789927a12668fa360a65c1d41e8a9c76b486b7e6"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/5.json",
+        "sha256": "1f5254d3062b18aa3c0af7dcf06ab16e47a83c32224b84226db047356cc5ce11"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/6.json",
+        "sha256": "b3dc4571a6a5ee9ed5c5562bfb3353b0d6e13211dbe7591c363244be7af6428e"
+      },
+      {
+        "file": "assets/cuts/crystal-six/5x5/7.json",
+        "sha256": "b1baddc5c51b9bce4920b5c2ebe05890e6b7c296bd5f9368b7b6d19e5c178fb5"
+      }
+    ],
+    "crystal-six/7x7": [
+      {
+        "file": "assets/cuts/crystal-six/7x7/0.json",
+        "sha256": "fec28ab2d92c64cde1b291b8ce27ffd2ec03ff1b6f3eee1fc794a63db53e26db"
+      },
+      {
+        "file": "assets/cuts/crystal-six/7x7/1.json",
+        "sha256": "0a50fcb7fe179f5a56560e740879edfea4b18ddf139c7220cb55c73a631048f7"
+      },
+      {
+        "file": "assets/cuts/crystal-six/7x7/2.json",
+        "sha256": "9150d4509f3f83d3356f77d58b5dc5661d9576141187675129005ad5c1e6e0e2"
+      },
+      {
+        "file": "assets/cuts/crystal-six/7x7/3.json",
+        "sha256": "8ca0a6cd59bc37f82b003ed20212a389297772c70486dd9959997a3ca53637f1"
+      }
+    ],
+    "living-fringe/3x3": [
+      {
+        "file": "assets/cuts/living-fringe/3x3/0.json",
+        "sha256": "52cc861f50aa8def1de2c2b681e022f3702db521167d93f20565e979ef521a86"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/1.json",
+        "sha256": "42fdf0c6be19879fcb771cd64acbd005faf33ca4c4c67d7b9b1334a0e4e56130"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/2.json",
+        "sha256": "ff48105415f64291f0fc77aa50905fdb1512f1b7702ece9204fafb7d7815fa51"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/3.json",
+        "sha256": "a3f5b6471f313cca0264049e2504e5a601b21f18ce8c3b67f653a67352df778c"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/4.json",
+        "sha256": "1c8f2f176c2f5c4a1c76966a3be91df188b0f2ddbafefef9088fc9f523fdefd1"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/5.json",
+        "sha256": "040b3a488dbd4097ec00cc4d1c55fc890fa9d6b6243fd29815130297550acbc7"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/6.json",
+        "sha256": "edb94f89c42a873806d2ee4d22b0c9dd0ddf13681ad630acf4cae31a03234408"
+      },
+      {
+        "file": "assets/cuts/living-fringe/3x3/7.json",
+        "sha256": "d43daa4a1cb45b98e3ea8e68164014e416b41d37bb0dc7ff1490838cba62ac36"
+      }
+    ],
+    "living-fringe/4x4": [
+      {
+        "file": "assets/cuts/living-fringe/4x4/0.json",
+        "sha256": "83fba5c49e41608486b4a123c53317aad64db09935cf7a8dbd0617e65e50f530"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/1.json",
+        "sha256": "fc1cd96339878f94103a727bac76cceb81d38c6e5f48f05b07ffa3c8555d5c30"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/2.json",
+        "sha256": "2127cc5e1b4b981a79ffa15921b797521af8d0cc7455c9d850a234871c95ce6d"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/3.json",
+        "sha256": "c1b388b3f7e608594587490607658006ab659c99a4a42eb76371b78a853f6261"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/4.json",
+        "sha256": "d60de363a7a876db23db2accd537b403377ed0def9ab9ce9aef8473e99cf9dc8"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/5.json",
+        "sha256": "ddbe3e2c850e5a0b7ebe7c6d390283b3f34debfcbc3587f65c9dd545742b5e4f"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/6.json",
+        "sha256": "65c5549f5b332257fbb127259ca38b45cb6520a9b71579a6120b90c5186ab301"
+      },
+      {
+        "file": "assets/cuts/living-fringe/4x4/7.json",
+        "sha256": "d4edfdd0c7875a759d6ee1fb4c2df6c63f9e5861a107c31ab49fe0ae637842f1"
+      }
+    ],
+    "living-fringe/5x5": [
+      {
+        "file": "assets/cuts/living-fringe/5x5/0.json",
+        "sha256": "5243a792e95ce38572458478e5659d6c2089c5ffb8690d76516ec822832a9c5f"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/1.json",
+        "sha256": "34b81239290fe7de61e6d95c5c736fd023af607777636641230fec48c2bb6190"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/2.json",
+        "sha256": "44584b32bb578d37c9b80376e35e91cf0a11b135b53abc5a7ee81a9488c6c00c"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/3.json",
+        "sha256": "826695804ee67b54cab5c6346793afea3ec4475c0dd019264dd2dbb347ecf5d6"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/4.json",
+        "sha256": "fd76b3d8a56cba4f497a226a2c4a97f10f9f66705458c27c4e68473b1c4fdd82"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/5.json",
+        "sha256": "e981fbaba6766b4f474498d29b2c7cce4e4315ec6f0de12c661a781a53b6b303"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/6.json",
+        "sha256": "f784174669b33512b31187e54dd3af8fab363ecc6f1374ae961195fcca2c0ea3"
+      },
+      {
+        "file": "assets/cuts/living-fringe/5x5/7.json",
+        "sha256": "93fa9b5003019212a55a85d7c68e241b7f37f2a04390d87e78edcc9b67475cb6"
+      }
+    ],
+    "living-fringe/7x7": [
+      {
+        "file": "assets/cuts/living-fringe/7x7/0.json",
+        "sha256": "067e8fc591966a43b2a9000c6f636d8f929f50e2dddd1573ee9d28b1e2fcd4b2"
+      },
+      {
+        "file": "assets/cuts/living-fringe/7x7/1.json",
+        "sha256": "bf4c0bd27d0ac8b952f3839597fc59283e269121973f73ca35f58cfd510ce635"
+      },
+      {
+        "file": "assets/cuts/living-fringe/7x7/2.json",
+        "sha256": "29db6ee7cd38d06d8d6abb722b304775c928ab6f97acb43a90973402787cc627"
+      },
+      {
+        "file": "assets/cuts/living-fringe/7x7/3.json",
+        "sha256": "3d76c0871bb0f3eac72e957b016463ae8576c20f160dc77e2fbedccbb32db27c"
+      }
+    ],
+    "living-spectrum/3x3": [
+      {
+        "file": "assets/cuts/living-spectrum/3x3/0.json",
+        "sha256": "5961ab8077b813b987145e71d7aa63736c245400d14037d85b0b97edfc993a65"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/1.json",
+        "sha256": "7a989a6f71b7ea71b63b2078b9b731528487835219eb25e6135cc00655ebef42"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/2.json",
+        "sha256": "53bee1b5db7749473a1be76dcd3c4caa5bca16a71023da4d219e5fa5d0f6afaf"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/3.json",
+        "sha256": "322b5776c8faf2addd431e08beca8bca6d3841fa1f9d61bb57e5b3a0f82e9082"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/4.json",
+        "sha256": "27a3281ffd3c3b2dfc92e24940f4834355eec398c86513cd75b7b433bd58d44d"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/5.json",
+        "sha256": "882ae6bd3b41d9f2c92b996281923cbea97d6536aad1b31faaa095afe501dec9"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/6.json",
+        "sha256": "1b4b23b5bd661f7993ced400098914fb0037e2d320185eca9e55040d6f111428"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/3x3/7.json",
+        "sha256": "029ed63df5b4c7b8983eea792ed831c9e4788ce744c6aabe8087492f2d8d29ab"
+      }
+    ],
+    "living-spectrum/4x4": [
+      {
+        "file": "assets/cuts/living-spectrum/4x4/0.json",
+        "sha256": "e05b2a80401cce3abba994a42a08884273c06b111c839ee4405dffc57681ccf4"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/1.json",
+        "sha256": "ac2b74386295e734eb737c244cb2c26dceec782b87f998187486cbf48ea4c908"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/2.json",
+        "sha256": "4cfe7bf137dbe6125fcaedee7cce58ffad58968a5ff81e615fa5a3a93905b2b2"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/3.json",
+        "sha256": "12274b25a5b179bca3b978d9151932df4ea95a01f79afdb334d270b0fec31f93"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/4.json",
+        "sha256": "acbc0b60963d8c479374ecd99c3f2301e39c1dc579cd92ed04bb3b2b192eb65a"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/5.json",
+        "sha256": "4d72db8c6fbc62b89ef98fb0abf59e43fdc259395aee4b98c01095a30dd23ec4"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/6.json",
+        "sha256": "76b04303655d0c7a59b67cdfe00bbb76a1068e7807558005881d96b3a26d45bd"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/4x4/7.json",
+        "sha256": "a5ea4da3253443fcb40b1db26b3fa66ebefc9951b23ee427164c86c95ef62ff6"
+      }
+    ],
+    "living-spectrum/5x5": [
+      {
+        "file": "assets/cuts/living-spectrum/5x5/0.json",
+        "sha256": "85d466853a878284d8897c9f9c8cfc5663a2595702ad398ebdbcef3b29173582"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/1.json",
+        "sha256": "4a8a856bd6bc8579b09b74ffe3b8d693ba15a6176632a942743e978446957589"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/2.json",
+        "sha256": "43e7b4cf92ef09b119327e60de4edf80932a22756ca493c3d99a4f5a64a5707b"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/3.json",
+        "sha256": "ce49c7c2cdb7cf3a7349d25f9a8752ff58fa8fb74dd5c3beceac60dcf01dc050"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/4.json",
+        "sha256": "c04a2bf8a476ff967e9dc691eda289db4bbe7d90f58d769e9f821d5f7365985a"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/5.json",
+        "sha256": "270cb4fb4d24dd593043bc4ce065187d1fa6acb4b259ca32deb989316b192aa2"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/6.json",
+        "sha256": "2a2d6d7daee63e3ea9b325c1e898e450663145b2a132390d4e43635e674d6edc"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/5x5/7.json",
+        "sha256": "1bb8462282ba2cb3d022abd490e2480602362332fa24e804431e6e14fbc384a2"
+      }
+    ],
+    "living-spectrum/7x7": [
+      {
+        "file": "assets/cuts/living-spectrum/7x7/0.json",
+        "sha256": "4915fc890caf5106ae108c29a485b37b2a9ae021e3446931e2b9c5202d20d3f2"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/7x7/1.json",
+        "sha256": "6b835c2a3f09c960c42b8525492acb39200b7c5060f421cabb1bbfdcf560eafd"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/7x7/2.json",
+        "sha256": "4aaa57b13bd14fb667c19b7ccf97ec241b8c7c420bf25f485579252b38d5ca98"
+      },
+      {
+        "file": "assets/cuts/living-spectrum/7x7/3.json",
+        "sha256": "bf0260ea4e3979115e4c9ec7d70c70cb64c0944afe955b6ced4783b1267dbe2b"
+      }
+    ]
+  }
+}

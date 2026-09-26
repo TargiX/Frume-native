@@ -19,6 +19,12 @@
       }
     ]
   },
+  "r2_buckets": [
+    {
+      "binding": "CUTS",
+      "bucket_name": "frume-cuts"
+    }
+  ],
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },

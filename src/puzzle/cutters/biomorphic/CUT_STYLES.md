@@ -6,8 +6,9 @@ measured or re-try what was already ruled out.
 
 ## The constraint that shapes everything
 
-A cut cannot be generated on the device. Measured on a laptop, so a phone is
-three to ten times slower again:
+Cuts are baked offline. The following historical laptop measurements used
+earlier profiles/resolutions; they are not phone benchmarks or timings for
+the 100/196-piece batch:
 
 | grid | Living | Amoeba |
 | --- | --- | --- |
@@ -28,10 +29,10 @@ need to be stored: keep the point sequence, rebuild the curve on load. With
 | 4×4 | 112 KB | 6 KB |
 | 5×5 | 190 KB | 12 KB |
 
-One style across three grids with 24 seeds is about 530 KB. Six styles fit in
-roughly 3 MB, which is a bundle, not a download. Bake time is the only real
-budget: a few hundred cuts at about a minute each, parallel across cores, is
-an hour of offline work.
+Those earlier storage measurements describe small grids. The actual cost of
+a new batch should be measured from its JSON files; compression and decoded
+memory are different quantities. Full-resolution large boards take much
+longer to simulate than the small-grid timing table suggests.
 
 ## What makes two styles actually different
 
@@ -61,8 +62,64 @@ will likely not read as two styles.
 
 ## Shipping now
 
-Nothing is committed to yet; the candidate set is being looked at. Written here
-so the decision, once made, has somewhere to live.
+The installed library contains Living, Living spectrum, Crystal, Crystal
+quartered, Amoeba, and Amoeba columnar. `cutStyles.ts` defines their recipes;
+`bakedLibrary.generated.ts` defines the assets actually loaded by the product.
+The older timing and spectrum measurements above describe those earlier
+profiles and resolutions, not the experiments below.
+
+The product direction is to preserve these complex families, particularly
+Living's fine fringe, and expand their independent variants and piece counts.
+The broad-lobed experimental recipes below are separate research controls;
+their acceptance rate is not a reason to replace the existing styles.
+
+Current catalog 2 contains 192 cuts: each of the six styles has eight variants
+at 9, 16, and 25 pieces, four at 49, and two independent variants at both 100
+and 196. The new 24 cuts use the original 96-sample recipes. Catalog 2 also
+selects 20 locally corrected small-grid cuts; 148 old files are shared unchanged.
+The original 168-cut catalog remains frozen for historical saved descriptors.
+
+The 26 September installed-library audit checked all 168 cuts and supported
+rotations. Validation found no crossing or partition error, including a
+ten-times-finer check of nine cuts with very small measured gaps. Thin
+regions, acute junctions and area outliers are separate review findings.
+The experimental 6% thickness target flagged almost every existing cut; it is
+not a calibrated product requirement for these complex styles. The library
+baker therefore preserves the original geometry, blocks invalid partitions,
+and emits a quality review report. Local correction of extreme defects must
+preserve the surrounding fringe and be compared against the original.
+
+## Experimental organic and rounded recipes (2026-09-26)
+
+`cutRecipes.ts` defines `organic-v1` and `rounded-v1` with lengths relative to
+one piece. The reference solve uses 48 samples per piece, dx 0.012, and dt
+0.00003. Refining the resolution preserves physical piece size and simulated
+duration; it does not establish convergence of the raster solver. Both members
+of the paired 3x3 experiment at 48 and 96 samples pass the final validator;
+that single pair is not convergence evidence.
+
+Both recipes are available as candidate presets in the lab. The lab shows the
+growth simulation. The offline study additionally performs bounded local seam
+repair, encoding/decoding, and acceptance checks. Its accepted payloads are
+separate from the installed product library.
+
+`auditCut.ts` now checks final curve contacts, retracing, ownership, contour and
+frame integrity, narrow regions, acute junctions, and area outliers. The gap
+test works on adaptive line segments; its error budget is explicit. The area
+sum is only a consistency check. `prepareBakedCut.ts` repairs local shared
+seams within a displacement budget, then rejects unresolved geometry. The
+experimental study enforces those full thresholds. The installed-style bake
+uses partition validity and records shape findings for separate visual review.
+
+See the [offline study workflow](../../../../scripts/cuts/README.md) for the
+72-case matrix, receipts, previews, acceptance limits and catalog assembly.
+The experimental recipes do not change saved-game geometry. The separate
+complex-style migration pins `bakedLibraryVersion` in new descriptors and
+maps versionless saves to catalog 1. Session schema 4 preserves the version
+while reading schemas 1–3. New plays receive random seeds; restore and resize
+keep the saved seed and catalog. Future pool changes require another immutable
+catalog version. Rotations are orientations of existing cuts, not additional
+independent geometries. None of these checks establish physical-device QA.
 
 ## Candidates for later
 

@@ -3,6 +3,7 @@ import {
   type BiomorphicPhaseFieldLabSettings,
   type BiomorphicPhaseFieldStyle,
 } from "../../puzzle/cutters/biomorphic/phaseFieldLabConfig";
+import { resolveCutRecipe, type CutRecipeId } from "../../puzzle/cutters/biomorphic/cutRecipes";
 
 export type PhaseFieldLabBuiltIn = {
   id: string;
@@ -23,6 +24,13 @@ function build(
   settings.name = name;
   patch(settings);
   return { id, name, summary, settings };
+}
+
+function candidate(id: CutRecipeId, name: string, summary: string): PhaseFieldLabBuiltIn {
+  return {
+    id, name, summary,
+    settings: { ...resolveCutRecipe(id, 5, 5, 'cut-study-00'), name, captureEvery: 100, frameDurationMs: 100 },
+  };
 }
 
 /**
@@ -161,5 +169,13 @@ export const PHASE_FIELD_LAB_BUILT_INS: readonly PhaseFieldLabBuiltIn[] = [
         jitter: 0.55,
       };
     },
+  ),
+  candidate(
+    'organic-v1', 'Organic · candidate',
+    'Broad interlocking lobes. Experimental growth recipe; final cuts pass the offline repair and acceptance gate.',
+  ),
+  candidate(
+    'rounded-v1', 'Rounded · candidate',
+    'Soft, sparse lobes on the same starting sites as Organic. Experimental growth recipe.',
   ),
 ];

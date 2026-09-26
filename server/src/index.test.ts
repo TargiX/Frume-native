@@ -905,3 +905,93 @@ describe('browse and select a photograph', () => {
     expect((await fetchWorker('/photo?id=seeded_photo')).status).toBe(400);
   });
 });
+
+describe('baked cut payloads', () => {
+  const KEY = 'cuts-v2/living-fringe/10x10/0.json';
+  const BODY = '{"rows":10,"columns":10}';
+
+  it('serves a stored cut with an immutable cache policy', async () => {
+    await testEnv.CUTS!.put(KEY, BODY);
+    const response = await worker.fetch(
+      new Request(`https://frume.test/cuts/${KEY}`),
+      testEnv,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(BODY);
+    expect(response.headers.get('Cache-Control')).toBe(
+      'public, max-age=31536000, immutable',
+    );
+    expect(response.headers.get('Content-Type')).toBe('application/json');
+  });
+
+  it('applies the requesting origin after serving a shared cached payload', async () => {
+    const key = 'cuts-v2/living-fringe/10x10/98.json';
+    await testEnv.CUTS!.put(key, BODY);
+    const envWithOrigins = {
+      ...testEnv,
+      ALLOWED_ORIGINS: 'https://first.example,https://second.example',
+    } as Env;
+
+    const first = await worker.fetch(
+      new Request(`https://frume.test/cuts/${key}`, {
+        headers: { Origin: 'https://first.example' },
+      }),
+      envWithOrigins,
+    );
+    const second = await worker.fetch(
+      new Request(`https://frume.test/cuts/${key}`, {
+        headers: { Origin: 'https://second.example' },
+      }),
+      envWithOrigins,
+    );
+
+    expect(first.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://first.example',
+    );
+    expect(second.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://second.example',
+    );
+    expect(second.headers.get('Vary')).toBe('Origin');
+  });
+
+  it('answers a missing cut with 404 rather than an error', async () => {
+    const response = await worker.fetch(
+      new Request('https://frume.test/cuts/cuts-v2/amoeba-coral/14x14/9.json'),
+      testEnv,
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it('refuses keys outside the catalog layout', async () => {
+    await testEnv.CUTS!.put('secret.json', BODY);
+    for (const path of [
+      '/cuts/secret.json',
+      '/cuts/cuts-v2/../secret.json',
+      '/cuts/cuts-v2/Living/10x10/0.json',
+      '/cuts/cuts-v2/living-fringe/10x10/0.txt',
+    ]) {
+      const response = await worker.fetch(
+        new Request(`https://frume.test${path}`),
+        testEnv,
+      );
+      expect(response.status, path).toBe(404);
+    }
+  });
+
+  it('does not accept writes', async () => {
+    const response = await worker.fetch(
+      new Request(`https://frume.test/cuts/${KEY}`, { method: 'PUT', body: BODY }),
+      testEnv,
+    );
+    expect(response.status).toBe(405);
+  });
+
+  it('keeps serving cuts while the photo service is switched off', async () => {
+    await testEnv.CUTS!.put(KEY, BODY);
+    const response = await worker.fetch(
+      new Request(`https://frume.test/cuts/${KEY}`),
+      { ...testEnv, PHOTO_API_DISABLED: '1' } as Env,
+    );
+    expect(response.status).toBe(200);
+  });
+});

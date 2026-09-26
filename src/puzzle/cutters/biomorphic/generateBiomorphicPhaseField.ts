@@ -687,6 +687,7 @@ function createPhaseTopologyProjector(
   const pixelCount = width * height;
   const labels = new Int16Array(pixelCount);
   const strongest = new Float32Array(pixelCount);
+  const fieldOwners = new Int16Array(pixelCount);
   const componentIds = new Int32Array(pixelCount);
   const repaired = new Int16Array(pixelCount);
   const queue = new Int32Array(pixelCount);
@@ -718,6 +719,11 @@ function createPhaseTopologyProjector(
         }
       }
     }
+    // Keep the exact argmax before the seed anchors override labels. Repair
+    // below writes only the current pixel, so ownership at every later pixel
+    // still equals this snapshot. Re-scanning all phases per pixel was both
+    // redundant and expensive on large boards (strided reads across fields).
+    fieldOwners.set(labels);
 
     // Every physical piece keeps its original seed as an immutable topology
     // anchor. The phase may deform around it, but cannot vanish or be replaced
@@ -837,19 +843,9 @@ function createPhaseTopologyProjector(
     let changed = 0;
     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
       const repairedOwner = repaired[pixel];
-      // `labels` contains the forced seed anchors used by the topology solve.
-      // At an anchor its label can therefore differ from the actual strongest
-      // phase field. Compare against the fields themselves; otherwise the
-      // projector reports a connected partition but the next argmax brings
-      // the detached pre-anchor island straight back.
-      let previousOwner = 0;
-      let previousMaximum = -Infinity;
-      for (let phaseIndex = 0; phaseIndex < phaseCount; phaseIndex += 1) {
-        if (phis[phaseIndex][pixel] > previousMaximum) {
-          previousMaximum = phis[phaseIndex][pixel];
-          previousOwner = phaseIndex;
-        }
-      }
+      // Use field ownership, not the forced anchor labels. Preserve the old
+      // zero-owner fallback if no field beats -Infinity.
+      const previousOwner = fieldOwners[pixel] < 0 ? 0 : fieldOwners[pixel];
       if (previousOwner === repairedOwner) continue;
       changed += 1;
       let competingMaximum = 0;
@@ -1219,6 +1215,29 @@ function simulatePhaseField(
       downPixels[pixel] = y + 1 < height ? pixel + width : pixel;
     }
   }
+  // The 5-point Laplacian is anisotropic at the scale of the interface: a
+  // front one cell thick grows fastest along the grid axes, so fingers come out
+  // aligned to the lattice instead of wherever the seam points. The 9-point
+  // (Mehrstellen) stencil cancels that leading error term. Its stiffest mode is
+  // 16/3 over dx^2 against the 5-point 8, so the time step stays stable.
+  const isotropic = numerics.isotropicStencil === true;
+  const isotropicLaplacian = (field: Float32Array, pixel: number) => {
+    const left = leftPixels[pixel];
+    const right = rightPixels[pixel];
+    return (
+      (4 *
+        (field[left] +
+          field[right] +
+          field[upPixels[pixel]] +
+          field[downPixels[pixel]]) +
+        field[upPixels[left]] +
+        field[upPixels[right]] +
+        field[downPixels[left]] +
+        field[downPixels[right]] -
+        20 * field[pixel]) /
+      6
+    );
+  };
 
   // Free melt around the board: the border pieces have nothing to push against
   // there, so they grow outward into it and the puzzle's own outer edge ends up
@@ -1760,13 +1779,14 @@ function simulatePhaseField(
         for (let x = minX; x <= maxX; x += 1) {
           const pixel = rowOffset + x;
           const value = phi[pixel];
-          const laplacian =
-            (phi[leftPixels[pixel]] +
-              phi[rightPixels[pixel]] +
-              phi[upPixels[pixel]] +
-              phi[downPixels[pixel]] -
-              4 * value) *
-            invdx2;
+          const laplacian = isotropic
+            ? isotropicLaplacian(phi, pixel) * invdx2
+            : (phi[leftPixels[pixel]] +
+                phi[rightPixels[pixel]] +
+                phi[upPixels[pixel]] +
+                phi[downPixels[pixel]] -
+                4 * value) *
+              invdx2;
           let next = value;
           if (value > 0 || laplacian !== 0) {
             // Steinbach's pairwise potential folded into shared sums. Our
@@ -1938,13 +1958,14 @@ function simulatePhaseField(
           // a permanent maximum growth force along the whole perimeter --
           // invisible over a few hundred steps, fatal to the border pieces over
           // tens of thousands.
-          const laplacian =
-            (temperature[leftPixels[pixel]] +
-              temperature[rightPixels[pixel]] +
-              temperature[upPixels[pixel]] +
-              temperature[downPixels[pixel]] -
-              4 * temperature[pixel]) *
-            invdx2;
+          const laplacian = isotropic
+            ? isotropicLaplacian(temperature, pixel) * invdx2
+            : (temperature[leftPixels[pixel]] +
+                temperature[rightPixels[pixel]] +
+                temperature[upPixels[pixel]] +
+                temperature[downPixels[pixel]] -
+                4 * temperature[pixel]) *
+              invdx2;
           let relax = 0;
           if (bathCoupling > 0) {
             // The bath follows the CURRENT front, not the starting cell: this
@@ -3459,6 +3480,7 @@ export function createBiomorphicPhaseFieldTopology(
    */
   profile?: BiomorphicPhaseFieldProfile,
   numerics: BiomorphicPhaseFieldNumerics = BIOMORPHIC_PHASE_FIELD_NUMERICS,
+  observeExtraction?: (attempt: { smoothingPasses: number; safe: boolean; error?: string }) => void,
 ): BiomorphicTopology {
   assertDimensions(rows, columns);
   const simulation = simulatePhaseField(
@@ -3478,9 +3500,12 @@ export function createBiomorphicPhaseFieldTopology(
         simulation,
         smoothingPasses,
       );
-      if (isBiomorphicTopologySafe(topology)) return topology;
+      const safe = isBiomorphicTopologySafe(topology);
+      observeExtraction?.({ smoothingPasses, safe });
+      if (safe) return topology;
     } catch (error) {
       lastError = error;
+      observeExtraction?.({ smoothingPasses, safe: false, error: error instanceof Error ? error.message : String(error) });
     }
   }
 

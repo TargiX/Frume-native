@@ -6,7 +6,11 @@ import type {
   PuzzleImageSource,
   PuzzleLayout,
 } from '../../types/layout';
-import { biomorphicPiecesFrom } from './bakedCutSource';
+import {
+  bakedLibraryDescriptorFields,
+  biomorphicPiecesFrom,
+  ensureBakedCut,
+} from './bakedCutSource';
 import type { CutStyleId } from './cutStyles';
 import { canonicalizeBiomorphicSeed } from './generateBiomorphic';
 import {
@@ -87,6 +91,7 @@ export function createPhaseFieldCutter({
     return {
       cutterId,
       version,
+      ...bakedLibraryDescriptorFields(),
       seed: canonicalizeBiomorphicSeed(sourceSeed),
       rows,
       columns,
@@ -102,6 +107,13 @@ export function createPhaseFieldCutter({
     ): Promise<PuzzleLayout> {
       const cutDescriptor = descriptorFromOptions(image, options);
       const { width, height } = resolveBoardSize(image, options);
+      await ensureBakedCut(
+        styleId,
+        cutDescriptor.rows,
+        cutDescriptor.columns,
+        cutDescriptor.seed,
+        cutDescriptor.bakedLibraryVersion,
+      );
 
       return {
         cutterId,
@@ -128,6 +140,7 @@ export function createPhaseFieldCutter({
               cutDescriptor.seed,
               base,
             ),
+          cutDescriptor.bakedLibraryVersion,
         ),
       };
     },
