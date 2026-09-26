@@ -6,8 +6,9 @@ import {
 } from './puzzleMenuPresentation';
 
 describe('puzzle menu presentation', () => {
-  it('anchors the trigger to the same side as the landscape sheet', () => {
-    expect(puzzleMenuHudSide()).toBe('right');
+  it('keeps the trigger off the side shelf in landscape', () => {
+    expect(puzzleMenuHudSide('right')).toBe('left');
+    expect(puzzleMenuHudSide('bottom')).toBe('right');
   });
 
   it('keeps dismissal quicker than presentation', () => {

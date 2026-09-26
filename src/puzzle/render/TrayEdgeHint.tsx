@@ -11,6 +11,8 @@ type TrayEdgeHintProps = {
   /** Edge of the remaining pieces, in tray-content space. */
   edge: number;
   trayScroll: SharedValue<number>;
+  /** Leading edge of the shelf's visible window in tray-content space. */
+  viewportStart: number;
   viewportExtent: number;
   crossExtent: number;
   /** Chevron ink, matched to the tray material it floats over. */
@@ -28,12 +30,13 @@ export function TrayEdgeHint({
   side,
   edge,
   trayScroll,
+  viewportStart,
   viewportExtent,
   crossExtent,
   color,
 }: TrayEdgeHintProps) {
   const animatedStyle = useAnimatedStyle(() => {
-    const windowLeft = -trayScroll.value;
+    const windowLeft = viewportStart - trayScroll.value;
     const overflow =
       side === 'left' || side === 'top'
         ? windowLeft - edge

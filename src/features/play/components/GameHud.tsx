@@ -22,6 +22,8 @@ type GameHudProps = {
   activeElapsedMs: number;
   activeStartedAt: number | null;
   onOpenMenu: () => void;
+  /** Side the shelf sits on — the HUD keeps to the opposite edge. */
+  trayPlacement: 'bottom' | 'right';
 };
 
 export function GameHud({
@@ -30,12 +32,13 @@ export function GameHud({
   activeElapsedMs,
   activeStartedAt,
   onOpenMenu,
+  trayPlacement,
 }: GameHudProps) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [now, setNow] = useState(Date.now());
   const landscape = width > height;
-  const hudSide = puzzleMenuHudSide();
+  const hudSide = landscape ? puzzleMenuHudSide(trayPlacement) : 'right';
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1_000);
@@ -53,12 +56,13 @@ export function GameHud({
         landscape
           ? {
               top: insets.top + spacing.sm,
-              [hudSide]: insets.right + spacing.md,
+              [hudSide]:
+                (hudSide === 'left' ? insets.left : insets.right) + spacing.md,
             }
           : {
               top: insets.top + spacing.sm,
               right: insets.right + spacing.md,
-            },
+            }
       ]}
       pointerEvents="box-none"
     >

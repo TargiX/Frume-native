@@ -29,6 +29,13 @@ export const MIN_TRAY_WIDTH = 76;
 /** Share of a landscape play surface given to the side tray. */
 export const TRAY_WIDTH_RATIO = 0.15;
 /**
+ * A lane never grows past this, however wide the board gets. The lane share is
+ * a fraction of the board, so on a tablet it ballooned far past what a piece
+ * needs — a quarter of an iPad was shelf. Capping the lane gives that width
+ * back to the puzzle itself.
+ */
+export const MAX_TRAY_LANE_EXTENT = 140;
+/**
  * Table left between the board and the tray shelf. Matches the inset the table
  * keeps around the surface (TABLE_INSET), so the tray is framed on every side
  * instead of butting straight up against the board.
@@ -112,24 +119,25 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
 
   // A bottom shelf the layout made deep enough for extra rows is dealt into
   // them; otherwise the piece count alone decides, as it always has.
-  const fittedRowHeight = Math.max(
-    MIN_TRAY_HEIGHT,
-    (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
+  const fittedLaneExtent = Math.min(
+    MAX_TRAY_LANE_EXTENT,
+    Math.max(
+      placement === 'right' ? MIN_TRAY_WIDTH : MIN_TRAY_HEIGHT,
+      ((placement === 'right' ? boardWidth : boardHeight) /
+        (1 - (placement === 'right' ? TRAY_WIDTH_RATIO : TRAY_HEIGHT_RATIO))) *
+        (placement === 'right' ? TRAY_WIDTH_RATIO : TRAY_HEIGHT_RATIO),
+    ),
   );
   const lanes =
     placement === 'bottom'
       ? Math.max(
           trayLanes(layout.pieces.length),
-          Math.floor((layout.trayHeight ?? 0) / fittedRowHeight + 1e-6),
+          Math.floor((layout.trayHeight ?? 0) / fittedLaneExtent + 1e-6),
         )
       : trayLanes(layout.pieces.length);
 
   if (placement === 'right') {
-    const width =
-      Math.max(
-        MIN_TRAY_WIDTH,
-        (boardWidth / (1 - TRAY_WIDTH_RATIO)) * TRAY_WIDTH_RATIO,
-      ) * trayDepth(layout.pieces.length);
+    const width = fittedLaneExtent * trayDepth(layout.pieces.length);
     const laneWidth = width / lanes;
     const height = runExtent;
     const scale = Math.min(1, (laneWidth - TRAY_PADDING * 2) / largest.width);
@@ -155,12 +163,9 @@ export function getTrayMetrics(layout: PuzzleLayout): TrayMetrics {
   }
 
   // The layout may have handed the shelf table the board could not use; it is
-  // never shallower than the board alone would make it.
+  // never shallower than the board alone gives it.
   const height = Math.max(
-    Math.max(
-      MIN_TRAY_HEIGHT,
-      (boardHeight / (1 - TRAY_HEIGHT_RATIO)) * TRAY_HEIGHT_RATIO,
-    ) * trayDepth(layout.pieces.length),
+    fittedLaneExtent * trayDepth(layout.pieces.length),
     layout.trayHeight ?? 0,
   );
   const laneHeight = height / lanes;

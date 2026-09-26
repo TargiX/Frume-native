@@ -699,6 +699,7 @@ export function GameScreen({ navigation }: Props) {
             activeElapsedMs={state.activeElapsedMs}
             activeStartedAt={state.activeStartedAt}
             onOpenMenu={() => setMenuVisible(true)}
+            trayPlacement={playLayout.trayPlacement}
           />
         </View>
       ) : null}

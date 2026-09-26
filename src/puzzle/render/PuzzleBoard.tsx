@@ -93,7 +93,10 @@ import {
 } from './pieceOverflowMargin';
 import { shouldAnimateProgrammaticTrayExit } from './pieceVisualTransition';
 import { TrayEdgeHint } from './TrayEdgeHint';
-import { resolveTrayAutoRevealScroll } from './trayAutoReveal';
+import {
+  resolveTrayAutoRevealScroll,
+  resolveTrayScrollBounds,
+} from './trayAutoReveal';
 import { TraySurface } from './TraySurface';
 import { resolveTraySurfaceFrame } from './traySurfaceFrame';
 import { resolveBoardMaterial, resolveSurfaceInk } from './photoGlassStyle';
@@ -773,10 +776,17 @@ export function PuzzleBoard({
 
   const trayViewportExtent =
     trayPlacement === 'bottom' ? trayMetrics.width : trayMetrics.height;
-  const minScroll = trayExtent
-    ? Math.min(0, trayViewportExtent - trayExtent.max - 12)
-    : 0;
-  const maxScroll = trayExtent ? Math.max(0, -trayExtent.min + 12) : 0;
+  // The window's leading edge in tray-content space: the shelf is centred on
+  // the board but spans the whole table, so it starts before the board's
+  // origin (negative here). Scroll bounds and auto-reveal are measured from
+  // this edge, not from zero.
+  const trayViewportStart =
+    trayPlacement === 'bottom' ? trayMetrics.left : trayMetrics.top;
+  const { minScroll, maxScroll } = resolveTrayScrollBounds(
+    trayExtent,
+    trayViewportStart,
+    trayViewportExtent,
+  );
 
   const viewWidth = Math.max(workspaceWidth, viewportWidth ?? 0);
   const viewHeight = Math.max(workspaceHeight, viewportHeight ?? 0);
@@ -898,6 +908,7 @@ export function PuzzleBoard({
     const target = resolveTrayAutoRevealScroll({
       scroll,
       extent: trayExtent,
+      viewportStart: trayViewportStart,
       viewportExtent: trayViewportExtent,
       minScroll,
       maxScroll,
@@ -915,6 +926,7 @@ export function PuzzleBoard({
     trayExtent,
     trayScroll,
     trayViewportExtent,
+    trayViewportStart,
   ]);
 
   useEffect(() => {
@@ -1567,6 +1579,7 @@ export function PuzzleBoard({
                 side={trayPlacement === 'bottom' ? 'left' : 'top'}
                 edge={trayExtent.min}
                 trayScroll={trayScroll}
+                viewportStart={trayViewportStart}
                 viewportExtent={trayViewportExtent}
                 color={plateInk.trayHint}
                 crossExtent={
@@ -1579,6 +1592,7 @@ export function PuzzleBoard({
                 side={trayPlacement === 'bottom' ? 'right' : 'bottom'}
                 edge={trayExtent.max}
                 trayScroll={trayScroll}
+                viewportStart={trayViewportStart}
                 viewportExtent={trayViewportExtent}
                 color={plateInk.trayHint}
                 crossExtent={
